@@ -1,5 +1,5 @@
 local Scoring = { players = {}, settlements = {}, sequence = 0 }
-local scoreFields = { Intercept = "interceptScore", SEAD = "seadScore" }
+local scoreFields = { Intercept = "interceptScore", SEAD = "seadScore", DEAD = "deadScore" }
 
 function Scoring.NextID(category)
     -- This prototype has no disk persistence: IDs need only be unique within
@@ -14,7 +14,7 @@ function Scoring.Get(ucid, name)
     if not ucid then return nil end
     local p = Scoring.players[ucid]
     if not p then
-        p = { totalScore = 0, careerPoints = 0, interceptScore = 0, seadScore = 0,
+        p = { totalScore = 0, careerPoints = 0, interceptScore = 0, seadScore = 0, deadScore = 0,
             missionCount = 0, primarySuccessCount = 0, rtbSuccessCount = 0,
             recoveryFailureCount = 0, failedCount = 0, abortCount = 0 }
         Scoring.players[ucid] = p
@@ -44,12 +44,16 @@ function Scoring.Settle(mission, result, reason)
         p.totalScore = p.totalScore + points
         p.careerPoints = p.careerPoints + points
         p[scoreField] = p[scoreField] + points
-        p.missionCount = p.missionCount + 1
-        if mission.primaryCompletedAt then p.primarySuccessCount = p.primarySuccessCount + 1 end
-        if result == "RTB_SUCCESS" then p.rtbSuccessCount = p.rtbSuccessCount + 1 end
-        if result == "RTB_FAILURE" then p.recoveryFailureCount = p.recoveryFailureCount + 1 end
-        if result == "FAILED" then p.failedCount = p.failedCount + 1 end
-        if result == "ABORT" then p.abortCount = p.abortCount + 1 end
+        -- Immediate DEAD is an extra objective in the same wing assignment.
+        -- Its separate ledger awards points without counting another mission.
+        if not mission.scoreOnly then
+            p.missionCount = p.missionCount + 1
+            if mission.primaryCompletedAt then p.primarySuccessCount = p.primarySuccessCount + 1 end
+            if result == "RTB_SUCCESS" then p.rtbSuccessCount = p.rtbSuccessCount + 1 end
+            if result == "RTB_FAILURE" then p.recoveryFailureCount = p.recoveryFailureCount + 1 end
+            if result == "FAILED" then p.failedCount = p.failedCount + 1 end
+            if result == "ABORT" then p.abortCount = p.abortCount + 1 end
+        end
     end
     local receipt = { missionID = mission.id, category = category, ownerUCID = mission.owner.ucid,
         fullReward = mission.fullReward, result = result, reason = reason, scored = p ~= nil,

@@ -9,7 +9,8 @@ F10 の `Dynamic Training → Generate SEAD` で、SA-6 または SA-8 を1グ�
 計画の作成と SAM の実体生成を分離する。地上受注では計画だけを作成し、登録参加者全員の離陸後20秒で生成する。
 受注時から全員が空中なら、計画確定と受注情報表示の直後に生成する。
 配置・方式別の情報表示・主要レーダーの状態遷移による成功判定・個別帰還採点・中止を実装する。
-今回はSEADのみを対象とし、DEADへの継続任務・F10項目・採点・任務状態の分岐は追加しない。
+SEAD完了後の残存Siteは、標準のCleanup、即時のDEAD継続、明示保持後の別SortieのDEADに対応する。
+Follow-onの境界・採点・予約は [DEAD.md](DEAD.md) を参照する。SEADの受注計画・配置・目標条件は維持する。
 コードと模擬テストは実装済み。DCS 内での地形・建物判定、SAM の交戦、TOO / PB の攻撃、レーダー破壊と採点の確認は未実施。
 
 ## 受注計画と攻撃方式
@@ -26,8 +27,10 @@ TOOの捜索座標、PBの推定座標は計画完成まで `Planning in progres
 
 | 方式 | プレイヤーへ渡す情報 |
 |---|---|
-| TOO | `MODE: TOO`、`THREAT AREA`として捜索用座標（度分秒）、`TARGET TYPE: UNKNOWN`、座標付近でHARM TOOのエミッターを捜索・攻撃する指示 |
-| PB | `MODE: PB`、SAM種類、推定位置の緯度経度（度分秒）、3桁のHARM PBコード、攻撃と帰還の指示 |
+| TOO | `MODE: TOO`、`THREAT AREA`として捜索用座標（DDM：度＋小数分）、`TARGET TYPE: UNKNOWN`、座標付近でHARM TOOのエミッターを捜索・攻撃する指示 |
+| PB | `MODE: PB`、SAM種類、推定位置の緯度経度（DDM：度＋小数分）、3桁のHARM PBコード、攻撃と帰還の指示 |
+
+両方式とも分の小数部は3桁。MOOSEの `COORDINATE:ToStringLLDDM({ LL_Accuracy = 3 })` を使用し、受注・開始・Mission Statusで同じDDM形式を表示する。MOOSE全体の座標表示設定には依存しない。
 
 TOOの `THREAT AREA` は地域名から捜索用座標へ変更した。実配置予定点からランダム方位へ3～5 NMずらした座標を渡す。
 誤差の設定は `tooEstimateErrorMinNM` / `tooEstimateErrorMaxNM`。計画完成時に座標を固定し、受注・開始・`Mission Status` に同じ座標を表示する。
@@ -56,7 +59,7 @@ TypeNameは現在の `.miz` の `mission` エントリで確認済み。PBコー
 | `record.plan.estimatedPoint` | TOOの捜索位置（3～5 NM誤差）またはPBの推定位置（1～3 NM誤差） |
 | `record.spawn.group` / `record.spawn.primaryUnits` | 生成したSAMグループと主要レーダーのオブジェクト・ID |
 | `record.spawn.emitterState` / `primaryResult` | エミッター状態・確定結果。帰還評価中も保持 |
-| `record.site` / `Missions.sites[missionID]` | 計画と生成Groupを持つ独立したサイト参照。削除完了まで保持 |
+| `record.site` / `Missions.sites[missionID]` | 計画・生成Group・disposition・予約・SEAD結果を持つサイト参照。明示RETAINは元record終了後も保持 |
 | `record.participants` | 受注時に固定した人間参加者と個別帰還・精算状態 |
 
 表示は計画から作る。生成後の実体から機種や位置を取り直してブリーフィングを作らない。
@@ -146,12 +149,21 @@ Enemy radar suppressed.
 ```
 
 生成Group、計画、エミッター状態・結果の参照を独立したサイト管理へ登録する。
-今回は全参加者の精算・中止・失敗終了後にCleanupを要求する方式とし、timeout方式は追加しない。
+`CLEANUP` が標準。何も選ばなければ全参加者の精算・中止・失敗終了後にCleanupを要求する。
+`Preserve Site for DEAD` を明示選択した場合だけ `RETAIN` とし、全員精算後もSiteを保持する。
+Preserve時の長機を保持者として固定し、そのプレイヤーのログアウトを確認した場合はRETAIN SiteをCleanupする。観戦席・別スロットへの移動は切断扱いにしない。
+このCleanupは元SEAD精算前でも可能だが、SEADのPrimary結果・帰還評価・Wing/UCIDロックは変更しない。すでにDEAD使用中のIN_USE Siteは対象外。
+元SEADが終了するまではSiteの予約を維持し、別Wingが先に取得できないようにする。
+`Continue as DEAD` は同じrecordを `DEAD_ACTIVE` へ移す。既存Groupを再生成せず、生存車両だけを対象に固定する。
+Immediate DEADではSEADの達成結果・任務ID・採点カテゴリを維持し、独立した追加DEAD報酬を設定する。DEAD全滅後にRTBへ戻り、帰還時に各150、両目標達成後事故は各90、DEAD未達成事故はSEAD90／DEAD0。任意Abortは両方0。任務数は1件を維持する。詳細は [DEAD.md](DEAD.md)。
+IN_USEのまま全員終了した場合はCLEANUPへ倒す。保持timeoutは今回追加しない。
 ウィングの終了処理はサイトの解放を通知するだけとし、SAMの削除・再試行は独立したサイト管理が担う。
 削除に失敗したサイトも参照を失わず、監視tickで再試行する。参照は削除完了まで保持する。
 生成途中の検証失敗による即時削除は、完成したサイトのCleanupとは別の失敗復旧とする。
-将来はこの解放時の方針を差し替え、残存Groupと確定済みの状態をFollow-on DEADへ引き継げる。
-今回、DEADの受注・採点・状態分岐は実装しない。
+保持SiteのGenerate DEADは新しい任務IDを使用し、DEAD Scoreへ独立精算する。
+Site stateの残存判定はSEADエミッターの終端状態と別に監視する。DEADで残存車両を破壊してもSEAD結果は変えない。
+`record.primaryResult = "DESTROYED"` は主要レーダー破壊だけを意味する。SA-6のLauncherが1両以上生存していればDEAD継続可能で、Site全滅は生存RED ground車両が0の場合だけとする。
+損傷＋Radar OFF60秒のSUPPRESSEDでは、生存レーダーもLauncherもDEAD対象に含める。SEAD完了済みの前提は `site.seadCompleted`、残存数は実Groupから取得する `site.remainingTargetCount` として分離する。
 
 ## Mission Editor の前提
 
@@ -241,12 +253,13 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 | TAKEOFF_DELAY | 全員の離陸検出から20秒待ち。途中の着地でARMEDへ戻る |
 | ACTIVE | 配置済み。エミッターの状態機械を監視 |
 | RTB_PENDING | 主要目標達成済み。各参加者の帰還・事故を評価 |
+| DEAD_ACTIVE | 同じSEAD recordで残存Siteの全滅を目指す。SEAD報酬は維持 |
 | 記録なし | 未受注、全体終了、生成失敗または全参加者の終了後 |
 
 帰還確認中の参加者は個別に `LANDING_CHECK` となる。個人中止・全体中止は選定中・戦闘中・帰還待ちに操作できる。
 
 受注時の同じ BLUE Hornet グループの人間全員で訓練を共有する。空席・AI・途中参加者は登録しない。
-同一ウィングで SEAD と Intercept を同時に受注できない。別ウィングは別々のカテゴリも同時に実行できる。
+同一ウィングで SEAD / Intercept / Follow-on DEADを同時に受注できない。別ウィングは別々のカテゴリも同時に実行できる。
 敵の名前は `DT_SEAD_<受注番号>#001` のような別名を使い、再受注・別ウィングとの衝突を防ぐ。
 
 地点選定中に受注時の機体・操縦者が無効になったら選定を取り消す。
@@ -255,7 +268,7 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 離陸判定は2秒間隔。計画完成後、全員の離陸を検出してから20秒待つため、通常は実際の全員離陸から約20～22秒で生成する。
 受注後に計画が完成する前に全員が離陸した場合は、計画完成後の離陸検出から20秒待つ。
 個人中止で離陸待ちから外れた人は対象外とし、計画を維持して残る参加者でカウントをやり直す。
-配置後の個人中止・機体喪失は残る参加者の訓練を維持し、全員の終了後に敵を削除する。
+配置後の個人中止・機体喪失は残る参加者の訓練を維持する。全員終了後の敵はdispositionに従い、標準は削除、明示RETAINは保持する。
 切断・スロット変更だけで配置済み訓練を自動終了しない。元の参加者は UCID を照合した個人中止が可能。
 共有メニューと受注ブロックの詳細は [WING.md](WING.md) を参照する。
 
@@ -266,6 +279,7 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 `Mission Status` では方式別の情報に加え、計画中の地点選定回数・生成までの残り時間・各参加者の状態を表示する。
 生成後は `Emitter state: ACTIVE / SUPPRESSION PENDING / SUPPRESSED / DESTROYED` と、計測中の継続時間を表示する。
 `Player Statistics` では SEAD Score を Intercept Score と別に表示する。
+SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSite dispositionとFollow-on DEAD availableを加える。
 `Abort Mission` でウィング全体、`Abort Sortie: <名前> [<機体>]` でその参加者だけを中止する。
 今回、F10 地図マーカー・コックピットのウェイポイント設定は追加しない。
 
@@ -274,12 +288,13 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 - [src/sead.lua](../src/sead.lua): Zone 抽選・地形／離隔判定・地上生成・主要レーダーの追跡。
 - [src/sead_objective.lua](../src/sead_objective.lua): エミッター観測・遷移表・終端状態・デバッグ状態表示。
 - [src/sead_sites.lua](../src/sead_sites.lua): サイト参照の登録・全員終了後の削除・削除失敗時の再試行。
+- [src/dead.lua](../src/dead.lua): 保持Siteの選定・残存対象snapshot・DEAD判定。
 - [src/DynamicTraining.lua](../src/DynamicTraining.lua): F10・共有受注・段階的な地点選定・状態・終了。
 - [scripts/Test-SEAD.lua](../scripts/Test-SEAD.lua): 方式抽選・情報制限・計画固定・PB誤差・距離候補・離陸待ち・配置条件・失敗復旧・主要目標・個別採点・複数ウィングの模擬検証。
   状態遷移、60秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
 
-`Build-Mission.ps1` で結合後、Lua 5.1 で `scripts/Test-SEAD.lua` と既存4種類のテストを実行する。
-2026-10-04時点でSEAD 61件、既存のIntercept・採点・ウィング・並行ウィング84件、計145件の模擬テストが通過。
+`Build-Mission.ps1` で結合後、Lua 5.1 で `scripts/Test-SEAD.lua`、`scripts/Test-DEAD.lua` と既存4種類のテストを実行する。
+SEAD61件と既存84件を維持し、DEAD follow-onの検証は [TESTING.md](TESTING.md) にまとめる。
 実際のDCSでのRadar状態・損傷Life・イベント順序・残存SAMのCleanupはゲーム内確認待ち。
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。

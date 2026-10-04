@@ -267,7 +267,7 @@ function SEAD.FailureSummary(job)
 end
 
 function SEAD.Briefing(plan)
-    local location = plan.estimatedPoint and COORDINATE:NewFromVec2(plan.estimatedPoint):ToStringLLDMS()
+    local location = plan.estimatedPoint and COORDINATE:NewFromVec2(plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
         or "Planning in progress"
     local text = "SEAD MISSION\nMODE: " .. plan.attackMode
     if plan.attackMode == "TOO" then

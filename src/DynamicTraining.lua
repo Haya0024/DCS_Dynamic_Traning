@@ -7,7 +7,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     trigger.action.outText("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "SEAD-emitter-FSM-trial-5" }
+DynamicTrainingRuntime = { version = "SEAD-DEAD-follow-on-trial-7" }
 
 local menus = {}
 local nextPlayerScan = 0
@@ -38,8 +38,8 @@ end
 local function Close(record)
     -- Release before cleanup: generated destroy events cannot award a win.
     if not Missions.Release(record) then return end
-    if record.category == "SEAD" then
-        SEADSites.Release(record.site)
+    if record.site then
+        SEADSites.CloseAssignment(record.site, record.assignmentID)
     elseif record.spawn then
         Safe("Enemy cleanup", record.group, function() record.spawn.group:Destroy(false) end)
     end
@@ -55,19 +55,38 @@ local function SelectLeader(record)
     end
 end
 
-local function SettleParticipant(record, p, result, reason)
+local function SettleParticipant(record, p, result, reason, time)
     if p.done then return end
     local receipt
     if p.id then receipt = Scoring.Settle(p, result, reason) end
+    if p.deadScoring then
+        local dead = p.deadScoring
+        local completed = dead.primaryCompletedAt and (time or timer.getTime()) >= dead.primaryCompletedAt
+        local deadResult = result
+        if result ~= "ABORT" and not completed then
+            deadResult = "FAILED"
+            dead.primaryCompletedAt = nil
+        end
+        p.deadReceipt = Scoring.Settle(dead, deadResult, reason)
+    end
     p.done, p.state, p.receipt, p.landing = true, result, receipt, nil
     local text = string.format("%s %s: %s\n%s", record.category or "Intercept", result, p.owner.name, reason)
     if receipt then
         if receipt.scored then
+            local points, total = receipt.points, receipt.total
+            if p.deadReceipt then
+                points, total = points + p.deadReceipt.points, p.deadReceipt.total
+                text = text .. string.format("\nSEAD Points: +%d\nDEAD Points: +%d", receipt.points, p.deadReceipt.points)
+            end
             text = text .. string.format("\nPoints: +%d\nTotal Score: %d\nSession only; not saved.",
-                receipt.points, receipt.total)
+                points, total)
         else text = text .. "\nUnscored sortie (UCID unavailable)." end
         Log(string.format("%s %s points=%d scored=%s", record.id, result,
             receipt.points, tostring(receipt.scored)))
+        if p.deadReceipt then
+            Log(string.format("%s %s points=%d scored=%s", p.deadReceipt.missionID, p.deadReceipt.result,
+                p.deadReceipt.points, tostring(p.deadReceipt.scored)))
+        end
     end
     Message(record.group, text, 20)
     if HasPending(record) then SelectLeader(record) else Close(record) end
@@ -76,7 +95,10 @@ end
 local function PrimaryComplete(record, time, result)
     if not Missions.IsActive(record) or record.state ~= "ACTIVE" then return end
     record.primaryCompletedAt, record.state = time, "RTB_PENDING"
-    if record.category == "SEAD" then record.primaryResult = result or "DESTROYED" end
+    if record.category == "SEAD" then
+        record.primaryResult = result or "DESTROYED"
+        SEADSites.PrimaryComplete(record.site, record.primaryResult)
+    end
     for _, p in ipairs(record.participants) do
         -- A pre-clear death/abort stays at zero even if the wing later wins.
         if not p.done then
@@ -88,6 +110,8 @@ local function PrimaryComplete(record, time, result)
     if record.category == "SEAD" then
         title = "SEAD Objective Complete"
         objective = record.primaryResult == "DESTROYED" and "Enemy radar destroyed." or "Enemy radar suppressed."
+    elseif record.category == "DEAD" then
+        title, objective = "DEAD Objective Complete", "SAM site destroyed.\nReturn to base."
     end
     Message(record.group, title .. "\n" ..
         objective .. "\nEach pilot: return to a BLUE airfield or carrier.\n" ..
@@ -95,6 +119,27 @@ local function PrimaryComplete(record, time, result)
             record.fullReward, math.floor(record.fullReward * Config.recoveryFailurePercent / 100)), 20)
     Log(record.id .. " primary objective complete" .. (record.primaryResult and (" (" .. record.primaryResult .. ")") or "") ..
         "; awaiting individual RTB")
+    ScanPlayers()
+end
+
+local function DeadComplete(record, time)
+    local active = record.state == "DEAD_ACTIVE" or (record.category == "DEAD" and record.state == "ACTIVE")
+    if not Missions.IsActive(record) or record.deadCompletedAt or not active then return end
+    record.deadCompletedAt = time
+    record.site.state, record.site.followOnAvailable, record.site.disposition = "DESTROYED", false, "CLEANUP"
+    if record.category == "DEAD" then PrimaryComplete(record, time); return end
+    record.state = "RTB_PENDING"
+    for _, p in ipairs(record.participants) do
+        if not p.done then
+            p.state, p.landing = "RTB_PENDING", nil
+            p.deadScoring.primaryCompletedAt = time
+        end
+    end
+    Message(record.group, "DEAD Objective Complete\nSAM site destroyed.\nReturn to base.\n" ..
+        string.format("DEAD reward per pilot: %d points; recovery failure: %d points.\nSEAD reward also retained.",
+            record.deadFullReward, math.floor(record.deadFullReward * Config.recoveryFailurePercent / 100)), 20)
+    Log(record.id .. " immediate DEAD complete; awaiting SEAD and DEAD recovery settlement")
+    ScanPlayers()
 end
 
 local function Ready(record)
@@ -125,8 +170,20 @@ local function Start(record)
     local controlling, airborne = Ready(record)
     local leader = SelectLeader(record)
     if not controlling or not airborne or not leader then
-        Close(record)
+        if record.category == "DEAD" then
+            for _, p in ipairs(record.participants) do
+                SettleParticipant(record, p, "FAILED", "DEAD reservation cancelled. No reward.")
+            end
+        else Close(record) end
         Message(record.group, record.category .. " reservation cancelled. Player aircraft changed or unavailable.")
+        return
+    end
+    if record.category == "DEAD" then
+        record.state, record.deadStartedAt = "ACTIVE", timer.getTime()
+        for _, p in ipairs(record.participants) do if not p.done then p.state = "ACTIVE" end end
+        Message(record.group, record.deadBriefing .. "\nDEAD TRAINING START\nRemaining targets: " ..
+            DEAD.Remaining(record), 25)
+        Log(record.id .. " started using retained site " .. record.site.id)
         return
     end
     if record.category == "SEAD" then
@@ -179,6 +236,41 @@ local function Generate(groupName, category)
     local acquired, blocked = Missions.Acquire(record)
     if not acquired then Message(group, blocked); return end
     if problem then Message(group, problem, 15) end
+    if category == "DEAD" then
+        -- Follow-on DEAD accepts a preserved SEAD site; never create a new SAM.
+        record.owner = roster[1]
+        local site, previous, airborne
+        local ok, failure = pcall(function()
+            site = DEAD.SelectSite(record.owner.unit:GetVec3())
+            if not site then return end
+            previous = assert(SEADSites.Reserve(site, record.assignmentID))
+            local reward = Config.dead.fullReward
+            assert(type(reward) == "number" and reward >= 0 and reward < math.huge and reward % 1 == 0,
+                "Invalid DEAD full reward.")
+            record.deadTargets = DEAD.Snapshot(site)
+            record.deadBriefing = DEAD.Briefing(site)
+            record.site, record.spawn, record.plan = site, site.spawn, site.plan
+            local controlling
+            controlling, airborne = Ready(record)
+            assert(controlling, "DEAD participant aircraft changed during acceptance.")
+            BeginScoring(record, reward)
+        end)
+        if not ok or not site then
+            Missions.Release(record)
+            SEADSites.Rollback(site, record.assignmentID, previous)
+            if not ok then
+                env.error("[DynamicTraining] DEAD setup: " .. tostring(failure))
+                Message(group, "ERROR: DEAD setup failed. Site reservation rolled back; see DCS log.", 20)
+            else Message(group, "No preserved SAM sites available for DEAD.", 15) end
+            return
+        end
+        if airborne then Start(record) else
+            record.state = "ARMED"
+            for _, p in ipairs(record.participants) do p.state = "ARMED" end
+            Message(group, record.deadBriefing .. "\nSite reserved. Waiting for ALL registered pilots to take off.", 25)
+        end
+        return
+    end
     if category == "SEAD" then
         record.owner = roster[1]
         record.id = Scoring.NextID(category)
@@ -216,9 +308,9 @@ local function Statistics(groupName)
         local p = Scoring.Get(owner.ucid, owner.name)
         if p then
             texts[#texts + 1] = string.format(
-                "PLAYER STATISTICS: %s [%s]\nTotal Score: %d\nCareer Points: %d\nIntercept Score: %d\nSEAD Score: %d\n" ..
+                "PLAYER STATISTICS: %s [%s]\nTotal Score: %d\nCareer Points: %d\nIntercept Score: %d\nSEAD Score: %d\nDEAD Score: %d\n" ..
                 "Settled Missions: %d\nPrimary Success: %d\nRTB Success: %d\nRecovery Failure: %d",
-                owner.name, owner.unitName, p.totalScore, p.careerPoints, p.interceptScore, p.seadScore,
+                owner.name, owner.unitName, p.totalScore, p.careerPoints, p.interceptScore, p.seadScore, p.deadScore,
                 p.missionCount, p.primarySuccessCount, p.rtbSuccessCount, p.recoveryFailureCount)
         else texts[#texts + 1] = "PLAYER STATISTICS: " .. owner.name .. "\nUCID unavailable; unscored." end
     end
@@ -229,18 +321,34 @@ local function Status(groupName)
     local group = GROUP:FindByName(groupName)
     local roster = Player.ForGroup(groupName)
     local records = Missions.ForGroup(groupName, roster)
-    if #records == 0 then Message(group, "Intercept: Idle.\nSEAD: Idle."); return end
+    if #records == 0 then Message(group, "Intercept: Idle.\nSEAD: Idle.\nDEAD: Idle."); return end
     local texts = {}
     for _, record in ipairs(records) do
         local text = (record.category or "Intercept") .. ": " .. record.state .. "\nWing: " .. record.groupName ..
             "\nLead reference: " .. record.owner.name
+        if record.state == "DEAD_ACTIVE" then
+            text = "SEAD: COMPLETE\nFollow-on: DEAD ACTIVE\nRemaining targets: " .. DEAD.Remaining(record) ..
+                "\nWing: " .. record.groupName
+        elseif record.category == "DEAD" then
+            text = "DEAD: " .. record.state:gsub("_", " ") .. "\nArea: " .. record.plan.areaLabel ..
+                "\nRemaining targets: " .. DEAD.Remaining(record) .. "\n" .. DEAD.Briefing(record.site)
+        end
         if record.category == "SEAD" then
             text = text .. "\n" .. SEAD.Briefing(record.plan)
-            if record.primaryResult then text = text .. "\nPrimary result: " .. record.primaryResult end
+            if record.primaryResult then text = text .. "\nSEAD Primary result: " .. record.primaryResult end
             if record.spawn then text = text .. "\n" .. SEADObjective.Status(record.spawn, timer.getTime()) end
             if record.state == "PLANNING" then
                 text = text .. "\nSite checks: " .. record.selection.totalAttempts
             end
+        end
+        if record.site then
+            SEADSites.Refresh(record.site)
+            text = text .. "\nSite state: " .. record.site.state
+            if record.site.seadCompleted then
+                text = text .. "\nSite remaining vehicles: " .. (record.site.remainingTargetCount or "UNKNOWN")
+            end
+            text = text .. "\nSite disposition: " .. record.site.disposition:gsub("_", " ") ..
+                "\nFollow-on DEAD available: " .. (record.site.followOnAvailable and "YES" or "NO")
         end
         if record.spawnAt then
             text = text .. string.format("\nSpawn in %d seconds.", math.max(0, math.ceil(record.spawnAt - timer.getTime())))
@@ -248,6 +356,10 @@ local function Status(groupName)
         for _, p in ipairs(record.participants) do
             text = text .. "\n" .. p.owner.name .. " [" .. p.owner.unitName .. "]: " .. p.state
             if p.receipt then text = text .. " (+" .. p.receipt.points .. ")" end
+            if p.deadScoring then
+                text = text .. "\nDEAD objective: " .. (p.deadScoring.primaryCompletedAt and "COMPLETE" or "INCOMPLETE")
+                if p.deadReceipt then text = text .. " (+" .. p.deadReceipt.points .. ")" end
+            end
         end
         texts[#texts + 1] = text
     end
@@ -263,6 +375,56 @@ local function CanManage(groupName, target)
     return false
 end
 
+local function FollowOnAvailable(groupName, record)
+    if not Missions.IsActive(record) or record.groupName ~= groupName or record.category ~= "SEAD"
+        or record.state ~= "RTB_PENDING" or record.deadStartedAt or not record.primaryCompletedAt then return false end
+    local site = record.site
+    local targets = site and SEADSites.Refresh(site)
+    if not targets or #targets == 0 or not site.followOnAvailable or site.cleanupRequested or site.cleaned
+        or site.reservedByAssignmentID ~= record.assignmentID then return false end
+    for _, p in ipairs(record.participants) do
+        if not p.done and CanManage(groupName, p) then return true end
+    end
+    return false
+end
+
+local function FollowOn(groupName, record, preserve)
+    local group = GROUP:FindByName(groupName)
+    if not FollowOnAvailable(groupName, record) then
+        Message(group, "Follow-on DEAD is no longer available for this SEAD mission."); return
+    end
+    local site, time = record.site, timer.getTime()
+    if preserve then
+        local keeper
+        for _, p in ipairs(record.participants) do
+            if not p.done and Player.IsControlling(p.owner) then keeper = p.owner; break end
+        end
+        if keeper and SEADSites.Preserve(site, record.assignmentID, time, keeper) then
+            Message(group, "SAM site preserved for follow-on DEAD.\nKeeper: " .. site.retainedBy.name ..
+                "\nReturn to base and rearm.\nSite will be cleaned when the keeper disconnects.", 20)
+        end
+        return
+    end
+    -- Snapshot before changing phase: an API failure leaves SEAD recovery intact.
+    local targets = DEAD.Snapshot(site)
+    local reward = Config.dead.fullReward
+    assert(type(reward) == "number" and reward >= 0 and reward < math.huge and reward == math.floor(reward),
+        "Invalid DEAD reward")
+    record.deadScoringID, record.deadFullReward = Scoring.NextID("DEAD"), reward
+    site.disposition, site.followOnAvailable = "IN_USE", false
+    record.deadTargets, record.deadStartedAt, record.state = targets, time, "DEAD_ACTIVE"
+    for _, p in ipairs(record.participants) do
+        if not p.done then
+            p.state, p.landing = "DEAD_ACTIVE", nil
+            p.deadScoring = { id = record.deadScoringID, category = "DEAD", owner = p.owner,
+                fullReward = reward, scoreOnly = true }
+        end
+    end
+    Message(group, "Immediate DEAD started.\nDestroy all remaining SAM site vehicles.\nRemaining targets: " ..
+        #targets .. string.format("\nAdditional DEAD reward per pilot: %d points.\nSEAD reward also retained.", reward), 20)
+    Log(record.id .. " continued as DEAD using original site")
+end
+
 local function Abort(groupName, target, assignment)
     local group = GROUP:FindByName(groupName)
     local record = assignment
@@ -270,7 +432,7 @@ local function Abort(groupName, target, assignment)
         if not Missions.IsActive(record) then Message(group, "This sortie is already closed."); return end
     else
         local records = Missions.ForGroup(groupName, Player.ForGroup(groupName))
-        if #records == 0 then Message(group, "Intercept: Idle.\nSEAD: Idle."); return end
+        if #records == 0 then Message(group, "Intercept: Idle.\nSEAD: Idle.\nDEAD: Idle."); return end
         record = records[1]
         if not Missions.wings[groupName] and #records > 1 then
             Message(group, "Multiple earlier wing missions found. Use the named Abort Sortie command."); return
@@ -326,6 +488,10 @@ ScanPlayers = function()
             signature = signature .. ":" .. owner.unitName .. ":" .. owner.objectID .. ":" .. owner.name
         end
         local targets = {}
+        local followOn = Missions.wings[name]
+        local canContinue = FollowOnAvailable(name, followOn)
+        local canPreserve = canContinue and followOn.site.disposition ~= "RETAIN"
+        signature = signature .. ":follow:" .. tostring(canContinue) .. ":preserve:" .. tostring(canPreserve)
         for _, record in ipairs(records) do
             signature = signature .. ":assignment:" .. record.assignmentID
             for _, p in ipairs(record.participants) do
@@ -345,13 +511,25 @@ ScanPlayers = function()
             menus[name] = { root = root, signature = signature }
             for _, command in ipairs({
                 { "Generate Intercept", Generate },
-                { "Generate SEAD", function(groupName) Generate(groupName, "SEAD") end }, { "Mission Status", Status },
+                { "Generate SEAD", function(groupName) Generate(groupName, "SEAD") end },
+                { "Generate DEAD", function(groupName) Generate(groupName, "DEAD") end }, { "Mission Status", Status },
                 { "Abort Mission", Abort }, { "Player Statistics", Statistics }
             }) do
                 local label, action = command[1], command[2]
                 MENU_GROUP_COMMAND:New(group, label, root, function()
                     Safe(label, group, function() action(name); ScanPlayers() end)
                 end)
+            end
+            if canContinue then
+                local record = followOn
+                for _, choice in ipairs({ { "Continue as DEAD", false }, { "Preserve Site for DEAD", true } }) do
+                    local label, preserve = choice[1], choice[2]
+                    if not preserve or canPreserve then
+                        MENU_GROUP_COMMAND:New(group, label, root, function()
+                            Safe(label, group, function() FollowOn(name, record, preserve); ScanPlayers() end)
+                        end)
+                    end
+                end
             end
             for _, entry in ipairs(targets) do
                 local target, record = entry.participant, entry.record
@@ -405,13 +583,19 @@ local function TickMission(record, time)
         record.nextTakeoffCheck = time + Config.takeoffCheckSeconds
         local controlling, airborne = Ready(record)
         if not controlling then
-            Close(record)
+            if record.category == "DEAD" then
+                for _, p in ipairs(record.participants) do
+                    SettleParticipant(record, p, "FAILED", "DEAD reservation cancelled. No reward.")
+                end
+            else Close(record) end
             Message(record.group, record.category .. " reservation cancelled. Player aircraft changed or unavailable.")
         elseif not airborne then
             if record.spawnAt then
                 record.spawnAt, record.state = nil, "ARMED"
                 Message(record.group, record.category .. " countdown reset. Waiting for all registered pilots to take off.")
             end
+        elseif record.category == "DEAD" then
+            Start(record) -- Existing SAM is already present; no spawn delay.
         elseif not record.spawnAt then
             record.spawnAt, record.state = time + Config.takeoffDelaySeconds, "TAKEOFF_DELAY"
             Message(record.group, string.format("All registered pilots airborne. Hostiles will spawn in %d seconds.",
@@ -420,10 +604,12 @@ local function TickMission(record, time)
             record.spawnAt = nil
             Start(record)
         end
-    elseif record.state == "ACTIVE" then
+    elseif record.state == "ACTIVE" or record.state == "DEAD_ACTIVE" then
         -- No retrospective polling win when every original aircraft has gone.
         if SelectLeader(record) then
-            if record.category == "SEAD" then
+            if record.deadTargets then
+                if DEAD.Remaining(record) == 0 then DeadComplete(record, time) end
+            elseif record.category == "SEAD" then
                 local result = SEAD.UpdateObjective(record.spawn, time)
                 if result then PrimaryComplete(record, time, result) end
             elseif Intercept.AllGone(record.spawn) then PrimaryComplete(record, time) end
@@ -432,7 +618,7 @@ local function TickMission(record, time)
         for _, p in ipairs(record.participants) do
             if not p.done and p.state == "LANDING_CHECK" then
                 if Recovery.Update(p, time) == "SUCCESS" then
-                    SettleParticipant(record, p, "RTB_SUCCESS", "Safe recovery confirmed (100%).")
+                    SettleParticipant(record, p, "RTB_SUCCESS", "Safe recovery confirmed (100%).", time)
                 end
             end
         end
@@ -454,18 +640,22 @@ local function HandleEvent(record, event)
             if Player.EventMatches(p.owner, event) then
                 if p.done then return end
                 if p.primaryCompletedAt and time >= p.primaryCompletedAt then
-                    SettleParticipant(record, p, "RTB_FAILURE", reason .. " before safe recovery (60%).")
+                    SettleParticipant(record, p, "RTB_FAILURE", reason .. " before safe recovery (60%).", time)
                 else
                     p.primaryCompletedAt = nil
-                    SettleParticipant(record, p, "FAILED", reason .. " before primary completion (0 points).")
+                    SettleParticipant(record, p, "FAILED", reason .. " before primary completion (0 points).", time)
                 end
                 return
             end
         end
-        if record.state == "ACTIVE" and
+        if (record.state == "ACTIVE" or record.state == "DEAD_ACTIVE") and
             (event.id == EVENTS.Crash or event.id == EVENTS.Dead or event.id == EVENTS.UnitLost) then
-            local module = record.category == "SEAD" and SEAD or Intercept
-            if module.RecordLoss(record.spawn, event) then PrimaryComplete(record, time) end
+            if record.deadTargets then
+                if DEAD.RecordLoss(record, event) then DeadComplete(record, time) end
+            else
+                local module = record.category == "SEAD" and SEAD or Intercept
+                if module.RecordLoss(record.spawn, event) then PrimaryComplete(record, time) end
+            end
         end
     elseif event.id == EVENTS.RunwayTouch or event.id == EVENTS.Land then
         if record.state == "RTB_PENDING" then
@@ -489,9 +679,13 @@ for _, name in ipairs({ "RunwayTouch", "Land", "Takeoff", "RunwayTakeoff" }) do
 end
 for id in pairs(subscriptions) do
     eventHandler:HandleEvent(id, function(_, event)
+        if event.id == EVENTS.Crash or event.id == EVENTS.Dead or event.id == EVENTS.UnitLost then
+            Safe("SAM site loss", nil, function() SEADSites.RecordLoss(event) end)
+        end
         for _, record in ipairs(Missions.Snapshot()) do
             Safe("Mission event", record.group, function() HandleEvent(record, event) end)
         end
+        Safe("Player menu scan", nil, ScanPlayers)
     end)
 end
 

@@ -2,7 +2,8 @@
 
 更新日: 2026-10-04
 
-現在の採点対象は Intercept と SEAD。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続60秒でクリアとする。
+現在の採点対象は Intercept / SEAD / Immediate DEAD / Follow-on DEAD。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続60秒、DEADは開始時の残存対象全滅でクリアとする。
+Immediate DEADは同じSEAD sortie内のphaseとして、SEADのID・達成結果・報酬を維持し、独立したDEAD報酬を追加する。詳細は [DEAD.md](DEAD.md)。
 SEAD の対象レーダーと配置の仕様は [SEAD.md](SEAD.md) を参照する。SEAD の採点は模擬テスト済みで、ゲーム内確認は未実施。
 
 ## 現在の実装と範囲
@@ -16,7 +17,7 @@ UCID 取得・着陸・事故イベントの個別ケースの確認範囲は未
 
 設定は [src/config.lua](../src/config.lua) に集約する。
 初期の試用値は満額150ポイント、失敗率60%、着陸確認10秒、停止判定5 knots。
-Intercept の満額は `fullReward`、SEAD の満額は `sead.fullReward` で個別に設定する。
+Intercept の満額は `fullReward`、SEAD の満額は `sead.fullReward`、両DEADの満額は `dead.fullReward` で個別に設定する。
 Difficulty / Threat Budget による配点、追加ボーナス、カテゴリ Rating は未実装。
 
 ## 採点規則（実装済み）
@@ -31,9 +32,12 @@ Difficulty / Threat Budget による配点、追加ボーナス、カテゴリ R
 
 60%の規則は着陸進入中に限定せず、クリア後の帰還途中の事故・被撃墜も対象とする。
 60%の付与額は整数に切り捨てる。例えば満額101なら60ポイント。
-満額は敵生成成功時に固定し、主要目標達成時点では報酬を予約するだけで累計へ加算しない。
-帰還成功・失敗で確定した額を Total Score、Career Points と、その任務の Intercept Score または SEAD Score に同額加算する。
-Intercept Score / SEAD Score はカテゴリ別累計であり、Rating ではない。
+Intercept/SEADの満額は敵生成成功時、Follow-on DEADは受注時、Immediate DEADはContinue時に固定する。主要目標達成時点では累計へ加算しない。
+帰還成功・失敗で確定した額を Total Score、Career Points と、その任務の Intercept Score / SEAD Score / DEAD Score に同額加算する。
+各Scoreはカテゴリ別累計であり、Ratingではない。両DEADの満額は `dead.fullReward = 150`。
+
+Immediate DEADは同じRecovery結果でSEADと追加DEAD報酬を別々に精算する。両目標達成＋帰還なら各150で合計300、両目標達成後事故なら各90で180、DEAD未達成事故ならSEAD90＋DEAD0。任意Abortは両方0。
+Continue前の精算済み参加者やDEAD達成前の終了者へ追加報酬を遡って与えない。任務数・Primary成功数・Recovery等は元SEADの1件を維持し、追加DEAD精算で二重に数えない。
 
 受注時に同じグループへ搭乗する人間全員への達成報酬。満額は各自150で、編隊人数で分割しない。
 目標達成は共有するが、帰還・事故・個人中止・精算は UCID ごとに独立する。
@@ -83,7 +87,9 @@ UCID の全文をゲーム内表示や通常のログに出力しない。
 ウィング名と登録 UCID に受注ロックを設定し、1人の精算・スロット変更では解除しない。
 
 Intercept は `ARMED` → `TAKEOFF_DELAY` → `ACTIVE`、SEADは計画作成の `PLANNING` を経て同じ離陸待ちへ進む。
-両カテゴリとも主要目標達成後は `RTB_PENDING` → 全員終了で解除、の順に進む。
+各カテゴリとも主要目標達成後は `RTB_PENDING` → 全員終了で解除、の順に進む。
+ImmediateはSEAD達成後に `DEAD_ACTIVE` を挟み、全対象破壊で `RTB_PENDING` に戻る。未精算者の着陸確認を解除し、DEAD達成後の着地から確認を開始する。
+Follow-on DEADは地上受注ならARMED、全員離陸でACTIVE。20秒待ち・再Spawnはなく、地上予約の事故・中止は0で精算する。
 帰還待ちの各参加者は `RTB_PENDING` → `LANDING_CHECK` → 個別精算へ進む。
 Intercept は全員が空中で要求した場合に `ACTIVE` へ即座に進む。
 Intercept の地上予約は全参加者の離陸検出から20秒待つ。詳細は [Intercept.md](Intercept.md) を参照する。
@@ -94,18 +100,20 @@ SEADの地点選定は地上・空中を問わず開始する。受注時から�
 
 敵は生成時の各 DCS オブジェクトに対応付け、死亡・墜落・喪失イベントで主要目標を判定する。
 SEAD は主要レーダーだけを対象とし、発射機が残っていても帰還評価へ進む。完了状態は固定し、残存車両の追加撃破に報酬はない。
-残敵は全員終了時に独立したサイト管理へ削除を依頼する。削除失敗で精算を巻き戻さず、参照を保持して再試行する。DEADの採点は未実装。
+残敵は全員終了時に独立したサイト管理がdispositionで処理する。標準CLEANUP、明示保持のみRETAIN、IN_USE終了はCLEANUPへ倒す。削除失敗で精算を巻き戻さず、参照を保持して再試行する。
+RETAIN Siteの保持者ログアウトでは精算前でもSiteだけCleanupする。ログアウトやSite削除自体を成功・失敗・Abortとして採点せず、元SEADの達成結果と帰還評価・確定済みポイントを維持する。
 1秒間隔の監視でも生存状態を確認するが、未精算の元の参加者機が全機失われた後に遅れてクリアを推測しない。
 イベント処理で確認したクリア時刻を保持し、それより前のプレイヤー事故に60%を付与しない。
 実際のイベント発火・配信順序はゲーム内で確認が必要。
 DCS が必要なイベントを通知しない場合、帰還・事故の精算が保留される可能性がある。
 
 精算記録は `Scoring.settlements[mission.id]["ucid:" .. ucid]` に参加者ごとに一度だけ作る。
+Immediate DEADでは元SEAD IDに加えて `record.deadScoringID` の追加精算記録を作る。参加者の `deadScoring` はcategory=DEAD、scoreOnly=trueを持ち、DEAD達成時刻を元SEADと分離する。追加精算は成績累計だけを更新する。
 同じ任務IDを共有する2人の精算は互いを上書きしない。
 UCID 不明の参加者はセッション内の機体 ID で別の非採点記録を保持し、仮の成績アカウントは作らない。
 脱出・墜落・死亡が同じ事故で重複しても、ポイントと各件数の更新は一度だけ。
 精算済みの任務への別の結果通知は既存の結果を返し、変更しない。
-全員の精算・中止後は任務とロックを解除してから残敵を削除し、削除によるイベントを任務クリアと誤認しない。
+全員の精算・中止後は任務とロックを解除してからSiteの終了方針を処理し、削除によるイベントを任務クリアと誤認しない。
 1人の事故・個人中止だけでは敵を削除せず、残る参加者の任務を継続する。
 他のウィングの敵・帰還評価・精算記録には影響しない。任務IDは全ウィングを通じて異なる連番を使用する。
 新しい任務IDを発行するので、前の精算記録で次の任務を加算済みと誤認しない。
@@ -166,7 +174,7 @@ AI 僚機・未参加者・別グループのプレイヤーの事故は参加�
 `Dynamic Training → Player Statistics` で以下を表示する。
 そのグループに現在搭乗する人間全員を機体名つきで表示する。
 
-- Total Score、Career Points、Intercept Score、SEAD Score。
+- Total Score、Career Points、Intercept Score、SEAD Score、DEAD Score。
 - 精算済み任務数、Primary Success、RTB Success、Recovery Failure。
 - メモリ内のみの記録であること。
 
@@ -204,7 +212,7 @@ DCS のミッション環境で `require` や外部ファイル読み込みを�
 
 ## 検証とゲーム内確認
 
-`Build-Mission.ps1` の実行後、Lua 5.1 で `scripts/Test-Intercept.lua`、`scripts/Test-Scoring.lua`、`scripts/Test-Wing.lua`、`scripts/Test-ParallelWings.lua`、`scripts/Test-SEAD.lua` を実行する。
+`Build-Mission.ps1` の実行後、Lua 5.1 で `scripts/Test-Intercept.lua`、`scripts/Test-Scoring.lua`、`scripts/Test-Wing.lua`、`scripts/Test-ParallelWings.lua`、`scripts/Test-SEAD.lua`、`scripts/Test-DEAD.lua` を実行する。
 結合済みの本番コードを読み込み、DCS / MOOSE の呼び出し先だけを模擬する。
 計算、UCID・スロットの照合、名前変更、再スポーン、着陸確認、動く空母、重複事故、Abort、複数任務の累積を自動検証する。
 

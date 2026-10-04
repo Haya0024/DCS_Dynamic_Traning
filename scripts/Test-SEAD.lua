@@ -485,7 +485,8 @@ test("TOO displays its fixed search coordinate but hides type, exact location an
     local s = setup(); s.player.airborne = false; s.randomValues = { 1, 1, 1 }
     generate(s); status(s, "PLANNING"); s:tick(1); status(s, "ARMED")
     local r = s:mission(); local saved = fingerprint(r.plan); local draws = #s.randomCalls
-    local location = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDMS()
+    local location = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
+    local actual = s.env.COORDINATE:NewFromVec2(r.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
     s:lastMessageContains("THREAT AREA: " .. location)
     s.randomValues = { 9999 } -- No estimate redraw during departure/spawn.
     s.player.airborne = true; s:tick(2)
@@ -493,7 +494,7 @@ test("TOO displays its fixed search coordinate but hides type, exact location an
     status(s, "ACTIVE")
     assert(fingerprint(r.plan) == saved and #s.randomCalls == draws)
     for _, m in ipairs(s.messages) do
-        for _, forbidden in ipairs({ "SA-6", "SA-8", "Kub", "Osa", "TPL_SEAD", "LL 20000 0", "PB CODE", "108", "117", "ESTIMATED LOCATION" }) do
+        for _, forbidden in ipairs({ "SA-6", "SA-8", "Kub", "Osa", "TPL_SEAD", actual, "PB CODE", "108", "117", "ESTIMATED LOCATION" }) do
             assert(not string.find(m.text, forbidden, 1, true), m.text)
         end
     end
@@ -507,6 +508,7 @@ test("TOO three-to-five NM and PB one-to-three NM estimates match actual spawns 
     for _, fraction in ipairs({ 0, 500000, 1000000 }) do
         for _, heading in ipairs({ 0, 90, 180, 359 }) do
             local s = setup(2); s.randomValues = { 2, mode, 1, fraction, heading }
+            s.env.COORDINATE.ToStringLLDMS = function() error("SEAD must display DDM coordinates") end
             generate(s); s:tick(1)
             local p = s:mission().plan
             local dx, dy = p.estimatedPoint.x - p.actualSpawnPoint.x, p.estimatedPoint.y - p.actualSpawnPoint.y
@@ -516,7 +518,15 @@ test("TOO three-to-five NM and PB one-to-three NM estimates match actual spawns 
             assert(g.position.x == p.actualSpawnPoint.x and g.position.z == p.actualSpawnPoint.y)
             s:command("Mission Status")
             local label = mode == 1 and "THREAT AREA: " or "ESTIMATED LOCATION: "
-            s:lastMessageContains(label .. s.env.COORDINATE:NewFromVec2(p.estimatedPoint):ToStringLLDMS())
+            local location = s.env.COORDINATE:NewFromVec2(p.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
+            s:lastMessageContains(label .. location)
+            assert(not string.find(s.messages[#s.messages].text, "LL DMS", 1, true))
+            for _, message in ipairs(s.messages) do
+                if string.find(message.text, "SEAD MISSION", 1, true)
+                    and not string.find(message.text, "Planning in progress", 1, true) then
+                    assert(string.find(message.text, label .. location, 1, true), message.text)
+                end
+            end
             if mode == 2 then s:lastMessageContains("HARM PB CODE: 117")
             else
                 assert(not string.find(s.messages[#s.messages].text, "HARM PB CODE", 1, true))

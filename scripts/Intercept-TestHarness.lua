@@ -28,6 +28,8 @@ local function scenario(options)
         function u:GetName() return self.unitName end
         function u:GetDCSObject() return self.raw end
         function u:GetCoalition() return self.side end
+        function u:IsGround() return self.ground ~= false and (self.kind == "Kub 1S91 str"
+            or self.kind == "Kub 2P25 ln" or self.kind == "Osa 9A33 ln") end
         function u:GetTypeName() return self.side == 1 and s.enemyTypeOverride or self.kind end
         function u:GetLife()
             self.lifeCalls = (self.lifeCalls or 0) + 1
@@ -93,6 +95,10 @@ local function scenario(options)
         return not s.surfaceLand or s.surfaceLand({ x = self.x, y = self.z })
     end
     function coordinate:ToStringLLDMS() return string.format("LL %d %d", self.x, self.z) end
+    function coordinate:ToStringLLDDM(settings)
+        assert(settings and settings.LL_Accuracy == 3, "Expected three decimal places in DDM minutes")
+        return string.format("LL DDM %.3f %.3f", self.x, self.z)
+    end
     function coordinate:ScanObjectsSquare(side, units, statics, scenery)
         assert(units and statics and scenery)
         s.scans = (s.scans or 0) + 1
@@ -224,7 +230,7 @@ local function scenario(options)
     env.env = { info = function(text) table.insert(s.logs, text) end,
         error = function(text) table.insert(s.errors, text) end }
     env.trigger = { action = { outText = function() end } }
-    env.coalition = { side = { BLUE = 2 }, getPlayers = function() return s.players end }
+    env.coalition = { side = { BLUE = 2, RED = 1 }, getPlayers = function() return s.players end }
     env.net = {
         get_player_list = function()
             if s.netFailure then error("simulated network API failure") end

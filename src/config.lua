@@ -43,6 +43,7 @@ return {
         attemptsPerZone = 50,
         attemptsPerTick = 2
     },
+    dead = { fullReward = 150 }, -- Immediate additional reward and Follow-on DEAD reward.
     intercept = {
         templates = { "TPL_INT_MIG29A_2", "TPL_INT_SU27_1", "TPL_INT_MIG29A_1" },
         minDistanceNM = 60,

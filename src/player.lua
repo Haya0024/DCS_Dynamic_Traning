@@ -34,12 +34,44 @@ function Player.ForUnit(unit, group)
         end
         if #matches == 1 then return matches[1] end
     end)
+    if ok and info then owner.playerID = info.id end
     if ok and info and type(info.ucid) == "string" and info.ucid ~= "" then
         owner.ucid = info.ucid
         owner.playerID = info.id
         return owner
     end
     return owner, "UCID could not be verified; this sortie is unscored."
+end
+
+-- MOOSE's player lookup uses names/aircraft. Use network membership instead:
+-- spectators and pilots changing slots remain connected. nil means unknown.
+function Player.ConnectionStatus(identity)
+    if not identity or (not identity.ucid and not identity.playerID) then return nil end
+    if not net or not net.get_player_list or not net.get_player_info then return nil end
+    local ok, connected = pcall(function()
+        local ids = net.get_player_list()
+        assert(type(ids) == "table", "Connection list unavailable.")
+        local count = 0
+        for index, id in pairs(ids) do
+            assert(type(index) == "number" and index % 1 == 0 and index >= 1 and index <= #ids
+                and type(id) == "number" and id > 0 and id % 1 == 0, "Invalid connection list.")
+            count = count + 1
+        end
+        assert(count == #ids, "Incomplete connection list.")
+        local serverID = net.get_server_id and net.get_server_id()
+        local complete = true
+        for _, id in ipairs(ids) do
+            if not identity.ucid and id == identity.playerID then return true end
+            if identity.ucid then
+                local info = net.get_player_info(id)
+                if type(info) == "table" and type(info.ucid) == "string" and info.ucid ~= "" then
+                    if info.ucid == identity.ucid then return true end
+                elseif id ~= serverID then complete = false end
+            end
+        end
+        if complete then return false end
+    end)
+    if ok then return connected end -- false is confirmed logout; errors remain nil.
 end
 
 function Player.ForGroup(groupName)

@@ -4,7 +4,7 @@
 
 ## 現在の実装と対象
 
-同じ DCS グループに搭乗する BLUE F/A-18C の人間プレイヤーが、1件の Intercept または SEAD 任務を共有する。
+同じ DCS グループに搭乗する BLUE F/A-18C の人間プレイヤーが、1件の Intercept / SEAD / DEAD 任務を共有する。
 MP2（Client ×2）、単独 Client、Client＋AI 僚機に対応する。空席や AI は参加者に数えない。
 静的 Client スロットを対象とし、動的 Client スロット・複数乗員は試用対象外。
 コードと模擬テストは実装済み。ユーザーから任務がゲーム内で動作しているとの報告あり。
@@ -18,7 +18,8 @@ SEAD は主要レーダー破壊、または損傷＋Radar OFF連続60秒で目�
 地点選定中の `PLANNING` も受注をブロックし、同一ウィング・UCID で Intercept と SEAD を同時に受注できない。
 SEADは受注時にTOO / PB・SAM・Zoneを固定し、実配置予定点とTOOの捜索点／PBの推定点を計画する。地上受注では全員の離陸後20秒で同じ計画を生成する。
 距離判定は受注時の長機位置を使う。詳細は [SEAD.md](SEAD.md) を参照する。
-以下の開始手順は Intercept の動作。全員離陸待ち・共有目標・個別報酬・帰還評価は両カテゴリに適用する。
+以下の開始手順は Intercept の動作。全員離陸待ち・共有目標・個別報酬・帰還評価は3カテゴリに適用する。
+Follow-on DEADは既存Siteを受注時に予約し、全員離陸でACTIVEへ移す。20秒の生成待ちはない。
 
 ## 受注と開始
 
@@ -60,7 +61,7 @@ Intercept は生成した敵航空機の全滅、SEAD は生成した主要レ�
 長機が失われても、未精算の僚機がいれば敵と任務を維持する。
 残る参加者のうち機体番号が小さい生存機へ長機の基準を移す。
 クリア前の死亡・中止は0ポイントで確定し、後の編隊クリアで遡って報酬を与えない。
-全参加者の精算または個人中止が完了すると、受注ロックを解除して残敵を削除する。
+全参加者の精算または個人中止が完了すると受注ロックを解除する。残敵は標準で削除し、明示RETAINのSAM Siteだけ保持する。
 
 ## 受注ブロッカー
 
@@ -72,7 +73,10 @@ Intercept は生成した敵航空機の全滅、SEAD は生成した主要レ�
 ロックは離陸待ち・20秒待ち・戦闘中・帰還待ち・着陸確認中のすべてで保持する。
 SEADも計画中・離陸待ち・20秒待ち・戦闘中・帰還待ち・着陸確認中に保持する。計画・生成の失敗、予約取消、全参加者の終了で解除する。
 主要レーダーの目標を達成しても、その時点ではロックを解除しない。残る発射機も全参加者の終了まで維持する。
-エミッターの完了判定は止める。全員終了後のSAM削除は独立したサイト管理が行い、削除失敗中もウィングの受注ロックは解除する。
+エミッターの完了判定は止める。全員終了後のSAMの扱いは独立したサイト管理がdispositionで決め、削除失敗中もウィングの受注ロックは解除する。
+Immediate DEADは同じSEAD record内のDEAD_ACTIVE phaseで、未精算参加者に追加DEAD採点を設定する。SEADとDEADの達成時刻を分離し、両目標達成＋帰還は各自合計300、達成後事故180、DEAD未達成事故90。精算済み参加者へ遡及せず、任務数は1件。Follow-on DEADは新規DEAD recordで最寄り保持Siteを予約し、既存の個別帰還・排他を使う。
+元SEADの全員終了までは保持Siteの予約を解かず、DEAD受注後もその全員終了まで別Wingの取得を拒否する。詳細は [DEAD.md](DEAD.md)。
+例外として、Preserve時の登録長機がログアウトしたRETAIN SiteはSite予約だけ解除しCleanupする。元SEADの個別精算・Wing/UCIDロックは維持し、IN_USEのDEAD Siteはこの処理で削除しない。
 1人だけ精算しても、そのウィングと登録 UCID のロックは解除しない。
 元の参加者が全員スロットを移動してもウィングのロックを保持し、別の搭乗者による二重受注を防ぐ。
 同じ UCID が別ウィングのスロットへ移っても、元の編隊が終了するまでは新たな受注を拒否する。
@@ -97,7 +101,7 @@ SEAD の別名は `DT_SEAD_<受注番号>#001`。SAM の配置失敗・中止も
 
 1秒ごとの監視と事故・着陸イベントは、各任務を個別の保護呼び出しで処理する。
 1件の終了・予約取消・生成失敗で、別任務のロック・敵・帰還タイマーを解除しない。
-全員の終了でウィングの記録を解除してから、その任務の敵だけを削除する。
+全員の終了でウィングの記録を解除してから、その任務の敵をCleanupする。明示RETAINのSiteは予約だけ解除して保持する。
 処理中に記録が減っても他の任務を飛ばさないよう、監視・イベント処理は任務一覧のコピーを使う。
 
 ## F10 と中止操作
@@ -126,11 +130,14 @@ F10 はグループ共有で、ボタンを押した本人の UCID は取得し�
 - [src/missions.lua](../src/missions.lua): 共有状態、ウィング・UCID の受注ブロック。
 - [src/DynamicTraining.lua](../src/DynamicTraining.lua): 受注・開始・目標達成・参加者の状態・中止・表示。
 - [src/sead.lua](../src/sead.lua): 段階的な地点選定・地形／離隔判定・地上配置。
+- [src/sead_sites.lua](../src/sead_sites.lua): Siteの保持・予約・Cleanup。
+- [src/dead.lua](../src/dead.lua): 保持Site選定・残存対象固定・DEAD全滅判定。
 - [src/scoring.lua](../src/scoring.lua): 任務ID＋UCIDごとの一度だけの精算。
 - [src/recovery.lua](../src/recovery.lua): 参加者ごとの着陸確認。
 - [scripts/Test-Wing.lua](../scripts/Test-Wing.lua): 結合済み本番コードによる編隊の模擬検証。
 - [scripts/Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua): 複数ウィングの同時受注・敵識別・独立した帰還／中止／例外処理。
 - [scripts/Test-SEAD.lua](../scripts/Test-SEAD.lua): 地点選定・レーダー状態遷移・個別採点・サイトCleanup・カテゴリ間受注ブロック・中止と他ウィングの独立性。
+- [scripts/Test-DEAD.lua](../scripts/Test-DEAD.lua): 同Group継承・明示保持・多Wing予約・Immediate/Follow-on DEAD・独立採点とCleanup。
 
 `Build-Mission.ps1` の後に Lua 5.1 で `scripts/Test-Wing.lua` を実行する。
 `scripts/Test-ParallelWings.lua` で複数任務の独立性を確認し、既存の `Test-Intercept.lua` と `Test-Scoring.lua` でも単独訓練の動作を確認する。

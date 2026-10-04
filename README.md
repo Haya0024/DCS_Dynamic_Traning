@@ -7,6 +7,7 @@ DCS World / Syria / MOOSE を使用する動的訓練ミッションです。
 
 - [Intercept 訓練ミッション仕様](docs/Intercept.md): 開始条件、生成・経路計算、状態、制約、将来仕様、動作確認項目。
 - [SEAD 訓練ミッション仕様](docs/SEAD.md): SA-6 / SA-8、4 Zone、配置条件、レーダー状態遷移、帰還採点・サイト管理。
+- [DEAD follow-on仕様](docs/DEAD.md): 同Sortieの即時継続、Site保持後の別Sortie、最寄りSite予約、採点・Cleanup。
 - [プレイヤー採点・帰還評価仕様](docs/SCORING.md): UCID、帰還成功100%・クリア後の墜落/死亡/脱出60%、重複防止、保存方針。メモリ内の試用実装済み。
 - [ウィング共有任務仕様](docs/WING.md): MP2 の共有目標、個別帰還・採点、全員離陸待ち、二重受注ブロック、中止操作。
 - [テスト仕様書](docs/TESTING.md): 自動テスト全ケースの条件・期待結果、実行方法、DCS内の確認手順、結果記録。
@@ -49,11 +50,30 @@ PBはSAM種類、実配置予定点から1～3 NMずらした推定座標、HARM
 SA-6 は主要レーダー `Kub 1S91 str`、SA-8 はレーダー一体の `Osa 9A33 ln` を対象とします。
 破壊は即達成、生存中は生成時のLifeより減少し、Radar OFFが連続60秒続くとSuppressedとして達成します。再発信すると計測をリセットします。
 `Mission Status` でエミッターの4状態を確認できます。完了後は再判定を止め、残存SAMを全参加者の終了まで保持します。
-削除は独立したサイト管理が担い、失敗時は再試行します。DEADへの継続任務は未実装です。
+削除は独立したサイト管理が担い、失敗時は再試行します。明示保持を選ばなければCleanupが標準です。
 発射機を残しても達成できます。帰還成功で各自150ポイント、達成後の墜落・死亡・脱出で90ポイントを加算します。
 満額は `src/config.lua` の `sead.fullReward` で設定し、成績の `SEAD Score` に別途記録します。
-同じウィングでは Intercept と SEAD を同時に受注できず、全参加者の精算・中止までロックを維持します。
+同じウィングでは Intercept / SEAD / DEADを同時に受注できず、全参加者の精算・中止までロックを維持します。
 レーダー状態遷移・完了後のサイト管理と採点の DCS 内での確認は未実施です。
+
+## SEADからDEADへ継続する
+
+SEAD達成後に車両が残っている場合だけ、F10に `Continue as DEAD` と `Preserve Site for DEAD` が現れます。
+レーダーの破壊とSite全滅は別判定です。SA-6のレーダーを破壊してもLauncherが残ればDEADへ継続でき、Suppression後は生存レーダーもDEAD対象になります。
+通常は何も選ばずRTBすると、従来通りSEADを精算してSAMを削除します。
+
+`Continue as DEAD` は同じSortie・同じ任務recordで残存車両の全滅を目指します。
+Group・損傷・発信状態をそのまま使い、全滅後のRTBでSEAD150＋DEAD150、合計300ポイントを精算します。
+両目標達成後の事故は各90で合計180、DEAD未達成の事故はSEAD90のみ、任意Abortは0。任務数は1件のままです。
+
+`Preserve Site for DEAD` はSiteを明示保持し、通常のSEAD帰還・精算を続けます。
+保持者はPreserve時の長機です。保持者がログアウトしたら未使用の保持SiteをCleanupします。観戦席への移動・機体変更では削除せず、DEAD使用中はその任務の終了処理に従います。
+全参加者の終了後、次Sortieで再武装して `Generate DEAD` を選ぶと、長機に最も近い保持SiteをFollow-on DEADとして予約します。
+地上受注なら全員離陸待ちですが、SAMは既に世界に存在し、再Spawnや20秒待ちはありません。
+全残存対象破壊後のRTBでDEAD150、達成後事故90、達成前事故・任意Abort0。成績に `DEAD Score` を表示します。
+DEADはImmediate DEADとFollow-on DEADの2種類だけです。どちらも既存SEADの同じSiteを使用します。
+保持Siteがなければ `No preserved SAM sites available for DEAD.` と表示して終了します。
+保持・Site予約・状態表示・採点のDCS内確認は未実施です。
 
 ## 自動検証
 
@@ -73,6 +93,7 @@ lua scripts/Test-Scoring.lua
 lua scripts/Test-Wing.lua
 lua scripts/Test-ParallelWings.lua
 lua scripts/Test-SEAD.lua
+lua scripts/Test-DEAD.lua
 ```
 
 同期ツールは `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-MissionSync.ps1` で検証します。

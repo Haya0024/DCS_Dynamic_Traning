@@ -139,6 +139,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - `Generate SEAD` の受注時に TOO / PB を等確率で抽選し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
 - 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
 - TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。
+- TOOの捜索座標とPBの推定座標はDDM（度＋小数分、分の小数3桁）で受注・開始・Mission Statusに表示する。MOOSEのToStringLLDDMへ精度3を明示し、全体の表示設定から独立させる。
 - 計画と実体生成を分離する。受注時から全員が空中なら計画確定後に生成、地上受注なら全登録者の離陸後20秒で生成する。生成時に計画を再抽選しない。
 - LAND、半径200 m内の標高差20 m以内、各車両が建物・障害物から200 m以上離れることを検査する。
 - 選択した1 Zoneだけを最大50回試し、不合格なら任務を安全に解除する。別Zoneに変更しない。検査は1秒ごとに最大2候補。
@@ -152,9 +153,26 @@ BLUE 空港への RTB を追加評価対象とする。
 - `sead.templates` の `name` / `type` / `pbCode` / `primaryUnitType` に対応をまとめる。TypeNameは `.miz` で確認済みの値を使い、複数の主要レーダーがある場合は全対象の破壊または損傷＋OFF継続時間達成を要求する。
 - 満額は `sead.fullReward = 150`。目標達成後の帰還成功で各自150、墜落・死亡・脱出で90、達成前の事故・任意中止は0。UCID ごとの既存帰還評価と重複防止を使う。
 - Total Score / Career Points / SEAD Score を更新し、Intercept Score と分ける。永続保存は未実装。
-- 目標達成時にSAM Groupを削除しない。残敵とロックを全参加者の終了まで保持する。終了後は独立した `src/sead_sites.lua` に削除を依頼し、失敗時は参照を保持して再試行する。サイト参照は `Missions.sites` に置く。残存車両の追加撃破は報酬に影響しない。
-- 仕様変更では先に `docs/SEAD.md` に状態遷移と終了方針を書く。将来のDEADへ参照を引き継げる構造とし、今回DEADのF10項目・採点・任務状態は追加しない。
+- 目標達成時にSAM Groupを削除しない。Siteのdispositionは初期CLEANUP。保持を選ばなければ全参加者終了後に独立した `src/sead_sites.lua` へ削除を依頼し、失敗時は参照を保持して再試行する。Siteは `Missions.sites` に置き、残存車両の追加撃破はSEAD報酬に影響しない。
+- 仕様変更では先に `docs/SEAD.md` と `docs/DEAD.md` に状態遷移と終了方針を書く。
 - 仕様は `docs/SEAD.md`、模擬検証は `scripts/Test-SEAD.lua` を参照する。
+
+## SEAD → DEAD follow-on（実装済み・ゲーム内確認待ち）
+
+- DEADは既存SEAD Siteの継続任務だけ。種類は同SortieのImmediate DEADと、明示保持・SEAD精算後の次Sortieで取得するFollow-on DEADの2つとする。
+- `Generate DEAD` はpreserved Siteがある場合だけ成立する。候補なしでは `No preserved SAM sites available for DEAD.` を表示して終了し、新規ランダムSAM Siteは生成しない。
+- 同じ生成済みSAM Groupと実際の残存・損傷・発信状態を使う。DEADのためにSpawn、抽選、Life復元、Radar再設定を行わない。
+- SEAD達成後の残存Siteにだけ同階層の `Continue as DEAD` / `Preserve Site for DEAD` を一時表示する。古いcallbackは任務・Site・参加者を再照合する。
+- `record.primaryResult` / `site.primaryResult` はレーダーだけのSUPPRESSED/DESTROYED結果。Site全滅とは分離する。完了通知は `site.seadCompleted`、残存数は `SEADSites.CountAliveSiteTargets` と `site.remainingTargetCount` で管理し、DEAD可否をPrimary結果の値から決めない。SA-6レーダー破壊後も生存Launcherが1両以上あれば継続可能、Suppressed時は生存レーダーも対象、全残存対象0でDEAD不可。
+- Immediateは同じSEAD recordを `RTB_PENDING → DEAD_ACTIVE → RTB_PENDING` とし、新規Acquireは行わない。SEADの結果・任務IDを維持し、Continue時に満額と追加DEAD採点用IDを固定する。両目標達成＋帰還はSEAD150＋DEAD150、両目標達成後事故は各90、DEAD未達成事故はSEAD90／DEAD0、任意中止は両方0。精算済み・途中終了者への遡及採点をせず、追加DEADはscoreOnlyとして任務・帰還等の統計を二重に数えない。
+- Preserveを明示選択した場合だけRETAINとし、`retainedAt` を保存する。元SEADの全員終了までSiteを予約し、終了後はGroupを残して予約だけ解除する。
+- Preserve時の操縦中の登録長機を保持者として固定し、UCIDでログアウトを検出したらRETAIN SiteをCleanupする。未照合UCIDは取得済み接続player IDを使い、観戦・スロット変更と切断を区別する。元SEAD精算前でもSite予約だけ解除し、採点・Wing/UCIDロックは維持する。DEADでIN_USEのSiteは対象外、API不明時は削除せず、削除失敗は再試行する。
+- 通常の `Generate DEAD` は予約なしのRETAIN Siteから長機に最も近いものを取得。既存のWing/UCID排他とSite予約を併用し、準備失敗では予約とロックをrollbackする。
+- Follow-on DEADは新しいDEAD recordをAcquireし、受注時の生存RED ground targetsを固定。地上ならARMED、全員離陸検出でACTIVEへ移行する。既存SAMを隠さず、20秒のSpawn待ちは設けない。
+- DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
+- 全員終了時にIN_USEならCLEANUPへ倒す。明示RETAIN以外はCleanupが標準。保持timeout・明示削除メニュー・永続化は未実装。
+- 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
+- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。既存5 LuaスイートとBuild/Syncテストも通す。
 
 ---
 
@@ -238,7 +256,7 @@ Difficulty ごとに使用可能な Threat Budget を決め、
 - `src/missions.lua` の `Missions.Acquire` を予約・生成より前に使う。ウィング名と登録 UCID で二重受注を拒否する。
 - 参加者が別スロットへ移動しても、元のウィングが終了するまでは新たな受注を拒否する。
 - 任務はカテゴリを問わずウィングごとに同時に1件。別ウィングはそれぞれ別の任務を同時に進められる。BLUE 全体の1件制限は設けない。
-- 状態は `Missions.wings[groupName]` に集約し、`category` で Intercept / SEAD を区別する。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
+- 状態は `Missions.wings[groupName]` に集約し、`category` で Intercept / SEAD / DEAD を区別する。Immediate DEADはSEAD内のphase。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
 - 同じテンプレートから生成する敵は `SPAWN:NewWithAlias` と受注ごとの識別子で名前を分離し、テンプレート名は変更しない。
 - F10 はグループ共有。`Abort Mission` は全体中止、名前・機体を指定する `Abort Sortie` は個人中止。
 - 詳細は `docs/WING.md`。結合後に `scripts/Test-Wing.lua`、`scripts/Test-ParallelWings.lua` と既存の Intercept・採点テストで確認する。
@@ -426,7 +444,7 @@ DCS-Dynamic-Training/
 
 ### 機能別仕様書
 
-- 機能単位の仕様書を `docs/<機能名>.md` に作成する。Intercept は `docs/Intercept.md`、SEAD は `docs/SEAD.md` を参照する。
+- 機能単位の仕様書を `docs/<機能名>.md` に作成する。Intercept は `docs/Intercept.md`、SEAD は `docs/SEAD.md`、DEADは `docs/DEAD.md` を参照する。
 - 仕様書では、現在の実装・既知の制約・将来仕様を区別する。
 - 機能の動作や設定値を変更したら、対応する仕様書も同じ作業で更新する。
 - コードに実装済みであることと、DCS 内で動作確認済みであることを区別して記録する。
@@ -440,7 +458,7 @@ DCS-Dynamic-Training/
 ### Lua と .miz の同期
 
 - `src/*.lua` と `vendor/MOOSE/Moose.lua` を編集元とする。設定値は `src/config.lua` に集約する。
-- `scripts/Build-Mission.ps1` が設定・プレイヤー・採点・任務ロック・Intercept・SEAD目標判定・SEAD配置・サイト管理・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
+- `scripts/Build-Mission.ps1` が設定・プレイヤー・採点・任務ロック・Intercept・SEAD目標判定・SEAD配置・サイト管理・DEAD・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
 - Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、`mission/Syria.miz` も更新する。
   1. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1`
   2. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Check`
@@ -505,3 +523,5 @@ DCS-Dynamic-Training/
 - 複数ウィングが同時に受注でき、各ウィングの目標・帰還・中止・ロック解除が他の任務に影響しないこと
 - 敵の5種類の編隊指定を接敵前に確認すること（初期相対座標はテンプレートから継承し、AI が指定形状へ移行する）
 - 敵テンプレート3種類の抽選、実際の機種・機数の表示、1機・2機編成それぞれの全滅判定を確認すること（模擬テスト済み）
+- SEAD標準Cleanup、Continueで同SiteのImmediate DEAD、Preserve後の別SortieでFollow-on DEADを確認すること
+- 元SEAD全員終了までのSite予約、最寄りRETAINの取得、別Wingの二重取得拒否、DEAD150/90/0とImmediateのSEAD＋DEAD採点・任務数1件を確認すること。詳細な手順は `docs/DEAD.md` と `docs/TESTING.md` を参照する

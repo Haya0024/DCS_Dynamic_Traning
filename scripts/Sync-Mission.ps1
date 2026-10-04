@@ -19,10 +19,9 @@ if ($Check -and $Watch) {
     throw '-Check and -Watch cannot be used together.'
 }
 
-# Only replace scripts already registered by Mission Editor. New modules need
-# their DO SCRIPT FILE action configured in ME before adding a mapping here.
+# Bundle modules into the already registered entry; no ME triggers are added.
 $scripts = @(
-    @{ Source = (Join-Path $projectRoot 'src/DynamicTraining.lua'); Entry = 'l10n/DEFAULT/DynamicTraining.lua' },
+    @{ Source = (Join-Path $projectRoot 'build/DynamicTraining.lua'); Entry = 'l10n/DEFAULT/DynamicTraining.lua' },
     @{ Source = (Join-Path $projectRoot 'vendor/MOOSE/Moose.lua'); Entry = 'l10n/DEFAULT/Moose.lua' }
 )
 
@@ -54,6 +53,7 @@ function Get-ArchiveHashes {
 }
 
 function Sync-Mission {
+    & (Join-Path $PSScriptRoot 'Build-Mission.ps1')
     $sourceHashes = @{}
     foreach ($script in $scripts) {
         $sourceHashes[$script.Entry] = (Get-FileHash -LiteralPath $script.Source -Algorithm SHA256).Hash
@@ -144,7 +144,9 @@ function Sync-Mission {
 }
 
 function Get-WatchStamp {
-    $paths = @($MissionPath) + @($scripts | ForEach-Object { $_.Source })
+    $paths = @($MissionPath) + @($scripts | ForEach-Object { $_.Source }) +
+        @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Filter '*.lua' -File | ForEach-Object { $_.FullName }) +
+        @(Join-Path $PSScriptRoot 'Build-Mission.ps1')
     return (($paths | ForEach-Object {
         $file = Get-Item -LiteralPath $_
         '{0}:{1}:{2}' -f $file.FullName, $file.LastWriteTimeUtc.Ticks, $file.Length

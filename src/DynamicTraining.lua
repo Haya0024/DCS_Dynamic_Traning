@@ -1,413 +1,410 @@
-trigger.action.outText("DynamicTraining.lua loaded", 10)
+-- Runtime entry. Build-Mission.ps1 prepends the local gameplay modules.
+if DynamicTrainingRuntime then
+    trigger.action.outText("Dynamic Training is already loaded.", 10)
+    return
+end
+if not BASE or not SPAWN or not MENU_GROUP then
+    trigger.action.outText("ERROR: Load MOOSE before DynamicTraining.", 15)
+    return
+end
+DynamicTrainingRuntime = { version = "UCID-parallel-wing-scoring-trial-3" }
 
-------------------------------------------------------------
--- SETTINGS
-------------------------------------------------------------
+local menus = {}
+local nextPlayerScan = 0
+local ScanPlayers
 
-local NM_TO_M = 1852
-local FT_TO_M = 0.3048
-
-local BVR_MIN_DISTANCE_NM = 60
-local BVR_MAX_DISTANCE_NM = 80
-local BVR_MAX_BEARING_OFFSET_DEG = 60
-local BVR_THROUGH_DISTANCE_NM = 20
-local BVR_TAKEOFF_DELAY_SECONDS = 20
-local BVR_TAKEOFF_CHECK_INTERVAL_SECONDS = 2
-
-local BVR_MIN_ALT_FT = 15000
-local BVR_MAX_ALT_FT = 30000
-
-local BVR_ROUTE_SPEED_MPS = 230
-local BVR_ENGAGE_TARGET_TYPES = { "Fighters", "Multirole fighters" }
-
-------------------------------------------------------------
--- STATE
-------------------------------------------------------------
-
-local bvrPending = false
-local bvrPendingPlayer = nil
-local bvrSpawnAt = nil
-local bvrActive = false
-local currentEnemyGroup = nil
-
-local function ClearBVRPending()
-    bvrPending = false
-    bvrPendingPlayer = nil
-    bvrSpawnAt = nil
+local function Message(group, text, seconds)
+    if group then pcall(function() MESSAGE:New(text, seconds or 10):ToGroup(group) end) end
 end
 
-------------------------------------------------------------
--- GET CURRENT BLUE PLAYER
-------------------------------------------------------------
-
-local function GetBluePlayer()
-
-    local players = coalition.getPlayers(coalition.side.BLUE)
-
-    if not players or #players == 0 then
-        return nil
-    end
-
-    local dcsUnit = players[1]
-
-    if not dcsUnit or not dcsUnit:isExist() then
-        return nil
-    end
-
-    return UNIT:FindByName(dcsUnit:getName())
+local function Log(text)
+    env.info("[DynamicTraining] " .. text)
 end
 
-------------------------------------------------------------
--- BVR ROUTE / ENGAGEMENT
-------------------------------------------------------------
-
-local function ConfigureBVRRoute(enemyGroup, spawnVec3, destinationVec3)
-
-    -- En-route engagement uses normal AI detection. No route-leg distance
-    -- limit is imposed; this argument is not a weapon launch range.
-    local engageTask = enemyGroup:EnRouteTaskEngageTargets(
-        nil,
-        BVR_ENGAGE_TARGET_TYPES,
-        0
-    )
-
-    -- MOOSE waypoint builders accept km/h, unlike RouteToVec3's m/s.
-    local speedKmh = BVR_ROUTE_SPEED_MPS * 3.6
-    local altitudeType = COORDINATE.WaypointAltType.BARO
-    local route = {
-        COORDINATE:NewFromVec3(spawnVec3):WaypointAirTurningPoint(
-            altitudeType,
-            speedKmh,
-            { engageTask }
-        ),
-        COORDINATE:NewFromVec3(destinationVec3):WaypointAirFlyOverPoint(
-            altitudeType,
-            speedKmh
-        )
-    }
-
-    -- Only designated target types may be engaged, so the BLUE AWACS is
-    -- excluded. Weapons Free would permit attacks outside this task filter.
-    enemyGroup:OptionROEOpenFire()
-
-    -- Submit the movement and engagement task together. RouteToVec3 builds
-    -- bare waypoints and would discard the template's CAP engagement task.
-    enemyGroup:Route(route)
+local function Safe(label, group, callback)
+    local ok, result = pcall(callback)
+    if not ok then
+        env.error("[DynamicTraining] " .. label .. ": " .. tostring(result))
+        Message(group, "ERROR: " .. label .. ". See DCS log.", 15)
+    end
+    return ok, result
 end
 
-------------------------------------------------------------
--- SPAWN BVR
-------------------------------------------------------------
-
-local function SpawnBVR(playerUnit)
-
-    if bvrActive then
-        MESSAGE:New(
-            "A BVR mission is already active.",
-            10
-        ):ToBlue()
-        return
-    end
-
-    if not playerUnit or not playerUnit:IsAlive() then
-        MESSAGE:New(
-            "Player aircraft not found.",
-            10
-        ):ToBlue()
-        return
-    end
-
-    --------------------------------------------------------
-    -- Player position / heading
-    --------------------------------------------------------
-
-    local playerVec3 = playerUnit:GetVec3()
-    local playerHeading = playerUnit:GetHeading()
-
-    --------------------------------------------------------
-    -- Random distance
-    --------------------------------------------------------
-
-    local distanceNM =
-        math.random(
-            BVR_MIN_DISTANCE_NM,
-            BVR_MAX_DISTANCE_NM
-        )
-
-    local distanceM = distanceNM * NM_TO_M
-
-    --------------------------------------------------------
-    -- Enemy altitude
-    --------------------------------------------------------
-
-    local altitudeFT =
-        math.random(
-            BVR_MIN_ALT_FT,
-            BVR_MAX_ALT_FT
-        )
-
-    local altitudeM = altitudeFT * FT_TO_M
-
-    --------------------------------------------------------
-    -- Randomize bearing within the forward sector
-    --------------------------------------------------------
-
-    local bearingOffset = math.random(
-        -BVR_MAX_BEARING_OFFSET_DEG,
-        BVR_MAX_BEARING_OFFSET_DEG
-    )
-    local spawnBearing = (playerHeading + bearingOffset) % 360
-
-    -- MOOSE Translate uses the same x/z heading convention as GetHeading.
-    local playerCoordinate = COORDINATE:NewFromVec3(playerVec3)
-    local spawnCoordinate = playerCoordinate:Translate(
-        distanceM,
-        spawnBearing,
-        true
-    )
-    -- SetAltitude's second argument selects ASL rather than its default AGL.
-    spawnCoordinate:SetAltitude(altitudeM, true)
-    local spawnVec3 = spawnCoordinate:GetVec3()
-
-    --------------------------------------------------------
-    -- Enemy faces player
-    --------------------------------------------------------
-
-    -- HOT is relative to the actual spawn-to-player line, not player heading.
-    local enemyHeading = spawnCoordinate:HeadingTo(playerCoordinate)
-
-    --------------------------------------------------------
-    -- Spawn
-    --------------------------------------------------------
-
-    local spawner =
-        SPAWN:New("TPL_BVR_MIG29_2")
-        :InitHeading(enemyHeading)
-
-    currentEnemyGroup =
-        spawner:SpawnFromVec3(spawnVec3)
-
-    if not currentEnemyGroup then
-        MESSAGE:New(
-            "ERROR: BVR enemy spawn failed.",
-            15
-        ):ToBlue()
-
-        return
-    end
-
-    bvrActive = true
-
-    --------------------------------------------------------
-    -- Route THROUGH player's position
-    --------------------------------------------------------
-
-    -- Extend the randomized approach line through the player's reference
-    -- position. Using playerHeading here would make the route miss the player.
-    local destinationCoordinate = playerCoordinate:Translate(
-        BVR_THROUGH_DISTANCE_NM * NM_TO_M,
-        (spawnBearing + 180) % 360,
-        true
-    )
-    destinationCoordinate:SetAltitude(altitudeM, true)
-    local destinationVec3 = destinationCoordinate:GetVec3()
-
-    ConfigureBVRRoute(currentEnemyGroup, spawnVec3, destinationVec3)
-
-    --------------------------------------------------------
-    -- Message
-    --------------------------------------------------------
-
-    MESSAGE:New(
-        string.format(
-            "BVR MISSION START\n\n" ..
-            "Hostiles: 2 x MiG-29A\n" ..
-            "Range: %d NM\n" ..
-            "Altitude: %d ft\n" ..
-            "Aspect: HOT",
-            distanceNM,
-            altitudeFT
-        ),
-        15
-    ):ToBlue()
+local function HasPending(record)
+    for _, p in ipairs(record.participants) do if not p.done then return true end end
+    return false
 end
 
-------------------------------------------------------------
--- GENERATE BVR COMMAND
-------------------------------------------------------------
+local function Close(record)
+    -- Release before cleanup: generated destroy events cannot award a win.
+    if not Missions.Release(record) then return end
+    if record.spawn then Safe("Enemy cleanup", record.group, function() record.spawn.group:Destroy(false) end) end
+    Log((record.id or "Intercept reservation") .. " closed; wing assignment released")
+end
 
-local function GenerateBVR()
+local function SelectLeader(record)
+    for _, p in ipairs(record.participants) do
+        if not p.done and Player.SameAircraft(p.owner) then
+            record.owner = p.owner
+            return p.owner
+        end
+    end
+end
 
-    if bvrActive then
-        MESSAGE:New(
-            "A BVR mission is already active.",
-            10
-        ):ToBlue()
+local function SettleParticipant(record, p, result, reason)
+    if p.done then return end
+    local receipt
+    if p.id then receipt = Scoring.Settle(p, result, reason) end
+    p.done, p.state, p.receipt, p.landing = true, result, receipt, nil
+    local text = string.format("Intercept %s: %s\n%s", result, p.owner.name, reason)
+    if receipt then
+        if receipt.scored then
+            text = text .. string.format("\nPoints: +%d\nTotal Score: %d\nSession only; not saved.",
+                receipt.points, receipt.total)
+        else text = text .. "\nUnscored sortie (UCID unavailable)." end
+        Log(string.format("%s %s points=%d scored=%s", record.id, result,
+            receipt.points, tostring(receipt.scored)))
+    end
+    Message(record.group, text, 20)
+    if HasPending(record) then SelectLeader(record) else Close(record) end
+end
+
+local function PrimaryComplete(record, time)
+    if not Missions.IsActive(record) or record.state ~= "ACTIVE" then return end
+    record.primaryCompletedAt, record.state = time, "RTB_PENDING"
+    for _, p in ipairs(record.participants) do
+        -- A pre-clear death/abort stays at zero even if the wing later wins.
+        if not p.done then p.primaryCompletedAt, p.state = time, "RTB_PENDING" end
+    end
+    Message(record.group, "Intercept PRIMARY OBJECTIVE COMPLETE\n" ..
+        "All hostile aircraft destroyed.\nEach pilot: return to a BLUE airfield or carrier.\n" ..
+        string.format("Reward per pilot: %d points; recovery failure: %d points.",
+            record.fullReward, math.floor(record.fullReward * Config.recoveryFailurePercent / 100)), 20)
+    Log(record.id .. " primary objective complete; awaiting individual RTB")
+end
+
+local function Ready(record)
+    local airborne = true
+    for _, p in ipairs(record.participants) do
+        if not p.done then
+            if not Player.IsControlling(p.owner) then return false, false end
+            if not p.owner.unit:InAir() then airborne = false end
+        end
+    end
+    return true, airborne
+end
+
+local function Start(record)
+    local controlling, airborne = Ready(record)
+    local leader = SelectLeader(record)
+    if not controlling or not airborne or not leader then
+        Close(record)
+        Message(record.group, "Intercept reservation cancelled. Player aircraft changed or unavailable.")
         return
     end
-
-    if bvrPending then
-        MESSAGE:New(
-            "BVR mission is already armed.",
-            10
-        ):ToBlue()
+    local ok, spawn, problem = pcall(Intercept.Spawn, leader.unit, record.assignmentID)
+    if not ok or not spawn then
+        Close(record)
+        env.error("[DynamicTraining] Spawn: " .. tostring(ok and problem or spawn))
+        Message(record.group, "ERROR: Intercept enemy spawn failed. Select Generate Intercept to retry.", 15)
         return
     end
-
-    local playerUnit = GetBluePlayer()
-
-    local playerName = playerUnit and playerUnit:GetPlayerName()
-    if not playerUnit or not playerUnit:IsAlive() or not playerName or playerName == "" then
-        MESSAGE:New(
-            "Player aircraft not found.",
-            10
-        ):ToBlue()
-        return
+    record.spawn, record.state = spawn, "ACTIVE"
+    record.id, record.fullReward = Scoring.NextID(), Config.fullReward
+    local pilots = {}
+    for _, p in ipairs(record.participants) do
+        if not p.done then
+            p.id, p.fullReward, p.state = record.id, record.fullReward, "ACTIVE"
+            pilots[#pilots + 1] = p.owner.name ..
+                (p.owner.ucid and (" (reward: " .. record.fullReward .. ")") or " (unscored)")
+        end
     end
+    Message(record.group, string.format(
+        "Intercept MISSION START\nHostiles: %s\nRange: %d NM\nAltitude: %d ft\nAspect: HOT\nPilots: %s",
+        spawn.composition, spawn.distance, spawn.altitude, table.concat(pilots, ", ")), 15)
+    Log(record.id .. " started; registered pilots=" .. tostring(#pilots) ..
+        " template=" .. spawn.template ..
+        " formation=" .. spawn.formation .. "/" .. spawn.formationSpacing)
+end
 
-    --------------------------------------------------------
-    -- Already airborne
-    --------------------------------------------------------
+local function Generate(groupName)
+    local group = GROUP:FindByName(groupName)
+    local roster, problem = Player.ForGroup(groupName)
+    if not roster then Message(group, problem); return end
+    local blocker = Missions.Blocker(groupName, roster)
+    if blocker then Message(group, blocker); return end
+    local record = { group = group, groupName = groupName, participants = {},
+        state = "ARMED", nextTakeoffCheck = timer.getTime() }
+    -- Freeze membership at acceptance, including those still on the ground.
+    for _, owner in ipairs(roster) do
+        record.participants[#record.participants + 1] = { owner = owner, state = "ARMED" }
+    end
+    local acquired, blocked = Missions.Acquire(record)
+    if not acquired then Message(group, blocked); return end
+    if problem then Message(group, problem, 15) end
+    local _, airborne = Ready(record)
+    if airborne then Start(record) else
+        record.owner = roster[1]
+        Message(group, string.format(
+            "Intercept mission armed. Registered pilots: %d.\nHostiles will spawn %d seconds after ALL registered pilots take off.",
+            #roster, Config.takeoffDelaySeconds))
+    end
+end
 
-    if playerUnit:InAir() then
+local function Statistics(groupName)
+    local group = GROUP:FindByName(groupName)
+    local roster, problem = Player.ForGroup(groupName)
+    if not roster then Message(group, problem); return end
+    local texts = {}
+    for _, owner in ipairs(roster) do
+        local p = Scoring.Get(owner.ucid, owner.name)
+        if p then
+            texts[#texts + 1] = string.format(
+                "PLAYER STATISTICS: %s [%s]\nTotal Score: %d\nCareer Points: %d\nIntercept Score: %d\n" ..
+                "Settled Missions: %d\nPrimary Success: %d\nRTB Success: %d\nRecovery Failure: %d",
+                owner.name, owner.unitName, p.totalScore, p.careerPoints, p.interceptScore,
+                p.missionCount, p.primarySuccessCount, p.rtbSuccessCount, p.recoveryFailureCount)
+        else texts[#texts + 1] = "PLAYER STATISTICS: " .. owner.name .. "\nUCID unavailable; unscored." end
+    end
+    Message(group, table.concat(texts, "\n\n") .. "\nSession only; not saved.", 25)
+end
 
-        SpawnBVR(playerUnit)
+local function Status(groupName)
+    local group = GROUP:FindByName(groupName)
+    local roster = Player.ForGroup(groupName)
+    local records = Missions.ForGroup(groupName, roster)
+    if #records == 0 then Message(group, "Intercept: Idle."); return end
+    local texts = {}
+    for _, record in ipairs(records) do
+        local text = "Intercept: " .. record.state .. "\nWing: " .. record.groupName ..
+            "\nLead reference: " .. record.owner.name
+        if record.spawnAt then
+            text = text .. string.format("\nSpawn in %d seconds.", math.max(0, math.ceil(record.spawnAt - timer.getTime())))
+        end
+        for _, p in ipairs(record.participants) do
+            text = text .. "\n" .. p.owner.name .. " [" .. p.owner.unitName .. "]: " .. p.state
+            if p.receipt then text = text .. " (+" .. p.receipt.points .. ")" end
+        end
+        texts[#texts + 1] = text
+    end
+    Message(group, table.concat(texts, "\n\n"), 20)
+end
 
-    --------------------------------------------------------
-    -- Still on ground
-    --------------------------------------------------------
+local function CanManage(groupName, target)
+    local roster = Player.ForGroup(groupName)
+    if not roster then return false end
+    for _, current in ipairs(roster) do
+        if Player.CanManage(target.owner, current) then return true end
+    end
+    return false
+end
 
+local function Abort(groupName, target, assignment)
+    local group = GROUP:FindByName(groupName)
+    local record = assignment
+    if target then
+        if not Missions.IsActive(record) then Message(group, "This sortie is already closed."); return end
     else
-
-        bvrPending = true
-        -- Bind the reservation to this human-controlled aircraft. AI wingmen
-        -- and other BLUE players must not trigger its takeoff countdown.
-        bvrPendingPlayer = {
-            unit = playerUnit,
-            id = playerUnit:GetID(),
-            name = playerName
-        }
-        bvrSpawnAt = nil
-
-        MESSAGE:New(
-            "BVR mission armed.\n" ..
-            string.format(
-                "Hostiles will spawn %d seconds after takeoff detection.",
-                BVR_TAKEOFF_DELAY_SECONDS
-            ),
-            10
-        ):ToBlue()
-
+        local records = Missions.ForGroup(groupName, Player.ForGroup(groupName))
+        if #records == 0 then Message(group, "Intercept: Idle."); return end
+        record = records[1]
+        if not Missions.wings[groupName] and #records > 1 then
+            Message(group, "Multiple earlier wing missions found. Use the named Abort Sortie command."); return
+        end
+    end
+    local authorized = false
+    for _, p in ipairs(record.participants) do
+        if CanManage(groupName, p) then authorized = true; break end
+    end
+    if not authorized then Message(group, "Only registered mission participants may abort this mission."); return end
+    if target then
+        local registered = false
+        for _, p in ipairs(record.participants) do if p == target then registered = true end end
+        if not registered or target.done then Message(group, "This sortie is already closed."); return end
+        -- Group F10 has no caller identity: registered wing members may select
+        -- a named sortie; from another group, only their own UCID is permitted.
+        if groupName ~= record.groupName and not CanManage(groupName, target) then
+            Message(group, "Only your own sortie may be aborted from another wing."); return
+        end
+        SettleParticipant(record, target, "ABORT", "Individual sortie aborted. No reward.")
+        if not record.spawn and Missions.IsActive(record) then
+            record.spawnAt, record.state = nil, "ARMED"
+        end
+    else
+        if groupName ~= record.groupName and #record.participants > 1 then
+            Message(group, "Use Abort Sortie for your own pilot; wing abort is available in the original wing."); return
+        end
+        for _, p in ipairs(record.participants) do
+            SettleParticipant(record, p, "ABORT", "Wing mission aborted. No reward.")
+        end
+        if not record.spawn then Message(group, "Intercept reservation cancelled.") end
     end
 end
 
-------------------------------------------------------------
--- TAKEOFF MONITOR
-------------------------------------------------------------
-
-local function CheckTakeoff(arg, time)
-
-    if bvrPending then
-
-        local playerUnit = bvrPendingPlayer.unit
-
-        if not playerUnit:IsAlive()
-            or playerUnit:GetID() ~= bvrPendingPlayer.id
-            or playerUnit:GetPlayerName() ~= bvrPendingPlayer.name then
-
-            ClearBVRPending()
-            MESSAGE:New(
-                "BVR reservation cancelled. Player aircraft changed or unavailable.",
-                10
-            ):ToBlue()
-
-        elseif not playerUnit:InAir() then
-
-            -- A touchdown before spawning restarts the wait for takeoff.
-            if bvrSpawnAt then
-                bvrSpawnAt = nil
-                MESSAGE:New(
-                    "BVR countdown reset. Waiting for takeoff.",
-                    10
-                ):ToBlue()
+ScanPlayers = function()
+    local present = {}
+    -- Standard API lists human BLUE units; MOOSE supplies wrappers and menus.
+    -- Neither airfield names nor Client group names are fixed.
+    for _, dcsUnit in ipairs(coalition.getPlayers(coalition.side.BLUE) or {}) do
+        if dcsUnit:isExist() then
+            local unit = UNIT:FindByName(dcsUnit:getName())
+            if unit and unit:GetTypeName() == Config.playerType then
+                local group = unit:GetGroup()
+                present[group:GetName()] = group
             end
-
-        elseif not bvrSpawnAt then
-
-            bvrSpawnAt = time + BVR_TAKEOFF_DELAY_SECONDS
-            MESSAGE:New(
-                string.format(
-                    "Takeoff detected. Hostiles will spawn in %d seconds.",
-                    BVR_TAKEOFF_DELAY_SECONDS
-                ),
-                10
-            ):ToBlue()
-
-        elseif time >= bvrSpawnAt then
-
-            ClearBVRPending()
-            -- Read position and heading now, after the countdown has elapsed.
-            SpawnBVR(playerUnit)
         end
     end
-
-    return time + BVR_TAKEOFF_CHECK_INTERVAL_SECONDS
-end
-
-timer.scheduleFunction(
-    CheckTakeoff,
-    nil,
-    timer.getTime() + BVR_TAKEOFF_CHECK_INTERVAL_SECONDS
-)
-
-------------------------------------------------------------
--- BVR COMPLETION MONITOR
-------------------------------------------------------------
-
-local function CheckBVRMission(arg, time)
-
-    if bvrActive and currentEnemyGroup then
-
-        if not currentEnemyGroup:IsAlive() then
-
-            bvrActive = false
-            currentEnemyGroup = nil
-
-            MESSAGE:New(
-                "BVR MISSION COMPLETE\nAll hostile aircraft destroyed.",
-                15
-            ):ToBlue()
-
+    for name, group in pairs(present) do
+        local roster = Player.ForGroup(name) or {}
+        local records = Missions.ForGroup(name, roster)
+        local signature = tostring(group:GetID())
+        for _, owner in ipairs(roster) do
+            signature = signature .. ":" .. owner.unitName .. ":" .. owner.objectID .. ":" .. owner.name
+        end
+        local targets = {}
+        for _, record in ipairs(records) do
+            signature = signature .. ":assignment:" .. record.assignmentID
+            for _, p in ipairs(record.participants) do
+                local own = false
+                for _, current in ipairs(roster) do
+                    if Player.CanManage(p.owner, current) then own = true end
+                end
+                if not p.done and (name == record.groupName or own) then
+                    targets[#targets + 1] = { participant = p, record = record }
+                    signature = signature .. ":abort:" .. p.owner.unitName
+                end
+            end
+        end
+        if not menus[name] or menus[name].signature ~= signature then
+            if menus[name] then menus[name].root:Remove() end
+            local root = MENU_GROUP:New(group, "Dynamic Training")
+            menus[name] = { root = root, signature = signature }
+            for _, command in ipairs({
+                { "Generate Intercept", Generate }, { "Mission Status", Status },
+                { "Abort Mission", Abort }, { "Player Statistics", Statistics }
+            }) do
+                local label, action = command[1], command[2]
+                MENU_GROUP_COMMAND:New(group, label, root, function()
+                    Safe(label, group, function() action(name); ScanPlayers() end)
+                end)
+            end
+            for _, entry in ipairs(targets) do
+                local target, record = entry.participant, entry.record
+                local p = target
+                local label = "Abort Sortie: " .. p.owner.name .. " [" .. p.owner.unitName .. "]"
+                MENU_GROUP_COMMAND:New(group, label, root, function()
+                    Safe("Individual abort", group, function() Abort(name, target, record); ScanPlayers() end)
+                end)
+            end
         end
     end
-
-    return time + 2
+    for name, menu in pairs(menus) do
+        if not present[name] then menu.root:Remove(); menus[name] = nil end
+    end
 end
 
-timer.scheduleFunction(
-    CheckBVRMission,
-    nil,
-    timer.getTime() + 2
-)
+local function TickMission(record, time)
+    if not Missions.IsActive(record) then return end
+    if record.state == "ARMED" or record.state == "TAKEOFF_DELAY" then
+        if time < record.nextTakeoffCheck then return end
+        record.nextTakeoffCheck = time + Config.takeoffCheckSeconds
+        local controlling, airborne = Ready(record)
+        if not controlling then
+            Close(record)
+            Message(record.group, "Intercept reservation cancelled. Player aircraft changed or unavailable.")
+        elseif not airborne then
+            if record.spawnAt then
+                record.spawnAt, record.state = nil, "ARMED"
+                Message(record.group, "Intercept countdown reset. Waiting for all registered pilots to take off.")
+            end
+        elseif not record.spawnAt then
+            record.spawnAt, record.state = time + Config.takeoffDelaySeconds, "TAKEOFF_DELAY"
+            Message(record.group, string.format("All registered pilots airborne. Hostiles will spawn in %d seconds.",
+                Config.takeoffDelaySeconds))
+        elseif time >= record.spawnAt then
+            record.spawnAt = nil
+            Start(record)
+        end
+    elseif record.state == "ACTIVE" then
+        -- No retrospective polling win when every original aircraft has gone.
+        if SelectLeader(record) and Intercept.AllGone(record.spawn) then PrimaryComplete(record, time) end
+    elseif record.state == "RTB_PENDING" then
+        for _, p in ipairs(record.participants) do
+            if not p.done and p.state == "LANDING_CHECK" then
+                if Recovery.Update(p, time) == "SUCCESS" then
+                    SettleParticipant(record, p, "RTB_SUCCESS", "Safe recovery confirmed (100%).")
+                end
+            end
+        end
+    end
+end
 
-------------------------------------------------------------
--- F10 MENU
-------------------------------------------------------------
+local eventHandler = BASE:New()
+local failureEvents = {}
+for _, name in ipairs({ "Crash", "Dead", "PilotDead", "Ejection", "UnitLost" }) do
+    if EVENTS[name] and EVENTS[name] >= 0 then failureEvents[EVENTS[name]] = name end
+end
 
-local TrainingMenu =
-    MENU_COALITION:New(
-        coalition.side.BLUE,
-        "Dynamic Training"
-    )
+local function HandleEvent(record, event)
+    if not Missions.IsActive(record) or not record.spawn then return end
+    local time = event.Time or event.time or timer.getTime()
+    local reason = failureEvents[event.id]
+    if reason then
+        for _, p in ipairs(record.participants) do
+            if Player.EventMatches(p.owner, event) then
+                if p.done then return end
+                if p.primaryCompletedAt and time >= p.primaryCompletedAt then
+                    SettleParticipant(record, p, "RTB_FAILURE", reason .. " before safe recovery (60%).")
+                else
+                    p.primaryCompletedAt = nil
+                    SettleParticipant(record, p, "FAILED", reason .. " before primary completion (0 points).")
+                end
+                return
+            end
+        end
+        if record.state == "ACTIVE" and
+            (event.id == EVENTS.Crash or event.id == EVENTS.Dead or event.id == EVENTS.UnitLost) then
+            if Intercept.RecordLoss(record.spawn, event) then PrimaryComplete(record, time) end
+        end
+    elseif event.id == EVENTS.RunwayTouch or event.id == EVENTS.Land then
+        if record.state == "RTB_PENDING" then
+            for _, p in ipairs(record.participants) do
+                if not p.done then Recovery.Start(p, event) end
+            end
+        end
+    elseif event.id == EVENTS.Takeoff or event.id == EVENTS.RunwayTakeoff then
+        for _, p in ipairs(record.participants) do
+            if not p.done and Player.EventMatches(p.owner, event) and p.landing then
+                p.landing, p.state = nil, "RTB_PENDING"
+            end
+        end
+    end
+end
 
-MENU_COALITION_COMMAND:New(
-    coalition.side.BLUE,
-    "Generate BVR",
-    TrainingMenu,
-    GenerateBVR
-)
+local subscriptions = {}
+for id in pairs(failureEvents) do subscriptions[id] = true end
+for _, name in ipairs({ "RunwayTouch", "Land", "Takeoff", "RunwayTakeoff" }) do
+    if EVENTS[name] and EVENTS[name] >= 0 then subscriptions[EVENTS[name]] = true end
+end
+for id in pairs(subscriptions) do
+    eventHandler:HandleEvent(id, function(_, event)
+        for _, record in ipairs(Missions.Snapshot()) do
+            Safe("Mission event", record.group, function() HandleEvent(record, event) end)
+        end
+    end)
+end
 
-MESSAGE:New(
-    "Dynamic Training ready.",
-    10
-):ToBlue()
+local function Tick(_, time)
+    if time >= nextPlayerScan then
+        Safe("Player menu scan", nil, ScanPlayers)
+        nextPlayerScan = time + Config.playerScanSeconds
+    end
+    for _, record in ipairs(Missions.Snapshot()) do
+        Safe("Mission monitor", record.group, function() TickMission(record, time) end)
+    end
+    return time + Config.pollSeconds
+end
+
+Safe("Initial player menu scan", nil, ScanPlayers)
+timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
+trigger.action.outText("Dynamic Training ready. Wing UCID scoring trial; session scores are not saved.", 10)

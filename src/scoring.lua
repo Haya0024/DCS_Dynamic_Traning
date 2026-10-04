@@ -1,0 +1,57 @@
+local Scoring = { players = {}, settlements = {}, sequence = 0 }
+
+function Scoring.NextID()
+    -- This prototype has no disk persistence: IDs need only be unique within
+    -- this mission run. Persistent session IDs will be added with storage.
+    Scoring.sequence = Scoring.sequence + 1
+    return "Intercept:" .. tostring(Scoring.sequence)
+end
+
+function Scoring.Get(ucid, name)
+    if not ucid then return nil end
+    local p = Scoring.players[ucid]
+    if not p then
+        p = { totalScore = 0, careerPoints = 0, interceptScore = 0,
+            missionCount = 0, primarySuccessCount = 0, rtbSuccessCount = 0,
+            recoveryFailureCount = 0, failedCount = 0, abortCount = 0 }
+        Scoring.players[ucid] = p
+    end
+    p.lastKnownName = name or p.lastKnownName
+    return p
+end
+
+function Scoring.Settle(mission, result, reason)
+    -- A wing shares the mission ID, but each registered UCID settles once.
+    -- Unknown identities have a session-only aircraft key and never a score.
+    local key = mission.owner.ucid and ("ucid:" .. mission.owner.ucid)
+        or ("aircraft:" .. tostring(mission.owner.objectID))
+    local ledger = Scoring.settlements[mission.id] or {}
+    local existing = ledger[key]
+    if existing then return existing end
+    local points = 0
+    if result == "RTB_SUCCESS" then
+        points = mission.fullReward
+    elseif result == "RTB_FAILURE" and mission.primaryCompletedAt then
+        points = math.floor(mission.fullReward * Config.recoveryFailurePercent / 100)
+    end
+    local p = Scoring.Get(mission.owner.ucid, mission.owner.name)
+    if p then
+        p.totalScore = p.totalScore + points
+        p.careerPoints = p.careerPoints + points
+        p.interceptScore = p.interceptScore + points
+        p.missionCount = p.missionCount + 1
+        if mission.primaryCompletedAt then p.primarySuccessCount = p.primarySuccessCount + 1 end
+        if result == "RTB_SUCCESS" then p.rtbSuccessCount = p.rtbSuccessCount + 1 end
+        if result == "RTB_FAILURE" then p.recoveryFailureCount = p.recoveryFailureCount + 1 end
+        if result == "FAILED" then p.failedCount = p.failedCount + 1 end
+        if result == "ABORT" then p.abortCount = p.abortCount + 1 end
+    end
+    local receipt = { missionID = mission.id, ownerUCID = mission.owner.ucid,
+        fullReward = mission.fullReward, result = result, reason = reason, scored = p ~= nil,
+        points = p and points or 0, total = p and p.totalScore or 0 }
+    ledger[key] = receipt
+    Scoring.settlements[mission.id] = ledger
+    return receipt
+end
+
+return Scoring

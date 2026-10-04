@@ -16,8 +16,35 @@ return {
         Stennis = true, CVN_71 = true, CVN_72 = true, CVN_73 = true,
         CVN_74 = true, CVN_75 = true, Forrestal = true
     },
+    sead = {
+        fullReward = 150,
+        suppressionHoldSeconds = 60,
+        modes = { "TOO", "PB" },
+        templates = {
+            { name = "TPL_SEAD_SA6", type = "SA-6", pbCode = 108, primaryUnitType = "Kub 1S91 str" },
+            { name = "TPL_SEAD_SA8", type = "SA-8", pbCode = 117, primaryUnitType = "Osa 9A33 ln" }
+        },
+        zones = { "SEAD_ZONE_PALMYRA", "SEAD_ZONE_SALAMIYAH", "SEAD_ZONE_DUMAYR", "SEAD_ZONE_TABQA" },
+        zoneLabels = { SEAD_ZONE_PALMYRA = "Palmyra", SEAD_ZONE_SALAMIYAH = "Salamiyah",
+            SEAD_ZONE_DUMAYR = "Dumayr", SEAD_ZONE_TABQA = "Tabqa" },
+        minDistanceNM = 40,
+        maxDistanceNM = 130,
+        pbEstimateErrorMinNM = 1,
+        pbEstimateErrorMaxNM = 3,
+        tooEstimateErrorMinNM = 3,
+        tooEstimateErrorMaxNM = 5,
+        flatRadiusMeters = 200,
+        sampleStepMeters = 50,
+        perimeterSamples = 16,
+        maxHeightDifferenceMeters = 20,
+        buildingClearanceMeters = 200,
+        objectSearchPaddingMeters = 300,
+        unknownObjectRadiusMeters = 50,
+        attemptsPerZone = 50,
+        attemptsPerTick = 2
+    },
     intercept = {
-        templates = { "TPL_BVR_MIG29A_2", "TPL_BVR_SU27_1", "TPL_BVR_MIG29A_1" },
+        templates = { "TPL_INT_MIG29A_2", "TPL_INT_SU27_1", "TPL_INT_MIG29A_1" },
         minDistanceNM = 60,
         maxDistanceNM = 80,
         maxBearingOffsetDeg = 60,

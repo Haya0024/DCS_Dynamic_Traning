@@ -51,9 +51,9 @@ Intercept、SEAD、DEAD、Strike、CAS、Anti-Ship などの訓練ミッショ�
 
 | グループ名 | 構成 |
 |---|---|
-| `TPL_BVR_MIG29A_2` | MiG-29A ×2 |
-| `TPL_BVR_SU27_1` | Su-27 ×1 |
-| `TPL_BVR_MIG29A_1` | MiG-29A ×1 |
+| `TPL_INT_MIG29A_2` | MiG-29A ×2 |
+| `TPL_INT_SU27_1` | Su-27 ×1 |
+| `TPL_INT_MIG29A_1` | MiG-29A ×1 |
 
 共通設定:
 
@@ -65,7 +65,7 @@ Intercept、SEAD、DEAD、Strike、CAS、Anti-Ship などの訓練ミッショ�
 これらのグループは実際の初期配置用ではなく、
 動的スポーン用のテンプレートとして使用する。
 候補は `src/config.lua` の `intercept.templates` で管理し、任務生成ごとに等確率で1つ選ぶ。
-任務名は Intercept。ME に登録済みの `TPL_BVR_...` は外部参照名として保持し、名称変更時も書き換えない。
+任務名は Intercept。生成候補は ME に登録済みの `TPL_INT_...` のグループ名に一致させる。
 ME で名前を変更した場合は設定と仕様書も合わせる。機種・機数は生成した実機から取得し、表示・完了判定に使う。
 
 ---
@@ -129,6 +129,32 @@ BLUE 空港への RTB を追加評価対象とする。
 - BLUE 空港へ帰還: RTB Bonus
 - 生還: Bonus
 - ノーダメージ: Bonus
+
+---
+
+## SEAD 訓練ミッション（実装済み・ゲーム内確認待ち）
+
+- `TPL_SEAD_SA6`（レーダー＋発射機3両）と `TPL_SEAD_SA8`（1両）を等確率で選ぶ。
+- Zone は `SEAD_ZONE_PALMYRA` / `SEAD_ZONE_SALAMIYAH` / `SEAD_ZONE_DUMAYR` / `SEAD_ZONE_TABQA`。
+- `Generate SEAD` の受注時に TOO / PB を等確率で抽選し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
+- 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
+- TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。
+- 計画と実体生成を分離する。受注時から全員が空中なら計画確定後に生成、地上受注なら全登録者の離陸後20秒で生成する。生成時に計画を再抽選しない。
+- LAND、半径200 m内の標高差20 m以内、各車両が建物・障害物から200 m以上離れることを検査する。
+- 選択した1 Zoneだけを最大50回試し、不合格なら任務を安全に解除する。別Zoneに変更しない。検査は1秒ごとに最大2候補。
+- 試行上限での失敗時は拒否理由の件数と早期拒否までに観測した高低差を画面・ログへ出す。TOOの機種・正確な位置・PBコードを画面に出さない。
+- 未生成の他ウィングの配置予定点とも離隔を取る。生成直前に同じ予定点を再検査し、塞がっていたら別地点に変更せず失敗解除する。
+- `src/sead.lua` に配置ロジック、`src/config.lua` の `sead` に設定を置く。
+- `SpawnFromVec2` で地上配置し、SAM を戦闘状態・停止状態にする。
+- SEAD と Intercept は同じウィング・UCID の受注ロックを共有する。
+- 主要レーダーの状態を `ACTIVE` / `SUPPRESSION_PENDING` / `SUPPRESSED` / `DESTROYED` の遷移表で管理する。SA-6 は `Kub 1S91 str`、SA-8 は `Osa 9A33 ln`。破壊は即達成、生存中は開始時Lifeより減少＋Radar OFF連続60秒で達成。無傷OFFやLife残量だけでは達成しない。再発信・観測失敗でタイマーをリセットする。
+- `src/sead_objective.lua` に判定を分離し、成功後は再判定を停止する。`sead.suppressionHoldSeconds` に60秒を集約する。
+- `sead.templates` の `name` / `type` / `pbCode` / `primaryUnitType` に対応をまとめる。TypeNameは `.miz` で確認済みの値を使い、複数の主要レーダーがある場合は全対象の破壊または損傷＋OFF継続時間達成を要求する。
+- 満額は `sead.fullReward = 150`。目標達成後の帰還成功で各自150、墜落・死亡・脱出で90、達成前の事故・任意中止は0。UCID ごとの既存帰還評価と重複防止を使う。
+- Total Score / Career Points / SEAD Score を更新し、Intercept Score と分ける。永続保存は未実装。
+- 目標達成時にSAM Groupを削除しない。残敵とロックを全参加者の終了まで保持する。終了後は独立した `src/sead_sites.lua` に削除を依頼し、失敗時は参照を保持して再試行する。サイト参照は `Missions.sites` に置く。残存車両の追加撃破は報酬に影響しない。
+- 仕様変更では先に `docs/SEAD.md` に状態遷移と終了方針を書く。将来のDEADへ参照を引き継げる構造とし、今回DEADのF10項目・採点・任務状態は追加しない。
+- 仕様は `docs/SEAD.md`、模擬検証は `scripts/Test-SEAD.lua` を参照する。
 
 ---
 
@@ -211,8 +237,8 @@ Difficulty ごとに使用可能な Threat Budget を決め、
 - 先に帰還した参加者へ先に加算する。全参加者の精算または中止まで任務と受注ロックを維持する。
 - `src/missions.lua` の `Missions.Acquire` を予約・生成より前に使う。ウィング名と登録 UCID で二重受注を拒否する。
 - 参加者が別スロットへ移動しても、元のウィングが終了するまでは新たな受注を拒否する。
-- 任務はウィングごとに同時に1件。別ウィングはそれぞれ別の任務を同時に進められる。BLUE 全体の1件制限は設けない。
-- 状態は `Missions.wings[groupName]` に集約する。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
+- 任務はカテゴリを問わずウィングごとに同時に1件。別ウィングはそれぞれ別の任務を同時に進められる。BLUE 全体の1件制限は設けない。
+- 状態は `Missions.wings[groupName]` に集約し、`category` で Intercept / SEAD を区別する。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
 - 同じテンプレートから生成する敵は `SPAWN:NewWithAlias` と受注ごとの識別子で名前を分離し、テンプレート名は変更しない。
 - F10 はグループ共有。`Abort Mission` は全体中止、名前・機体を指定する `Abort Sortie` は個人中止。
 - 詳細は `docs/WING.md`。結合後に `scripts/Test-Wing.lua`、`scripts/Test-ParallelWings.lua` と既存の Intercept・採点テストで確認する。
@@ -400,15 +426,21 @@ DCS-Dynamic-Training/
 
 ### 機能別仕様書
 
-- 機能単位の仕様書を `docs/<機能名>.md` に作成する。Intercept は `docs/Intercept.md` を参照する。
+- 機能単位の仕様書を `docs/<機能名>.md` に作成する。Intercept は `docs/Intercept.md`、SEAD は `docs/SEAD.md` を参照する。
 - 仕様書では、現在の実装・既知の制約・将来仕様を区別する。
 - 機能の動作や設定値を変更したら、対応する仕様書も同じ作業で更新する。
 - コードに実装済みであることと、DCS 内で動作確認済みであることを区別して記録する。
 
+### テスト仕様書
+
+- テストの構成・条件・期待結果・実行方法・DCS内の確認手順は `docs/TESTING.md` にまとめる。
+- 自動テストを追加・変更したら、対応表・件数・機能仕様書の検証範囲を同じ作業で更新する。
+- 模擬テストの通過とDCS内での確認済みを区別する。手動結果には対象版・設定・テストID・実測結果を記録する。
+
 ### Lua と .miz の同期
 
 - `src/*.lua` と `vendor/MOOSE/Moose.lua` を編集元とする。設定値は `src/config.lua` に集約する。
-- `scripts/Build-Mission.ps1` が設定・プレイヤー・採点・任務ロック・Intercept・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
+- `scripts/Build-Mission.ps1` が設定・プレイヤー・採点・任務ロック・Intercept・SEAD目標判定・SEAD配置・サイト管理・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
 - Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、`mission/Syria.miz` も更新する。
   1. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1`
   2. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Check`

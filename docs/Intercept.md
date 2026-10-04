@@ -20,12 +20,12 @@ Intercept（迎撃）任務として、目視外距離での接敵・交戦を�
 | フレームワーク | MOOSE。DynamicTraining より先に読み込む |
 | BLUE | USA、F/A-18C Lot 20 の Client スロット |
 | RED | Russia |
-| 敵テンプレート名 | `TPL_BVR_MIG29A_2`、`TPL_BVR_SU27_1`、`TPL_BVR_MIG29A_1` |
+| 敵テンプレート名 | `TPL_INT_MIG29A_2`、`TPL_INT_SU27_1`、`TPL_INT_MIG29A_1` |
 | 敵テンプレート構成 | 順に MiG-29A ×2、Su-27 ×1、MiG-29A ×1。すべて Late Activation、Airborne Start、CAP |
 | 現在の敵 AI Skill | テンプレートの `High` を継承 |
 
-任務の名称は Intercept。ME に登録済みの `TPL_BVR_...` は外部参照名として保持する。
-スクリプトや同期処理でテンプレート名を変更する必要はない。
+任務の名称は Intercept。生成候補は ME に登録した `TPL_INT_...` のグループ名を参照する。
+ME で名前を変更したら `intercept.templates` と仕様書も合わせる。同期処理で ME のグループ名は変更しない。
 
 BLUE は空港・空母に複数のスロットを配置している。単独用グループの例は以下。
 実装はグループ名や空港名を指定して検索しない。

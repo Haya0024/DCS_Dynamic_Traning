@@ -151,9 +151,9 @@ end)
 
 test("three template draws preserve ME composition and display the actual enemy", function()
     local choices = {
-        { "TPL_BVR_MIG29A_2", "MiG-29A", 2 },
-        { "TPL_BVR_SU27_1", "Su-27", 1 },
-        { "TPL_BVR_MIG29A_1", "MiG-29A", 1 }
+        { "TPL_INT_MIG29A_2", "MiG-29A", 2 },
+        { "TPL_INT_SU27_1", "Su-27", 1 },
+        { "TPL_INT_MIG29A_1", "MiG-29A", 1 }
     }
     for index, choice in ipairs(choices) do
         for formation = 1, 5 do
@@ -201,7 +201,7 @@ test("two-aircraft template cannot complete while its second enemy is alive", fu
 end)
 
 test("missing selected template releases the reservation and permits a fresh draw", function()
-    for index, template in ipairs({ "TPL_BVR_MIG29A_2", "TPL_BVR_SU27_1", "TPL_BVR_MIG29A_1" }) do
+    for index, template in ipairs({ "TPL_INT_MIG29A_2", "TPL_INT_SU27_1", "TPL_INT_MIG29A_1" }) do
         local s = scenario(); s.player.airborne = true; s.missingTemplate = template
         s.randomValues = { 60, 15000, 0, 1, index }; s.generate()
         s:lastMessageContains("spawn failed"); assert(#s.spawns == 0 and #s.errors == 1)
@@ -226,7 +226,7 @@ test("new assignments redraw templates and concurrent wings remain independent",
         s:command("Abort Mission")
         assert(a.destroyed and not b.destroyed)
         s.randomValues = { 60, 15000, 0, 1, 3 }; s.generate()
-        assert(#s.spawns == 3 and s.spawns[3].template == "TPL_BVR_MIG29A_1")
+        assert(#s.spawns == 3 and s.spawns[3].template == "TPL_INT_MIG29A_1")
         assert(s.spawns[3].name ~= a.name and s.spawns[3].name ~= b.name)
         s:assertClean()
     end

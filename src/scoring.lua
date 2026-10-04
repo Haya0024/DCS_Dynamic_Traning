@@ -1,17 +1,20 @@
 local Scoring = { players = {}, settlements = {}, sequence = 0 }
+local scoreFields = { Intercept = "interceptScore", SEAD = "seadScore" }
 
-function Scoring.NextID()
+function Scoring.NextID(category)
     -- This prototype has no disk persistence: IDs need only be unique within
     -- this mission run. Persistent session IDs will be added with storage.
+    category = category or "Intercept"
+    assert(scoreFields[category], "Unsupported scoring category: " .. tostring(category))
     Scoring.sequence = Scoring.sequence + 1
-    return "Intercept:" .. tostring(Scoring.sequence)
+    return category .. ":" .. tostring(Scoring.sequence)
 end
 
 function Scoring.Get(ucid, name)
     if not ucid then return nil end
     local p = Scoring.players[ucid]
     if not p then
-        p = { totalScore = 0, careerPoints = 0, interceptScore = 0,
+        p = { totalScore = 0, careerPoints = 0, interceptScore = 0, seadScore = 0,
             missionCount = 0, primarySuccessCount = 0, rtbSuccessCount = 0,
             recoveryFailureCount = 0, failedCount = 0, abortCount = 0 }
         Scoring.players[ucid] = p
@@ -21,6 +24,8 @@ function Scoring.Get(ucid, name)
 end
 
 function Scoring.Settle(mission, result, reason)
+    local category = mission.category or "Intercept"
+    local scoreField = assert(scoreFields[category], "Unsupported scoring category: " .. tostring(category))
     -- A wing shares the mission ID, but each registered UCID settles once.
     -- Unknown identities have a session-only aircraft key and never a score.
     local key = mission.owner.ucid and ("ucid:" .. mission.owner.ucid)
@@ -38,7 +43,7 @@ function Scoring.Settle(mission, result, reason)
     if p then
         p.totalScore = p.totalScore + points
         p.careerPoints = p.careerPoints + points
-        p.interceptScore = p.interceptScore + points
+        p[scoreField] = p[scoreField] + points
         p.missionCount = p.missionCount + 1
         if mission.primaryCompletedAt then p.primarySuccessCount = p.primarySuccessCount + 1 end
         if result == "RTB_SUCCESS" then p.rtbSuccessCount = p.rtbSuccessCount + 1 end
@@ -46,7 +51,7 @@ function Scoring.Settle(mission, result, reason)
         if result == "FAILED" then p.failedCount = p.failedCount + 1 end
         if result == "ABORT" then p.abortCount = p.abortCount + 1 end
     end
-    local receipt = { missionID = mission.id, ownerUCID = mission.owner.ucid,
+    local receipt = { missionID = mission.id, category = category, ownerUCID = mission.owner.ucid,
         fullReward = mission.fullReward, result = result, reason = reason, scored = p ~= nil,
         points = p and points or 0, total = p and p.totalScore or 0 }
     ledger[key] = receipt

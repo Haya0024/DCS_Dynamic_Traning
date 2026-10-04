@@ -3,12 +3,12 @@
 local function scenario(options)
     options = options or {}
     local s = { time = 0, timers = {}, messages = {}, spawns = {}, randomValues = {},
-        errors = {}, logs = {}, units = {}, groups = {}, commands = {}, connections = {}, handlers = {} }
+        errors = {}, logs = {}, units = {}, groups = {}, commands = {}, connections = {}, handlers = {}, randomCalls = {} }
     local function newUnit(name, id, pilot, group, side, kind)
         local u = { alive = true, airborne = false, id = id, slotID = id, name = pilot,
             unitName = name, position = { x = 100, y = 200, z = 300 }, heading = 0,
             velocity = { x = 0, y = 0, z = 0 }, group = group, side = side or 2,
-            kind = kind or "FA-18C_hornet" }
+            kind = kind or "FA-18C_hornet", life = side == 1 and s.enemyInitialLife or 100, radarEmitting = true }
         function u:newDCSObject()
             local capturedID = self.id
             local raw = {}
@@ -28,7 +28,17 @@ local function scenario(options)
         function u:GetName() return self.unitName end
         function u:GetDCSObject() return self.raw end
         function u:GetCoalition() return self.side end
-        function u:GetTypeName() return self.kind end
+        function u:GetTypeName() return self.side == 1 and s.enemyTypeOverride or self.kind end
+        function u:GetLife()
+            self.lifeCalls = (self.lifeCalls or 0) + 1
+            if self.lifeError then error("simulated life API failure") end
+            return self.life
+        end
+        function u:GetRadar()
+            self.radarCalls = (self.radarCalls or 0) + 1
+            if self.radarError then error("simulated radar API failure") end
+            return self.radarEmitting, self.radarTarget
+        end
         function u:GetTemplate() return { unitId = self.slotID } end
         function u:GetNumber() return self.number or 1 end
         function u:GetVelocityVec3() return self.velocity end
@@ -73,6 +83,22 @@ local function scenario(options)
     end
     function coordinate:SetAltitude(altitude, asl) assert(asl == true); self.y = altitude end
     function coordinate:GetVec3() return { x = self.x, y = self.y, z = self.z } end
+    function coordinate:NewFromVec2(v)
+        return self:NewFromVec3({ x = v.x, y = s.terrainHeight and s.terrainHeight(v) or 0, z = v.y })
+    end
+    function coordinate:GetLandHeight()
+        return s.terrainHeight and s.terrainHeight({ x = self.x, y = self.z }) or 0
+    end
+    function coordinate:IsSurfaceTypeLand()
+        return not s.surfaceLand or s.surfaceLand({ x = self.x, y = self.z })
+    end
+    function coordinate:ToStringLLDMS() return string.format("LL %d %d", self.x, self.z) end
+    function coordinate:ScanObjectsSquare(side, units, statics, scenery)
+        assert(units and statics and scenery)
+        s.scans = (s.scans or 0) + 1
+        local lists = s.scanObjects and s.scanObjects(self, side) or { {}, {}, {} }
+        return #lists[1] > 0, #lists[2] > 0, #lists[3] > 0, lists[1], lists[2], lists[3]
+    end
     function coordinate:HeadingTo(other) return math.deg(math.atan2(other.z - self.z, other.x - self.x)) % 360 end
     function coordinate:WaypointAirTurningPoint(altitudeType, speed, tasks)
         return { position = self:GetVec3(), altitudeType = altitudeType, speed = speed, tasks = tasks }
@@ -80,17 +106,30 @@ local function scenario(options)
     coordinate.WaypointAirFlyOverPoint = coordinate.WaypointAirTurningPoint
 
     local templates = {
-        TPL_BVR_MIG29A_2 = { "MiG-29A", "MiG-29A" },
-        TPL_BVR_SU27_1 = { "Su-27" },
-        TPL_BVR_MIG29A_1 = { "MiG-29A" }
+        TPL_INT_MIG29A_2 = { "MiG-29A", "MiG-29A" },
+        TPL_INT_SU27_1 = { "Su-27" },
+        TPL_INT_MIG29A_1 = { "MiG-29A" },
+        TPL_SEAD_SA6 = { "Kub 1S91 str", "Kub 2P25 ln", "Kub 2P25 ln", "Kub 2P25 ln" },
+        TPL_SEAD_SA8 = { "Osa 9A33 ln" }
     }
+    s.groundTemplates = {}
+    for _, name in ipairs({ "TPL_SEAD_SA6", "TPL_SEAD_SA8" }) do
+        local data = { route = { points = { { x = 1000, y = 2000 } } }, units = {} }
+        local offsets = { { 0, 0 }, { 140, 0 }, { 0, -140 }, { 0, 140 } }
+        for i, kind in ipairs(templates[name]) do
+            data.units[i] = { x = 1000 + offsets[i][1], y = 2000 + offsets[i][2], type = kind }
+        end
+        s.groundTemplates[name] = data
+        s.groups[name] = { GetTemplate = function() return data end }
+    end
     local spawn = {}
     function spawn:New(template)
         assert(templates[template] and s.missingTemplate ~= template, "Intercept template not found: " .. template)
         return setmetatable({ template = template }, { __index = spawn })
     end
     function spawn:NewWithAlias(template, alias)
-        assert(string.match(alias, "^DT_INTERCEPT_%d+$"), "unique assignment alias required")
+        assert(string.match(alias, "^DT_INTERCEPT_%d+$") or string.match(alias, "^DT_SEAD_%d+$"),
+            "unique assignment alias required")
         local instance = self:New(template)
         instance.alias = alias
         return instance
@@ -104,7 +143,14 @@ local function scenario(options)
         for i, kind in ipairs(templates[self.template]) do
             local name = g.name .. "-" .. i
             assert(not s.units[name], "SPAWN reused a group/unit name")
-            g.units[i] = newUnit(name, 2000 + n * 2 + i, nil, g, 1, kind)
+            g.units[i] = newUnit(name, 2000 + n * 10 + i, nil, g, 1, kind)
+            local ground = s.groundTemplates[self.template]
+            if ground then
+                local origin, data = ground.route.points[1], ground.units[i]
+                g.units[i].kind = data.type
+                local point = { x = position.x + data.x - origin.x, y = position.z + data.y - origin.y }
+                g.units[i].position = { x = point.x, y = s.terrainHeight and s.terrainHeight(point) or 0, z = point.y }
+            end
         end
         function g:EnRouteTaskEngageTargets(distance, types, priority)
             assert(distance == nil and priority == 0)
@@ -112,6 +158,14 @@ local function scenario(options)
             return { id = "EngageTargets", types = types }
         end
         function g:OptionROEOpenFire() self.openFire = true end
+        function g:OptionAlarmStateRed()
+            if s.failAlarm then error("simulated alarm failure") end
+            self.alarmRed = true
+        end
+        function g:RouteStop()
+            if s.failRouteStop then error("simulated route stop failure") end
+            self.stopped = true
+        end
         function g:SetFormation(formation)
             if s.failFormation then error("simulated formation failure") end
             self.formation = formation
@@ -126,7 +180,13 @@ local function scenario(options)
             self.route = route
         end
         function g:GetUnits() return self.units end
+        function g:GetName() return self.name end
         function g:Destroy()
+            self.destroyCalls = (self.destroyCalls or 0) + 1
+            if self.cleanupFailures and self.cleanupFailures > 0 then
+                self.cleanupFailures = self.cleanupFailures - 1
+                error("simulated cleanup failure")
+            end
             self.destroyed = true
             for _, u in ipairs(self.units) do
                 u.alive = false
@@ -134,6 +194,12 @@ local function scenario(options)
             end
         end
         table.insert(s.spawns, g)
+        return g
+    end
+    function spawn:SpawnFromVec2(point, minimum, maximum)
+        assert(minimum == nil and maximum == nil, "ground spawn must omit airborne heights")
+        local g = self:SpawnFromVec3({ x = point.x, y = s.terrainHeight and s.terrainHeight(point) or 0, z = point.y })
+        if g then g.fromVec2 = true end
         return g
     end
 
@@ -147,10 +213,12 @@ local function scenario(options)
     } } }
     env.AI = { Option = { Air = { id = { FORMATION = 5 } } } }
     s.env = env
+    env.ZONE = { FindByName = function(_, name) return s.zones and s.zones[name] end }
     env.math = setmetatable({}, { __index = math })
     function env.math.random(minimum, maximum)
         local value = table.remove(s.randomValues, 1) or minimum
         assert(value >= minimum and value <= maximum, "random bounds changed")
+        s.randomCalls[#s.randomCalls + 1] = { minimum = minimum, maximum = maximum, value = value }
         return value
     end
     env.env = { info = function(text) table.insert(s.logs, text) end,
@@ -192,6 +260,24 @@ local function scenario(options)
     end
     runBundle()
     s.reload = runBundle
+    function s:mission(player)
+        -- Inspect the real state owned by the bundled timer, without exposing
+        -- gameplay modules or changing their production visibility.
+        for i = 1, 100 do
+            local name, value = debug.getupvalue(self.timers[1].callback, i)
+            if not name then break end
+            if name == "Missions" then return value.wings[(player or self.player).group:GetName()] end
+        end
+        error("Mission state upvalue unavailable")
+    end
+    function s:sites()
+        for i = 1, 100 do
+            local name, value = debug.getupvalue(self.timers[1].callback, i)
+            if not name then break end
+            if name == "Missions" then return value.sites end
+        end
+        error("Mission site state upvalue unavailable")
+    end
     function s:command(title, player)
         player = player or self.player
         local commands = assert(self.commands[player.group:GetName()], "no group menu")

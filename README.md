@@ -1,137 +1,137 @@
 # DCS Dynamic Training Syria
 
-DCS World / Syria / MOOSE を使用する動的訓練ミッションです。
-設計方針と開発ルールは [AGENTS.md](AGENTS.md) を参照してください。
+DCS World の Syria マップで、F/A-18C の迎撃・防空制圧・防空サイト破壊を繰り返し練習するための動的訓練ミッションです。
+F10から任務を受注すると敵が配置され、目標達成後は味方基地や空母への帰還まで評価します。
 
-## 機能別仕様書
+ソロ、AI僚機との編隊、2人のマルチプレイに対応しています。出撃場所と兵装を選び、短い迎撃訓練から、SEAD後に再武装してDEADへ向かう連続出撃まで、自分たちのペースで訓練できます。
 
-- [Intercept 訓練ミッション仕様](docs/Intercept.md): 開始条件、生成・経路計算、状態、制約、将来仕様、動作確認項目。
-- [SEAD 訓練ミッション仕様](docs/SEAD.md): SA-6 / SA-8、4 Zone、配置条件、レーダー状態遷移、帰還採点・サイト管理。
-- [DEAD follow-on仕様](docs/DEAD.md): 同Sortieの即時継続、Site保持後の別Sortie、最寄りSite予約、採点・Cleanup。
-- [プレイヤー採点・帰還評価仕様](docs/SCORING.md): UCID、帰還成功100%・クリア後の墜落/死亡/脱出60%、重複防止、保存方針。メモリ内の試用実装済み。
-- [ウィング共有任務仕様](docs/WING.md): MP2 の共有目標、個別帰還・採点、全員離陸待ち、二重受注ブロック、中止操作。
-- [テスト仕様書](docs/TESTING.md): 自動テスト全ケースの条件・期待結果、実行方法、DCS内の確認手順、結果記録。
+## 訓練できること
 
-## マルチプレイで採点を試す
+| 任務 | 内容 | 目標達成条件 |
+|---|---|---|
+| **Intercept — 迎撃** | ランダムな敵編成・方位・高度・フォーメーションに対する空対空戦闘 | 生成された敵航空機をすべて撃墜 |
+| **SEAD — 防空制圧** | TOO / PBでSA-6またはSA-8のレーダーを捜索・攻撃 | 主要レーダーを破壊、または損傷させて連続60秒間レーダー停止 |
+| **DEAD — 防空サイト破壊** | SEADで制圧したサイトに残る車両への継続攻撃 | DEAD開始時に生存していた対象車両をすべて破壊 |
 
-同期済みの `mission/Syria.miz` をマルチプレイでホストし、BLUE Hornet の Client スロットに入ります。
-F10 の `Dynamic Training` は各プレイヤーグループに表示され、`Generate Intercept`、`Mission Status`、
-`Abort Mission`、`Player Statistics` を使用できます。任務はウィングごとに同時に1件で、別ウィングは並行して受注できます。
+InterceptではMiG-29A ×2、Su-27 ×1、MiG-29A ×1のいずれかが、長機から60～80 NM、機首方向の左右60°以内に生成されます。高度や編隊も毎回変わります。
 
-MP2 は2人とも搭乗してから、どちらかが `Generate Intercept` を選びます。受注時の搭乗者を参加者として固定し、
-全員が空中なら即開始、地上にいる参加者がいれば全員の離陸検出から20秒後に敵を生成します。
-目標達成は編隊で共有し、報酬は各自150ポイント。帰還失敗した人だけ90ポイントになります。
-先に1人が精算してもウィングの受注ロックは維持し、全員の精算または中止まで次の任務を受注できません。
-`Abort Sortie: <名前> [<機体>]` は個人中止、`Abort Mission` は編隊全体の中止です。
-各ウィングの敵・離陸待ち・帰還評価・中止は独立し、別ウィングの任務を終了させません。
+SEADでは受注時にTOO / PBを等確率で選びます。TOOは機種不明の捜索座標、PBはSAM機種・推定座標・HARM PBコードを知らせます。
+座標はDDM（度＋分の小数3桁）で表示し、実際の配置位置からTOOは3～5 NM、PBは1～3 NMの誤差を持たせます。HARM以外の武器で主要レーダーを破壊しても達成です。
 
-敵編成は MiG-29A ×2、Su-27 ×1、MiG-29A ×1 の3種類から、生成ごとに各1/3の確率で選びます。
-候補は `src/config.lua` の `intercept.templates` に設定します。開始表示と全滅判定は実際の機種・機数に合わせます。
+## 始め方
 
-敵全滅後、BLUE 飛行場または空母に着陸し、5 knots以下を連続10秒維持すると150ポイントを加算します。
-空母では艦との相対速度を使います。クリア後の墜落・死亡・脱出は90ポイント、未クリアの事故・任意 Abort は0ポイントです。
-満額・距離・高度・判定時間などの設定は `src/config.lua` にあります。
+必要な環境は **DCS World / Syriaマップ / F/A-18C** です。MOOSEと訓練スクリプトはミッションに組み込まれています。
 
-UCID はサーバーの接続情報と Client スロットを照合して取得します。取得できない場合は採点なしと表示し、訓練は継続します。
-同じグループの複数の人間に対応します。途中参加者は次の任務から登録します。動的 Client スロットは今回の試用対象外です。
-ポイントはメモリ内だけに保持し、ミッション再開始・サーバー再起動でリセットします。
-DCS 本体・Saved Games の設定変更や Hook の配置は今回必要ありません。
-名称変更前の任務は、ユーザーからゲーム内で動作しているとの報告があります。名称変更後の表示は再確認してください。
+1. [mission/Syria.miz](mission/Syria.miz) をマルチプレイでホストします。
+2. BLUEのHornetスロットに搭乗します。Incirlik、Akrotiri、Beirut、Ramat David、空母から出撃できます。
+3. 再武装を要請し、訓練に合わせた兵装を搭載します。初期兵装は空です。
+4. F10の `Dynamic Training` から任務を選びます。
+5. 目標を達成したら、BLUEの基地または空母に帰還して精算します。
 
-## SEAD を試す
+スロットには、単独の `SOLO`、AI僚機付きの `AI2`、プレイヤー2人用の `MP2` があります。
+MP2では参加する全員が搭乗してから受注してください。
 
-SEAD は受注時に TOO / PB を各50%で抽選します。TOOは実配置予定点から3～5 NMずらした捜索座標を知らせ、SAM機種・正確な座標・PBコードを隠します。
-PBはSAM種類、実配置予定点から1～3 NMずらした推定座標、HARM PBコード（SA-6:108、SA-8:117）を表示します。
-受注時の長機位置からZone中心まで40～130 NMの候補から1つ選び、LAND・半径200 mの標高差20 m以内・各車両と建物の離隔200 mを確認します。
-選択Zone内を最大50回、1秒ごとに最大2候補ずつ検査し、条件を満たさなければ任務を解除します。失敗時は拒否理由ごとの件数を画面とログへ表示します。
-計画と生成を分離し、地上受注なら全登録者の離陸後20秒で生成します。全員が空中で受注した場合は計画確定後に生成します。
-計画確定後の地点・機種・方式・コードは変えません。生成直前に予定点が塞がった場合も別地点へ変更せず失敗解除します。
-`Mission Status` でも方式に応じた受注情報を表示します。
-SA-6 は主要レーダー `Kub 1S91 str`、SA-8 はレーダー一体の `Osa 9A33 ln` を対象とします。
-破壊は即達成、生存中は生成時のLifeより減少し、Radar OFFが連続60秒続くとSuppressedとして達成します。再発信すると計測をリセットします。
-`Mission Status` でエミッターの4状態を確認できます。完了後は再判定を止め、残存SAMを全参加者の終了まで保持します。
-削除は独立したサイト管理が担い、失敗時は再試行します。明示保持を選ばなければCleanupが標準です。
-発射機を残しても達成できます。帰還成功で各自150ポイント、達成後の墜落・死亡・脱出で90ポイントを加算します。
-満額は `src/config.lua` の `sead.fullReward` で設定し、成績の `SEAD Score` に別途記録します。
-同じウィングでは Intercept / SEAD / DEADを同時に受注できず、全参加者の精算・中止までロックを維持します。
-レーダー状態遷移・完了後のサイト管理と採点の DCS 内での確認は未実施です。
+Intercept / SEADを地上で受注した場合は、登録参加者全員の離陸を待ち、離陸検出から20秒後に敵を生成します。
+全員が空中で受注した場合、Interceptは即開始、SEADは配置計画の確定後に開始します。
 
-## SEADからDEADへ継続する
-
-SEAD達成後に車両が残っている場合だけ、F10に `Continue as DEAD` と `Preserve Site for DEAD` が現れます。
-レーダーの破壊とSite全滅は別判定です。SA-6のレーダーを破壊してもLauncherが残ればDEADへ継続でき、Suppression後は生存レーダーもDEAD対象になります。
-通常は何も選ばずRTBすると、従来通りSEADを精算してSAMを削除します。
-
-`Continue as DEAD` は同じSortie・同じ任務recordで残存車両の全滅を目指します。
-Group・損傷・発信状態をそのまま使い、全滅後のRTBでSEAD150＋DEAD150、合計300ポイントを精算します。
-両目標達成後の事故は各90で合計180、DEAD未達成の事故はSEAD90のみ、任意Abortは0。任務数は1件のままです。
-
-`Preserve Site for DEAD` はSiteを明示保持し、通常のSEAD帰還・精算を続けます。
-保持者はPreserve時の長機です。保持者がログアウトしたら未使用の保持SiteをCleanupします。観戦席への移動・機体変更では削除せず、DEAD使用中はその任務の終了処理に従います。
-全参加者の終了後、次Sortieで再武装して `Generate DEAD` を選ぶと、長機に最も近い保持SiteをFollow-on DEADとして予約します。
-地上受注なら全員離陸待ちですが、SAMは既に世界に存在し、再Spawnや20秒待ちはありません。
-全残存対象破壊後のRTBでDEAD150、達成後事故90、達成前事故・任意Abort0。成績に `DEAD Score` を表示します。
-DEADはImmediate DEADとFollow-on DEADの2種類だけです。どちらも既存SEADの同じSiteを使用します。
-保持Siteがなければ `No preserved SAM sites available for DEAD.` と表示して終了します。
-保持・Site予約・状態表示・採点のDCS内確認は未実施です。
-
-## 自動検証
-
-スイートと各ケースの検証範囲・期待結果、DCS内での手動確認は [テスト仕様書](docs/TESTING.md) にまとめています。
-
-リポジトリのルートから Lua 5.1 で実行します。DCS の `bin/luae.exe` も使用できます。
-DCS / MOOSE の呼び出し先を模擬し、生成のタイミング・予約・配置・経路・UCID・採点・着陸確認を検証します。
-ゲーム内での動作確認は別途必要です。
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Mission.ps1
-```
+## F10メニュー
 
 ```text
-lua scripts/Test-Intercept.lua
-lua scripts/Test-Scoring.lua
-lua scripts/Test-Wing.lua
-lua scripts/Test-ParallelWings.lua
-lua scripts/Test-SEAD.lua
-lua scripts/Test-DEAD.lua
+Dynamic Training
+├─ Generate Intercept
+├─ Generate SEAD
+├─ Generate DEAD
+├─ Mission Status
+├─ Abort Mission
+└─ Player Statistics
 ```
 
-同期ツールは `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-MissionSync.ps1` で検証します。
-モジュール結合・設定ファイル変更の自動同期は `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-MissionBuild.ps1` で検証します。
+`Mission Status` で任務の進行状況、`Player Statistics` で自分の成績を確認できます。
+`Abort Mission` はウィング全体の中止です。参加者ごとの `Abort Sortie` が表示されている場合は、その人だけ離脱できます。
 
-## Lua のミッションへの反映
+## SEADの後は、帰還も継続攻撃も選べる
 
-`src/*.lua` と `vendor/MOOSE/Moose.lua` が編集元です。
-同期時に `scripts/Build-Mission.ps1` がモジュールと実行部分を `build/DynamicTraining.lua` に結合し、
-既存の埋め込み `DynamicTraining.lua` を置き換えます。生成物は直接編集しません。
-次のコマンドで、`mission/Syria.miz` 内の対応する埋め込み Lua を同期します。
-Windows PowerShell 5.1 の標準機能のみで動作します。
+SEAD達成後に車両が残っていると、F10に `Continue as DEAD` と `Preserve Site for DEAD` が追加されます。
+SA-6のレーダーを破壊しても、発射機が残っていればDEADへ進めます。
+
+| 選択 | その後の流れ |
+|---|---|
+| **そのまま帰還** | SEADを精算し、全参加者の終了後にサイトを自動削除 |
+| **Continue as DEAD** | 同じ出撃のまま残存車両を攻撃。DEAD達成後に帰還し、SEAD＋DEADを精算 |
+| **Preserve Site for DEAD** | サイトを保持してSEADを精算。帰還・再武装後、次の出撃で `Generate DEAD` を受注 |
+
+DEADは、元のSEADで生成された同じSAMグループを使います。損傷や残存車両を引き継ぎ、攻撃するたびに敵が元に戻ることはありません。
+保持したSAMは再武装中も世界に存在します。
+
+`Generate DEAD` は、利用可能な保持サイトのうち長機に最も近いものを予約します。元SEADの全参加者が終了した後は、別ウィングも取得できます。
+候補がなければ `No preserved SAM sites available for DEAD.` と表示します。
+地上受注時は全員の離陸を待ちますが、SAMの再生成や20秒の生成待ちはありません。
+
+サイトの保持は明示的に選んだ場合だけです。Preserve時の長機を保持者とし、その人がログアウトすると未使用の保持サイトを削除します。
+観戦席への移動や機体変更では削除しません。すでにDEADで使用中のサイトは、その任務の終了まで維持します。
+
+## ウィングで協力する
+
+同じスロットグループを1つのウィングとして扱い、**1ウィングにつき同時に1任務**を受注できます。
+目標達成は共有しますが、帰還評価とポイントはプレイヤーごとです。別ウィングは独立した任務を並行して進められます。
+
+参加者は受注時に固定します。空席・AI僚機は採点対象に含めず、途中で搭乗したプレイヤーは次の任務から参加します。
+1人が帰還しても、全参加者の精算または中止が終わるまで次の任務は受注できません。
+
+## 帰還とポイント
+
+目標達成だけで即加算せず、帰還結果まで評価します。BLUEの飛行場または空母に着陸し、5 knots以下を連続10秒維持すると帰還成功です。
+空母では艦との相対速度を使います。
+
+| 結果 | Intercept / SEAD / Follow-on DEADの各報酬 |
+|---|---:|
+| 目標達成＋帰還成功 | 150 pt |
+| 目標達成後、帰還成功確定前に墜落・死亡・脱出 | 90 pt（60%） |
+| 目標達成前の事故、任意Abort | 0 pt |
+
+報酬は人数で分割せず、参加者それぞれに付与します。
+Immediate DEADで両目標を達成して帰還すると、SEAD 150＋DEAD 150で合計300 ptです。
+両目標達成後の事故は合計180 pt、DEAD未達成の事故はSEADの90 ptのみ、任意Abortは0 ptになります。
+
+成績はUCIDで管理し、カテゴリ別スコアと累計を表示します。現在はセッション内のみの記録で、ミッション再開始・サーバー再起動でリセットします。
+UCIDを照合できない場合も訓練は続けられますが、採点は行いません。
+
+## 開発状況と詳しい仕様
+
+現在は、マルチプレイのME配置済みClientスロットを対象とした試用実装です。動的Clientスロットは対象外です。
+任務がゲーム内で動作しているとの報告はありますが、全ケースのDCS内確認は完了していません。自動テストの検証範囲と手動確認項目はテスト仕様書にまとめています。
+
+今後は成績の永続保存、難易度・Threat Budget、Strike / CAS / Anti-Shipなどの訓練を追加する予定です。
+
+| ドキュメント | 内容 |
+|---|---|
+| [Intercept](docs/Intercept.md) | 敵生成、開始条件、経路、目標判定 |
+| [SEAD](docs/SEAD.md) | TOO / PB、配置条件、レーダーの状態遷移 |
+| [DEAD](docs/DEAD.md) | 継続攻撃、サイト保持・予約・削除 |
+| [Wing](docs/WING.md) | 共有任務、参加者、受注ブロック、中止 |
+| [Scoring](docs/SCORING.md) | UCID、帰還評価、採点と保存の制約 |
+| [Testing](docs/TESTING.md) | 自動テストの実行方法、DCS内の確認手順 |
+| [AGENTS.md](AGENTS.md) | 設計方針と開発ルール |
+
+## 開発・Luaの反映
+
+編集元は `src/*.lua` と `vendor/MOOSE/Moose.lua`、設定は [src/config.lua](src/config.lua) にまとめています。
+[Build-Mission.ps1](scripts/Build-Mission.ps1) が各モジュールを `build/DynamicTraining.lua` に結合します。生成物は直接編集しません。
+
+Luaを変更したら、リポジトリのルートで次を実行して `.miz` 内のスクリプトを更新します。同期時に結合も行います。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Check
 ```
 
-自分で Lua を編集する間は、次の監視コマンドを起動しておくと、保存後に自動同期します。
-最初に一度同期し、その後は約2秒間隔で Lua と `.miz` の変更を検出します。
-終了は Ctrl+C です。VS Code の「ターミナル → タスクの実行」から
-`DCS: Watch mission Lua` を選んでも起動できます。
+保存時の自動同期は `-Watch`、またはVS Codeの `DCS: Watch mission Lua` タスクで起動できます。監視の終了はCtrl+Cです。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Watch
 ```
 
-同期確認だけを行う場合は `-Check` を指定します。不一致時は失敗として終了します。
-別のミッションコピーを同期する場合は `-MissionPath <path>` を指定します。
+同期は登録済みの埋め込みLuaを置き換え、その他のミッション内容の保持を検証します。直前の `.miz` は `mission/Syria.miz.bak` に保存します。
+同期後にMEから実行する場合は `.miz` を開き直してください。実行中のDCSミッションへの反映には、更新した `.miz` での再開始が必要です。
 
-更新前に全 ZIP エントリの内容を記録し、更新後に対象 Lua の一致とその他の内容の保持を検証します。
-検証後にファイルを置き換え、直前の `.miz` を `mission/Syria.miz.bak` に保存します。
-内容が一致していれば書き込みません。バックアップと作業用ファイルは Git 管理対象外です。
-
-ME で既に開いているミッションには古い埋め込み Lua が残るため、同期後は `.miz` を開き直してから実行してください。
-開いたまま ME で上書き保存した場合も、監視中なら再同期します。
-既に実行中の DCS ミッションには反映されないため、更新した `.miz` でミッションを再開始してください。
-
-同期できるのは ME に登録済みの2つの Lua です。現在のモジュール分割は結合方式なので ME の追加設定は不要です。
-新しいモジュールを結合する場合は `scripts/Build-Mission.ps1` の結合順を更新します。
-別の埋め込み Lua として登録する場合は ME で `DO SCRIPT FILE` と読み込み順を設定し、同期ツールの対応表を更新します。
-ミッション設定・トリガー・テンプレート名・リソース対応表は同期処理で変更しません。
+テストの実行コマンドと確認項目は [docs/TESTING.md](docs/TESTING.md) を参照してください。

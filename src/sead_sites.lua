@@ -12,15 +12,24 @@ function SEADSites.Register(record)
 end
 
 function SEADSites.LivingTargets(site)
-    local targets = {}
+    local targets, byUnit, seen = {}, {}, {}
+    for _, target in pairs(site.unitRecords) do byUnit[target.unit] = target end
     local units = site.spawn.group:GetUnits()
     assert(units == nil or type(units) == "table", "SAM site unit list unavailable.")
-    for _, unit in ipairs(units or {}) do
+    local function observe(unit, listed)
+        seen[unit] = true
+        local target = byUnit[unit]
+        -- Explicit loss remains authoritative even when the wrapper returns nil.
+        if target and target.lost then return end
         local alive = unit:IsAlive()
-        assert(alive == nil or type(alive) == "boolean", "SAM site life observation unavailable.")
-        if alive then
+        assert(type(alive) == "boolean", "SAM site life observation unavailable.")
+        if alive == false then
+            if target then target.lost = true end
+        else
+            assert(listed, "SAM site live target missing from group list.")
             local id = assert(unit:GetID(), "SAM site unit identity unavailable.")
-            local target = site.unitRecords[id]
+            assert(not target or id == target.objectID, "SAM site target identity changed.")
+            target = site.unitRecords[id]
             -- A loss event is authoritative while the wrapper is still updating.
             if not target or not target.lost then
                 local side, ground = unit:GetCoalition(), unit:IsGround()
@@ -34,6 +43,11 @@ function SEADSites.LivingTargets(site)
                 end
             end
         end
+    end
+    for _, unit in ipairs(units or {}) do observe(unit, true) end
+    -- A missing/nil group list alone is not evidence of target destruction.
+    for _, target in pairs(site.unitRecords) do
+        if not seen[target.unit] and not target.lost then observe(target.unit, false) end
     end
     return targets
 end

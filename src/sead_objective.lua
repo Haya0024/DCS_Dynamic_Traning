@@ -25,7 +25,7 @@ local function Observe(record, time, hold)
     -- Use MOOSE's first radar return (emitting), not its optional tracking target.
     local ok, alive, life, radarOn = pcall(function()
         local alive = record.unit:IsAlive()
-        if alive == false or alive == nil then return false end
+        if alive ~= true then return alive end -- nil is unknown, not confirmed destruction.
         return alive, record.unit:GetLife(), record.unit:GetRadar()
     end)
     if ok and alive == false then

@@ -34,12 +34,20 @@ function DEAD.Remaining(record)
         if not target.lost then
             local ok, alive = pcall(function()
                 local alive = target.unit:IsAlive()
-                assert(alive == nil or type(alive) == "boolean", "DEAD target life observation unavailable.")
-                if not alive then return alive end
+                assert(type(alive) == "boolean", "DEAD target life observation unavailable.")
+                if alive == false then return false end
                 local id = assert(target.unit:GetID(), "DEAD target identity unavailable.")
-                return id == target.objectID
+                assert(id == target.objectID, "DEAD target identity changed.")
+                return true
             end)
-            if ok and (alive == nil or alive == false) then target.lost = true
+            if not ok then
+                if not target.deadObservationUnavailable then
+                    env.info("[DynamicTraining] DEAD target observation unavailable; site=" .. record.site.id ..
+                        ": " .. tostring(alive))
+                end
+                target.deadObservationUnavailable = true
+            else target.deadObservationUnavailable = nil end
+            if ok and alive == false then target.lost = true
             else remaining = remaining + 1 end -- Unknown is never proof of destruction.
         end
     end
@@ -57,11 +65,11 @@ function DEAD.RecordLoss(record, event)
 end
 
 function DEAD.Briefing(site)
-    local location = COORDINATE:NewFromVec2(Point(site)):ToStringLLDMS()
+    local location = COORDINATE:NewFromVec2(Point(site)):ToStringLLDDM({ LL_Accuracy = 3 })
     local status = site.primaryResult == "DESTROYED" and "Primary radar destroyed" or "Previously suppressed"
     return "DEAD MISSION\nAREA: " .. site.plan.areaLabel .. "\nTARGET SITE: " .. site.plan.samType ..
         "\nSTATUS: " .. status .. "\nOBJECTIVE: Destroy all remaining SAM site vehicles.\n" ..
-        "Estimated site location:\n" .. location
+        "SITE LOCATION:\n" .. location
 end
 
 return DEAD

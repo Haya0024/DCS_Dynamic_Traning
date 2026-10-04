@@ -68,6 +68,9 @@ SEADのエミッター終端状態は再判定しないが、Site残存車両の
 残存は生成済みGroupの実ユニットを確認する。MEテンプレートの車両数から推測しない。
 対象はRED ground unitだけ。生成時のDCS object/IDに紐付け、死亡通知はwrapper更新前でも失われた対象として扱う。
 生存確認のAPI例外・不正値を全滅と誤認しない。取得時の不明は受注失敗、戦闘中の不明は未達成扱いとする。
+Site／DEAD対象の `IsAlive()` はtrueを生存、falseを確認済み死亡、nilを観測不能として扱う。明示的な死亡イベントによるlostは観測不能より優先する。
+Siteの未確認対象が観測不能なら `observationUnavailable = true`、`remainingTargetCount = nil`、`followOnAvailable = false` とし、以前のSite状態を保持する。取得一覧から既知の対象が消えた場合も、falseまたは死亡イベントを確認するまで全滅の根拠にしない。
+DEAD進行中のnil・例外・不正値・オブジェクトID不一致は残存側に数え、lostを変更しない。観測不能への移行をログへ残し、継続中は同じログを毎秒繰り返さない。正常な観測に戻れば不明状態を解除する。
 
 | 現在のdisposition | 操作・条件 | 次のdisposition・処理 |
 |---|---|---|
@@ -171,6 +174,7 @@ Follow-on DEADは受注時、Immediate DEADはContinue時に満額を固定。�
 ## Briefing・Status・F10
 
 Follow-on DEADは地域、SAM種類、主要レーダーの履歴（Primary radar destroyed / Previously suppressed）、残存車両全滅の指示と既存Site位置を表示する。
+既存Siteの実配置点（actualSpawnPoint、ない場合はspawn.coordinate）を `SITE LOCATION:` としてDDM（度＋小数分、分の小数3桁）で表示する。MOOSEのToStringLLDDMへLL_Accuracy=3を明示する。SEAD TOO/PBの推定点・秘匿仕様には影響しない。
 SEADのTOO/PB秘匿はFollow-on DEADには適用しない。内部Group名・object IDは表示しない。
 Immediate DEADはSEAD情報の秘匿を維持し、残数・follow-on phaseを追加表示する。
 
@@ -200,5 +204,6 @@ Player StatisticsへDEAD Scoreを追加。
 12. Preserve後に保持者がログアウトするとSiteが削除される。観戦席への移動では残り、DEAD使用中のSiteは元保持者のログアウトで削除されない。
 
 自動検証は [scripts/Test-DEAD.lua](../scripts/Test-DEAD.lua) と既存5スイート、Build/Syncテストを使用する。
+nil観測・不明からの回復・明示死亡優先・Group一覧欠落はDEAD-77〜80で検証する。DEAD-16/29/52はDDM精度3、実配置点のSITE LOCATION表示、座標API失敗時のrollbackと保存済みbriefingの再利用を検証する。DCS内の座標確認はMAN-28で行う。
 Immediate追加採点はDEAD-67〜76で、事故5種、配点固定、MP2個別精算、達成前喪失、イベント順序・時刻、UCID未照合、Abort、不正設定、精算再試行と統計維持を検証する。DCS内ではMAN-25/26/39を確認する。
 自動検証の対応と手動結果は [TESTING.md](TESTING.md) に記録する。

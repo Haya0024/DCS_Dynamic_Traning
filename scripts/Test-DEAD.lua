@@ -205,13 +205,18 @@ test("Follow-on DEAD acquires the retained site without respawn and uses a new s
 end)
 
 test("Follow-on DEAD briefing exposes existing site information without internal object names", function()
-    local s, site, g = preserved(1, false); followOnDead(s)
+    local s, site, g = preserved(1, false)
+    s.env.COORDINATE.ToStringLLDMS = function() error("Follow-on DEAD must display DDM") end
+    followOnDead(s)
     local text = s.messages[#s.messages].text
-    for _, expected in ipairs({ "DEAD MISSION", "AREA: Palmyra", "TARGET SITE: SA-6", "Primary radar destroyed", "LL 20000 0" }) do
+    local location = s.env.COORDINATE:NewFromVec2(site.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
+    for _, expected in ipairs({ "DEAD MISSION", "AREA: Palmyra", "TARGET SITE: SA-6", "Primary radar destroyed", "SITE LOCATION:\n" .. location }) do
         assert(string.find(text, expected, 1, true), text)
     end
+    assert(not string.find(text, "Estimated site location", 1, true) and not string.find(text, "LL DMS", 1, true))
     assert(not string.find(text, g.name, 1, true) and not string.find(text, "objectID", 1, true))
     s:command("Mission Status"); s:lastMessageContains("DEAD: ACTIVE"); s:lastMessageContains("Remaining targets: 3")
+    s:lastMessageContains("SITE LOCATION:\n" .. location)
     s:assertClean()
 end)
 
@@ -343,13 +348,13 @@ test("briefing or reward preparation failure rolls back without deleting the pre
     for _, problem in ipairs({ "briefing", "reward" }) do
         local s, site, g = preserved(1, false)
         local coordinate, config = s.env.COORDINATE, module(s, "Config")
-        local formatter = coordinate.ToStringLLDMS
-        if problem == "briefing" then coordinate.ToStringLLDMS = function() error("Injected briefing failure") end
+        local formatter = coordinate.ToStringLLDDM
+        if problem == "briefing" then coordinate.ToStringLLDDM = function() error("Injected briefing failure") end
         else config.dead.fullReward = -1 end
         s:command("Generate DEAD"); s:lastMessageContains("reservation rolled back")
         assert(not s:mission() and site.disposition == "RETAIN" and not site.reservedByAssignmentID and not g.destroyed)
         assert(#s.errors == 1)
-        coordinate.ToStringLLDMS, config.dead.fullReward = formatter, 150
+        coordinate.ToStringLLDDM, config.dead.fullReward = formatter, 150
         assert(followOnDead(s).site == site)
     end
 end)
@@ -385,8 +390,12 @@ test("remaining-target API failures never imply destruction or erase the objecti
     s:tick(s.time + 1); assert(r.state == "ACTIVE")
     target.IsAlive = function() return "unknown" end
     s:tick(s.time + 1); assert(r.state == "ACTIVE")
+    target.IsAlive = function() return nil end
+    s:tick(s.time + 1); assert(r.state == "ACTIVE" and not r.deadTargets[1].lost)
     target.IsAlive = isAlive; target.GetID = function() return nil end
     s:tick(s.time + 1); assert(r.state == "ACTIVE")
+    target.GetID = function() return 99999 end
+    s:tick(s.time + 1); assert(r.state == "ACTIVE" and not r.deadTargets[1].lost)
     target.GetID = getID; destroy(s, target); assert(r.state == "RTB_PENDING"); s:assertClean()
 end)
 
@@ -560,11 +569,11 @@ end)
 test("prepared DEAD briefing is reused at activation without another coordinate API call", function()
     for _, airborne in ipairs({ true, false }) do
         local s, site = preserved(1, false); local coordinate = s.env.COORDINATE
-        local formatter, calls = coordinate.ToStringLLDMS, 0
-        coordinate.ToStringLLDMS = function(self)
+        local formatter, calls = coordinate.ToStringLLDDM, 0
+        coordinate.ToStringLLDDM = function(self, settings)
             calls = calls + 1
             assert(calls == 1, "Briefing coordinate queried again after acceptance")
-            return formatter(self)
+            return formatter(self, settings)
         end
         local r = followOnDead(s, airborne)
         if not airborne then s.player.airborne = true; s:tick(s.time + 1) end
@@ -880,6 +889,80 @@ test("additional DEAD ledger retries cannot duplicate points or mission statisti
     assert(p.rtbSuccessCount == 0 and p.failedCount == 0 and p.abortCount == 0)
     scoring.Settle({ id = "abort", category = "DEAD", owner = owner, fullReward = 150, scoreOnly = true }, "ABORT", "Abort")
     assert(p.totalScore == 150 and p.missionCount == 1 and p.abortCount == 0)
+end)
+
+test("nil life observations preserve retained sites with unknown remaining count and block DEAD acceptance", function()
+    local s, site, g = preserved(1, false)
+    for i = 2, #g.units do g.units[i].alive = nil end
+    s:tick(s.time + 1)
+    assert(site.observationUnavailable and site.remainingTargetCount == nil and not site.followOnAvailable)
+    assert(site.state == "SUPPRESSED" and site.disposition == "RETAIN" and not site.cleaned and not g.destroyed)
+    s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
+    assert(not s:mission() and not site.reservedByAssignmentID and #s.spawns == 1)
+    s:tick(s.time + 1)
+    local observations = 0
+    for _, log in ipairs(s.logs) do if string.find(log, "SAM site observation unavailable:", 1, true) then observations = observations + 1 end end
+    assert(observations == 1)
+    for i = 2, #g.units do g.units[i].alive = true end
+    s:tick(s.time + 1)
+    assert(not site.observationUnavailable and site.remainingTargetCount == 3 and site.followOnAvailable)
+    finish(s, followOnDead(s)); recover(s); s:score(300); s:assertClean()
+end)
+
+test("both DEAD paths keep a nil-observed last target pending and log once until explicit false", function()
+    for _, immediate in ipairs({ true, false }) do
+        local s, r, site = ready(1, false)
+        if immediate then s:command("Continue as DEAD") else
+            s:command("Preserve Site for DEAD"); recover(s); r = followOnDead(s)
+        end
+        for i = 2, #r.deadTargets do destroy(s, r.deadTargets[i].unit) end
+        local target = r.deadTargets[1]; target.unit.alive = nil
+        for _ = 1, 3 do s:tick(s.time + 1) end
+        assert(r.state == (immediate and "DEAD_ACTIVE" or "ACTIVE") and not r.deadCompletedAt and not target.lost)
+        assert(site.state == "SUPPRESSED" and site.observationUnavailable and site.remainingTargetCount == nil)
+        assert(target.deadObservationUnavailable and not site.cleaned)
+        local observations = 0
+        for _, log in ipairs(s.logs) do if string.find(log, "DEAD target observation unavailable;", 1, true) then observations = observations + 1 end end
+        assert(observations == 1)
+        target.unit.alive = true; s:tick(s.time + 1)
+        assert(not target.deadObservationUnavailable and not target.lost and not site.observationUnavailable)
+        target.unit.alive = false; s:tick(s.time + 1)
+        assert(r.state == "RTB_PENDING" and target.lost and site.state == "DESTROYED")
+        recover(s); s:score(300); s:assertClean()
+    end
+end)
+
+test("explicit target death completes either DEAD path even while every lost wrapper returns nil", function()
+    for _, immediate in ipairs({ true, false }) do
+        local s, r, site = ready(1, false)
+        if immediate then s:command("Continue as DEAD") else
+            s:command("Preserve Site for DEAD"); recover(s); r = followOnDead(s)
+        end
+        for i, target in ipairs(r.deadTargets) do
+            target.unit.alive = nil; s:event("Dead", target.unit)
+            if i < #r.deadTargets then assert(not r.deadCompletedAt) end
+        end
+        assert(r.state == "RTB_PENDING" and r.deadCompletedAt and site.state == "DESTROYED")
+        assert(site.remainingTargetCount == 0 and not site.observationUnavailable)
+        recover(s); s:score(300); assert(site.cleaned); s:assertClean()
+    end
+end)
+
+test("missing group lists cannot erase unconfirmed site targets and false observations still confirm destruction", function()
+    for _, missing in ipairs({ "nil", "empty" }) do
+        local s, site, g = preserved(1, false); local getUnits = g.GetUnits
+        g.GetUnits = function() if missing == "empty" then return {} end end
+        s:tick(s.time + 1)
+        assert(site.observationUnavailable and site.remainingTargetCount == nil and not site.followOnAvailable)
+        assert(site.state == "SUPPRESSED" and not site.cleaned)
+        g.GetUnits = getUnits; s:tick(s.time + 1)
+        assert(not site.observationUnavailable and site.remainingTargetCount == 3 and site.followOnAvailable)
+        for i = 2, #g.units do g.units[i].alive = false end
+        g.GetUnits = function() if missing == "empty" then return {} end end
+        s:tick(s.time + 1)
+        assert(site.cleaned and site.state == "DESTROYED" and site.remainingTargetCount == 0)
+        s:assertClean()
+    end
 end)
 
 print(string.format("All %d DEAD tests passed (simulated DCS/MOOSE).", count))

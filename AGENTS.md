@@ -170,6 +170,8 @@ BLUE 空港への RTB を追加評価対象とする。
 - 通常の `Generate DEAD` は予約なしのRETAIN Siteから長機に最も近いものを取得。既存のWing/UCID排他とSite予約を併用し、準備失敗では予約とロックをrollbackする。
 - Follow-on DEADは新しいDEAD recordをAcquireし、受注時の生存RED ground targetsを固定。地上ならARMED、全員離陸検出でACTIVEへ移行する。既存SAMを隠さず、20秒のSpawn待ちは設けない。
 - DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
+- Site/DEAD対象のIsAliveはtrue=生存、false=死亡、nil=観測不能とする。未確認対象のnil・例外・不正値・ID不一致を全滅根拠にせず、Site残数は不明・継続候補から除外、DEADは残存側に数える。観測不能ログは移行時だけ記録する。明示死亡のlostを優先し、Group一覧欠落だけでも既知対象を全滅扱いしない。
+- Follow-on DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Estimated表現は使わず、SEAD TOO/PBの推定点と秘匿表示は維持する。
 - 全員終了時にIN_USEならCLEANUPへ倒す。明示RETAIN以外はCleanupが標準。保持timeout・明示削除メニュー・永続化は未実装。
 - 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
 - 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。既存5 LuaスイートとBuild/Syncテストも通す。

@@ -120,7 +120,7 @@ TypeNameは現在の `.miz` の `mission` エントリで確認済み。PBコー
 Lifeの基準はSAM生成時（戦闘開始時）の `UNIT:GetLife()` 実測値。
 工場出荷時の `GetLife0()` や固定のdamage percentageは使わない。基準値が取得できなければ生成失敗とする。
 Radar ON/OFFにはMOOSE `UNIT:GetRadar()` の第1戻り値を使う。第2戻り値の追尾対象がnilでもOFFとは限らない。
-Life・Radarの不正値やAPI例外をOFFと見なさない。破壊イベントまたは生存確認で破壊が確定した場合はLife/Radar取得を必要としない。
+Life・Radarの不正値やAPI例外をOFFと見なさない。IsAliveのnilも観測不能とし、lostやDESTROYEDへ変換せずOFFタイマーをリセットする。明示的な破壊イベントまたはIsAlive=falseで破壊が確定した場合はLife/Radar取得を必要としない。
 参照: [MOOSE UNIT API](https://flightcontrol-master.github.io/MOOSE_DOCS/Documentation/Wrapper.Unit.html)。
 
 継続時間はミッション時刻で測る。無傷のOFF時間は加算せず、損傷を観測した時点から数える。

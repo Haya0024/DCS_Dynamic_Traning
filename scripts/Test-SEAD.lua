@@ -758,12 +758,16 @@ test("radar restart resets OFF continuity and requires a new complete sixty-seco
     s:tick(122); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
 end)
 
-test("invalid life/radar observations and API exceptions break continuity rather than implying OFF", function()
-    for _, problem in ipairs({ "radarNil", "radarNumber", "radarError", "lifeNil", "lifeNegative", "lifeNaN", "lifeInfinity", "lifeError" }) do
+test("invalid alive/life/radar observations and API exceptions break continuity without implying OFF or destruction", function()
+    for _, problem in ipairs({ "aliveNil", "aliveNumber", "aliveError", "radarNil", "radarNumber", "radarError", "lifeNil", "lifeNegative", "lifeNaN", "lifeInfinity", "lifeError" }) do
         local s, g = started(); local radar = g.units[1]
+        local isAlive = radar.IsAlive
         radar.life, radar.radarEmitting = 95, false
         for t = 2, 60 do s:tick(t) end
-        if problem == "radarNil" then radar.radarEmitting = nil
+        if problem == "aliveNil" then radar.IsAlive = function() return nil end
+        elseif problem == "aliveNumber" then radar.IsAlive = function() return 0 end
+        elseif problem == "aliveError" then radar.IsAlive = function() error("Injected emitter life observation failure") end
+        elseif problem == "radarNil" then radar.radarEmitting = nil
         elseif problem == "radarNumber" then radar.radarEmitting = 0
         elseif problem == "lifeNil" then radar.life = nil
         elseif problem == "lifeNegative" then radar.life = -1
@@ -772,6 +776,13 @@ test("invalid life/radar observations and API exceptions break continuity rather
         else radar[problem] = true end
         s:tick(61); s:tick(62)
         assert(s:mission().spawn.primaryUnits[1].offSince == nil and s:mission().state == "ACTIVE")
+        assert(not s:mission().spawn.primaryUnits[1].lost and not s:mission().primaryResult)
+        if string.sub(problem, 1, 5) == "alive" then
+            s:command("Mission Status")
+            assert(s:mission().site.state == "ACTIVE" and s:mission().site.observationUnavailable)
+            assert(s:mission().site.remainingTargetCount == nil)
+        end
+        radar.IsAlive = isAlive
         radar.life, radar.radarEmitting, radar.lifeError, radar.radarError = 95, false, nil, nil
         s:tick(63)
         for t = 64, 122 do s:tick(t) end

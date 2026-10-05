@@ -253,9 +253,9 @@ local function Generate(groupName, category)
         record.owner = roster[1]
         local site, previous, airborne
         local ok, failure = pcall(function()
-            site = DEAD.SelectSite(record.owner.unit:GetVec3())
+            site = DEAD.SelectSite(record.owner.unit:GetVec3(), record.groupName)
             if not site then return end
-            previous = assert(SEADSites.Reserve(site, record.assignmentID))
+            previous = assert(SEADSites.Reserve(site, record.assignmentID, record.groupName))
             local reward = Config.dead.fullReward
             assert(type(reward) == "number" and reward >= 0 and reward < math.huge and reward % 1 == 0,
                 "Invalid DEAD full reward.")
@@ -418,7 +418,8 @@ local function FollowOn(groupName, record, preserve)
         end
         if keeper and SEADSites.Preserve(site, record.assignmentID, time, keeper) then
             Message(group, "SAM site preserved for follow-on DEAD.\nKeeper: " .. site.retainedBy.name ..
-                "\nReturn to base and rearm.\nSite will be cleaned when the keeper disconnects.", 20)
+                "\nSite remains reserved for your wing after SEAD settlement.\nReturn to base and rearm." ..
+                "\nSite will be cleaned when the keeper disconnects.", 20)
         end
         return
     end
@@ -429,6 +430,7 @@ local function FollowOn(groupName, record, preserve)
         "Invalid DEAD reward")
     record.deadScoringID, record.deadFullReward = Scoring.NextID("DEAD"), reward
     site.disposition, site.followOnAvailable = "IN_USE", false
+    site.unreservedSince = nil
     record.deadTargets, record.deadStartedAt, record.state = targets, time, "DEAD_ACTIVE"
     for _, p in ipairs(record.participants) do
         if not p.done then
@@ -502,13 +504,19 @@ ScanPlayers = function()
         local records = Missions.ForGroup(name, roster)
         local signature = tostring(group:GetID())
         for _, owner in ipairs(roster) do
-            signature = signature .. ":" .. owner.unitName .. ":" .. owner.objectID .. ":" .. owner.name
+            signature = signature .. ":" .. owner.unitName .. ":" .. owner.objectID .. ":" .. owner.name .. ":" .. tostring(owner.ucid)
         end
         local targets = {}
         local followOn = Missions.wings[name]
         local canContinue = FollowOnAvailable(name, followOn)
-        local canPreserve = canContinue and followOn.site.disposition ~= "RETAIN"
+        local canPreserve = canContinue and followOn.site.disposition == "CLEANUP"
         signature = signature .. ":follow:" .. tostring(canContinue) .. ":preserve:" .. tostring(canPreserve)
+        local reservations = {}
+        for _, site in pairs(Missions.sites) do
+            if SEADSites.CanReleaseReservation(site, name) then reservations[#reservations + 1] = site end
+        end
+        table.sort(reservations, function(a, b) return a.id < b.id end)
+        for _, site in ipairs(reservations) do signature = signature .. ":release:" .. site.id end
         for _, record in ipairs(records) do
             signature = signature .. ":assignment:" .. record.assignmentID
             for _, p in ipairs(record.participants) do
@@ -547,6 +555,35 @@ ScanPlayers = function()
                         end)
                     end
                 end
+            end
+            for index, reservedSite in ipairs(reservations) do
+                local site, groupID, owners = reservedSite, group:GetID(), roster
+                local label = "Release Site Reservation"
+                if #reservations > 1 then
+                    label = label .. ": " .. (site.plan.areaLabel or "SAM site") .. " (" .. index .. ")"
+                end
+                MENU_GROUP_COMMAND:New(group, label, root, function()
+                    Safe(label, group, function()
+                        local currentGroup, authorized = GROUP:FindByName(name), false
+                        if currentGroup and currentGroup:GetID() == groupID then
+                            for _, current in ipairs(Player.ForGroup(name) or {}) do
+                                for _, owner in ipairs(owners) do
+                                    if Player.CanManage(owner, current) then authorized = true end
+                                end
+                            end
+                        end
+                        if authorized and SEADSites.ReleaseReservation(site, name) then
+                            local waiting = site.reservedByAssignmentID ~= nil
+                            Message(currentGroup, "SAM site reservation released.\n" ..
+                                (waiting and "Available to other wings after SEAD settlement.\n" or "Available to all wings for Generate DEAD.\n") ..
+                                string.format("Cleanup after %g minutes without a reservation.",
+                                    Config.dead.unreservedSiteCleanupSeconds / 60), 20)
+                        else
+                            Message(currentGroup or group, "This site reservation is no longer available to release.")
+                        end
+                        ScanPlayers()
+                    end)
+                end)
             end
             for _, entry in ipairs(targets) do
                 local target, record = entry.participant, entry.record

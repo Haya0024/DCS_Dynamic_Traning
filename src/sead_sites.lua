@@ -3,7 +3,8 @@
 local SEADSites = {}
 
 function SEADSites.Register(record)
-    local site = { id = record.id, sourceMissionID = record.id, spawn = record.spawn, plan = record.plan,
+    local site = { id = record.id, sourceMissionID = record.id, sourceGroupName = record.groupName,
+        spawn = record.spawn, plan = record.plan,
         state = "ACTIVE", seadCompleted = false, disposition = "CLEANUP", followOnAvailable = false,
         reservedByAssignmentID = record.assignmentID, cleanupRequested = false, cleaned = false, unitRecords = {} }
     for _, unit in ipairs(record.spawn.units) do site.unitRecords[unit.objectID] = unit end
@@ -66,8 +67,27 @@ local function CheckRetention(site)
     end
 end
 
-function SEADSites.Refresh(site)
+local function CleanupTimeout()
+    local seconds = Config.dead.unreservedSiteCleanupSeconds
+    assert(type(seconds) == "number" and seconds > 0 and seconds < math.huge, "Invalid unreserved site cleanup timeout.")
+    return seconds
+end
+
+local function CheckAvailability(site)
     CheckRetention(site)
+    if site.disposition ~= "AVAILABLE" or site.cleanupRequested or site.cleaned then return end
+    if site.reservedByAssignmentID then return end
+    local time = timer.getTime()
+    site.unreservedSince = site.unreservedSince or time
+    if time - site.unreservedSince >= CleanupTimeout() then
+        site.disposition, site.followOnAvailable, site.cleanupRequested = "CLEANUP", false, true
+        site.cleanupReason = "UNRESERVED_TIMEOUT"
+        env.info("[DynamicTraining] SAM site cleanup: unreserved timeout; site=" .. site.id)
+    end
+end
+
+function SEADSites.Refresh(site)
+    CheckAvailability(site)
     local ok, remaining, targets = pcall(SEADSites.CountAliveSiteTargets, site)
     if not ok then
         if not site.observationUnavailable then
@@ -94,26 +114,52 @@ end
 function SEADSites.Preserve(site, assignmentID, time, keeper)
     local targets = SEADSites.Refresh(site)
     if site.reservedByAssignmentID ~= assignmentID or not site.followOnAvailable or not targets
-        or #targets == 0 or site.cleanupRequested or site.cleaned then return false end
+        or #targets == 0 or site.cleanupRequested or site.cleaned or site.disposition == "AVAILABLE"
+        or type(site.sourceGroupName) ~= "string" or site.sourceGroupName == "" then return false end
     site.disposition, site.retainedAt = "RETAIN", site.retainedAt or time
+    site.retainedWingName = site.retainedWingName or site.sourceGroupName
     if not site.retainedBy and keeper then
         site.retainedBy = { ucid = keeper.ucid, playerID = keeper.playerID, name = keeper.name }
     end
     return true
 end
 
-function SEADSites.Available(site)
-    if site.disposition ~= "RETAIN" or site.reservedByAssignmentID or site.cleanupRequested or site.cleaned then
+function SEADSites.CanReleaseReservation(site, groupName)
+    if not site or Missions.sites[site.id] ~= site then return false end
+    CheckRetention(site)
+    return site.disposition == "RETAIN" and site.seadCompleted and not site.cleanupRequested and not site.cleaned
+        and type(groupName) == "string" and groupName ~= "" and site.retainedWingName == groupName
+end
+
+function SEADSites.ReleaseReservation(site, groupName)
+    if not SEADSites.CanReleaseReservation(site, groupName) then return false end
+    CleanupTimeout() -- Validate before changing ownership/lifetime.
+    site.disposition, site.retainedWingName = "AVAILABLE", nil
+    site.releasedAt, site.releasedByWingName = timer.getTime(), groupName
+    -- Source SEAD recovery still owns its assignment use lock.
+    site.unreservedSince = site.reservedByAssignmentID == nil and timer.getTime() or nil
+    SEADSites.Refresh(site)
+    return true
+end
+
+function SEADSites.Available(site, groupName)
+    CheckAvailability(site)
+    if (site.disposition ~= "RETAIN" and site.disposition ~= "AVAILABLE")
+        or site.reservedByAssignmentID or site.cleanupRequested or site.cleaned then
         return false
     end
+    if type(groupName) ~= "string" or groupName == "" then return false end
+    if site.disposition == "RETAIN" and site.retainedWingName ~= groupName then return false end
     local targets = SEADSites.Refresh(site)
     return targets ~= nil and #targets > 0 and site.followOnAvailable
 end
 
-function SEADSites.Reserve(site, assignmentID)
-    if not SEADSites.Available(site) then return nil, "SAM site is no longer available." end
-    local previous = { disposition = site.disposition, followOnAvailable = site.followOnAvailable }
+function SEADSites.Reserve(site, assignmentID, groupName)
+    if not SEADSites.Available(site, groupName) then return nil, "SAM site is no longer available for this wing." end
+    local previous = { disposition = site.disposition, followOnAvailable = site.followOnAvailable,
+        unreservedSince = site.unreservedSince }
     site.reservedByAssignmentID, site.disposition, site.followOnAvailable = assignmentID, "IN_USE", false
+    site.unreservedSince = nil
     return previous
 end
 
@@ -121,6 +167,7 @@ function SEADSites.Rollback(site, assignmentID, previous)
     if site and previous and site.reservedByAssignmentID == assignmentID then
         site.reservedByAssignmentID, site.disposition, site.followOnAvailable = nil,
             previous.disposition, previous.followOnAvailable
+        site.unreservedSince = previous.unreservedSince
     end
 end
 
@@ -138,10 +185,11 @@ function SEADSites.Sweep()
     local sites = {}
     for _, site in pairs(Missions.sites) do sites[#sites + 1] = site end
     for _, site in ipairs(sites) do
-        CheckRetention(site)
+        CheckAvailability(site)
         if not site.cleanupRequested and site.seadCompleted then
             SEADSites.Refresh(site)
-            if site.disposition == "RETAIN" and not site.reservedByAssignmentID and site.state == "DESTROYED"
+            if (site.disposition == "RETAIN" or site.disposition == "AVAILABLE")
+                and not site.reservedByAssignmentID and site.state == "DESTROYED"
                 and not site.observationUnavailable then
                 site.disposition, site.cleanupRequested = "CLEANUP", true
             end
@@ -172,8 +220,11 @@ end
 function SEADSites.CloseAssignment(site, assignmentID)
     if not site or site.reservedByAssignmentID ~= assignmentID then return end
     site.reservedByAssignmentID = nil
+    -- The old assignment ends; retainedWingName still reserves the site for
+    -- its wing across RTB/rearm until the next DEAD assignment or cleanup.
     local targets = SEADSites.Refresh(site)
-    if site.disposition == "RETAIN" and site.seadCompleted and (not targets or #targets > 0) then return end
+    if (site.disposition == "RETAIN" or site.disposition == "AVAILABLE") and site.seadCompleted
+        and not site.cleanupRequested and (not targets or #targets > 0) then return end
     -- IN_USE on failure/abort must not leave an orphaned reservation/site.
     site.disposition, site.followOnAvailable = "CLEANUP", false
     SEADSites.Release(site)

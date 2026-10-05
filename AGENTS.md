@@ -169,16 +169,18 @@ BLUE 空港への RTB を追加評価対象とする。
 - SEAD達成後の残存Siteにだけ同階層の `Continue as DEAD` / `Preserve Site for DEAD` を一時表示する。古いcallbackは任務・Site・参加者を再照合する。
 - `record.primaryResult` / `site.primaryResult` はレーダーだけのSUPPRESSED/DESTROYED結果。Site全滅とは分離する。完了通知は `site.seadCompleted`、残存数は `SEADSites.CountAliveSiteTargets` と `site.remainingTargetCount` で管理し、DEAD可否をPrimary結果の値から決めない。SA-6レーダー破壊後も生存Launcherが1両以上あれば継続可能、Suppressed時は生存レーダーも対象、全残存対象0でDEAD不可。
 - Immediateは同じSEAD recordを `RTB_PENDING → DEAD_ACTIVE → RTB_PENDING` とし、新規Acquireは行わない。SEADの結果・任務IDを維持し、Continue時に満額と追加DEAD採点用IDを固定する。両目標達成＋帰還はSEAD150＋DEAD150、両目標達成後事故は各90、DEAD未達成事故はSEAD90／DEAD0、任意中止は両方0。精算済み・途中終了者への遡及採点をせず、追加DEADはscoreOnlyとして任務・帰還等の統計を二重に数えない。
-- Preserveを明示選択した場合だけRETAINとし、最初の選択時の `retainedAt` を保存する。通常は元SEADの全員終了（精算・中止・喪失）までSiteを予約し、終了後は予約を解除してGroupを残す。ただし残存対象の全滅・保持者の切断が確認されたSiteはCleanupする。残存観測不能を全滅とはみなさない。予約解除後の保持Siteは別ウィングもGenerate DEADで取得できる。
+- Preserveを明示選択した場合だけRETAINとし、最初の選択時の `retainedAt` と保持元ウィングの `retainedWingName` を保存する。元SEADの全員終了時は任務ロックと旧assignmentの使用予約だけを解除し、保持元Wing専用のSite予約はRTB・再武装後も維持する。同じWingのGenerate DEADだけが新assignmentで取得でき、別Wingは取得できない。同Wingに複数保持Siteがある場合のみ最寄りを選ぶ。残存対象の全滅・保持者の切断が確認されたSiteはCleanupし、残存観測不能を全滅とはみなさない。
 - Continue時には以前の着陸確認を解除するが、Immediate DEAD未達成でもその後の着地からSEAD帰還評価を行う。帰還成功はBLUE基地・対応空母で5 knots以下を連続10秒維持して確定し、その時点でDEAD未達成ならSEAD150／DEAD0で個別終了する。未精算の僚機は継続可能。確認中のDEAD達成では着陸タイマーを維持し、帰還確定前の達成なら各150。復行時は現在のphase（未達成ならDEAD_ACTIVE、達成後ならRTB_PENDING）へ戻す。全員終了でIN_USE SiteをCleanupし、精算済み参加者へ遡及採点しない。
 - Preserve時点で未精算かつ操縦中の登録参加者のうち、機体番号が最小の長機を保持者として固定する。UCIDで接続喪失が確認されたRETAIN SiteをCleanupする。UCID未照合なら取得済み接続player IDを使い、観戦・スロット変更を切断扱いしない。元SEAD精算前でもSite予約だけ解除し、採点・Wing/UCIDロックは維持する。DEADでIN_USEになったSiteは保持者切断Cleanupの対象外。接続APIの結果が不明なら切断を根拠とする削除を行わず、削除失敗は再試行する。
 - RETAINは同じミッション実行中の次Sortie向け保持であり、Site・生成Group・進行中任務はミッション再開始／サーバー再起動後に復元しない。永続保存するのはUCIDごとの精算済み成績だけ。
-- 通常の `Generate DEAD` は予約なしのRETAIN Siteから長機に最も近いものを取得。既存のWing/UCID排他とSite予約を併用し、準備失敗では予約とロックをrollbackする。
+- 通常の `Generate DEAD` は保持予約先が受注Wingと一致するRETAIN、または明示開放された期限内のAVAILABLE Siteから、使用中assignmentがない最寄り候補を取得。専用保持の候補選定と使用予約では両方でWing所有を照合する。既存のWing/UCID排他とSite使用予約を併用し、準備失敗では使用予約と任務ロックをrollbackし、元の保持予約・未予約時刻を維持する。同UCIDでも別グループのスロットは別Wingとする。
 - Follow-on DEADは新しいDEAD recordをAcquireし、受注時の生存RED ground targetsを固定。地上ならARMED、全員離陸検出でACTIVEへ移行する。既存SAMを隠さず、20秒のSpawn待ちは設けない。
 - DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
 - Site/DEAD対象のIsAliveはtrue=生存、false=死亡、nil=観測不能とする。未確認対象のnil・例外・不正値・ID不一致を全滅根拠にせず、Site残数は不明・継続候補から除外、DEADは残存側に数える。観測不能ログは移行時だけ記録する。明示死亡のlostを優先し、Group一覧欠落だけでも既知対象を全滅扱いしない。
 - Follow-on DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Estimated表現は使わず、SEAD TOO/PBの推定点と秘匿表示は維持する。
-- 全員終了時にIN_USEならCLEANUPへ倒す。明示RETAIN以外はCleanupが標準。保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
+- 保持元Wingの `Release Site Reservation` で専用予約を明示解除したSiteだけAVAILABLEへ移し、他WingのGenerate DEAD候補にする。元SEAD全員終了までは使用予約を維持し、受注・精算・Wing/UCIDロックを変更しない。複数保持Siteは地域名付きの個別解除メニューにする。古いcallbackはSite・Wing・操縦者を再照合する。
+- AVAILABLEで使用中assignmentがない状態を `unreservedSince` から連続計測し、`dead.unreservedSiteCleanupSeconds = 1800`（ミッション時刻30分）でCleanupする。RETAIN専用予約中・IN_USE（地上ARMED含む）は計測しない。準備失敗のrollbackは元の開始時刻を復元し、期限を延長しない。候補選定・使用予約時にも期限を確認する。AVAILABLEは元保持者の切断Cleanup対象外。観測不能を全滅とは扱わないが未予約timeoutは適用し、削除失敗はSweepで再試行する。
+- 全員終了時にIN_USEならCLEANUPへ倒す。明示保持・開放済みSite以外はCleanupが標準。専用保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
 - 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
 - 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。既存5 LuaスイートとBuild/Syncテストも通す。
 
@@ -542,4 +544,4 @@ DCS-Dynamic-Training/
 - 敵の5種類の編隊指定を接敵前に確認すること（初期相対座標はテンプレートから継承し、AI が指定形状へ移行する）
 - 敵テンプレート3種類の抽選、実際の機種・機数の表示、1機・2機編成それぞれの全滅判定を確認すること（模擬テスト済み）
 - SEAD標準Cleanup、Continueで同SiteのImmediate DEAD、Preserve後の別SortieでFollow-on DEADを確認すること
-- 元SEAD全員終了までのSite予約、最寄りRETAINの取得、別Wingの二重取得拒否、DEAD150/90/0とImmediateのSEAD＋DEAD採点・任務数1件を確認すること。詳細な手順は `docs/DEAD.md` と `docs/TESTING.md` を参照する
+- 元SEAD精算後・再武装中も保持元Wing専用のSite予約が残り、別Wingを拒否すること。同Wingの最寄りRETAIN取得、DEAD150/90/0、ImmediateのSEAD＋DEAD採点・任務数1件も確認する。詳細は `docs/DEAD.md` と `docs/TESTING.md` を参照する

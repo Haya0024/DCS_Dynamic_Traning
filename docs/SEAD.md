@@ -153,11 +153,12 @@ Enemy radar suppressed.
 `Preserve Site for DEAD` を明示選択した場合だけ `RETAIN` とし、全員精算後もSiteを保持する。
 Preserve時の長機を保持者として固定し、そのプレイヤーのログアウトを確認した場合はRETAIN SiteをCleanupする。観戦席・別スロットへの移動は切断扱いにしない。
 このCleanupは元SEAD精算前でも可能だが、SEADのPrimary結果・帰還評価・Wing/UCIDロックは変更しない。すでにDEAD使用中のIN_USE Siteは対象外。
-元SEADが終了するまではSiteの予約を維持し、別Wingが先に取得できないようにする。
+PreserveしたSiteは元SEADの全員終了後も保持元Wing専用に予約する。任務ロックと旧assignmentの使用予約は終了時に解除するが、Siteの保持予約先は維持し、RTB・再武装後に同WingだけがGenerate DEADで取得できる。
 `Continue as DEAD` は同じrecordを `DEAD_ACTIVE` へ移す。既存Groupを再生成せず、生存車両だけを対象に固定する。
 Immediate DEADではSEADの達成結果・任務ID・採点カテゴリを維持し、独立した追加DEAD報酬を設定する。DEAD全滅後にRTBへ戻り、帰還時に各150、両目標達成後事故は各90、DEAD未達成事故はSEAD90／DEAD0。任意Abortは両方0。任務数は1件を維持する。詳細は [DEAD.md](DEAD.md)。
 DEAD未達成でも新しい着地からSEADの帰還を評価し、安全帰還確定時はSEAD150／DEAD0で個別終了する。未精算の僚機は継続でき、後の達成を精算済み参加者へ遡って付けない。
-IN_USEのまま全員終了した場合はCLEANUPへ倒す。保持timeoutは今回追加しない。
+IN_USEのまま全員終了した場合はCLEANUPへ倒す。RETAIN専用保持中にtimeoutは設けない。
+保持元Wingが `Release Site Reservation` を明示選択するとAVAILABLEへ移り、元SEADの全員終了後は他Wingにも開放する。使用予約のない状態が連続30分続いた共有SiteはCleanupする。解除はSEADの採点・任務ロックに影響せず、元SEAD精算前は使用予約と計測開始待ちを維持する。詳細は [DEAD.md](DEAD.md)。
 ウィングの終了処理はサイトの解放を通知するだけとし、SAMの削除・再試行は独立したサイト管理が担う。
 削除に失敗したサイトも参照を失わず、監視tickで再試行する。参照は削除完了まで保持する。
 生成途中の検証失敗による即時削除は、完成したサイトのCleanupとは別の失敗復旧とする。
@@ -297,7 +298,7 @@ SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSi
   状態遷移、60秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
 
 `Build-Mission.ps1` で結合後、Lua 5.1 で `scripts/Test-SEAD.lua`、`scripts/Test-DEAD.lua` と既存4種類のテストを実行する。
-SEAD62件と既存85件、DEAD86件を検証し、詳細は [TESTING.md](TESTING.md) にまとめる。
+SEAD62件と既存85件、DEAD103件を検証し、詳細は [TESTING.md](TESTING.md) にまとめる。
 実際のDCSでのRadar状態・損傷Life・イベント順序・残存SAMのCleanupはゲーム内確認待ち。
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。

@@ -8,10 +8,10 @@ local function Point(site)
     return { x = point.x, y = point.z }
 end
 
-function DEAD.SelectSite(position)
+function DEAD.SelectSite(position, groupName)
     local nearest, minimum
     for _, site in pairs(Missions.sites) do
-        if SEADSites.Available(site) then
+        if SEADSites.Available(site, groupName) then
             local point = Point(site)
             local distance = (point.x - position.x)^2 + (point.y - position.z)^2
             if not minimum or distance < minimum or (distance == minimum and site.id < nearest.id) then

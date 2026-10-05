@@ -169,8 +169,10 @@ BLUE 空港への RTB を追加評価対象とする。
 - SEAD達成後の残存Siteにだけ同階層の `Continue as DEAD` / `Preserve Site for DEAD` を一時表示する。古いcallbackは任務・Site・参加者を再照合する。
 - `record.primaryResult` / `site.primaryResult` はレーダーだけのSUPPRESSED/DESTROYED結果。Site全滅とは分離する。完了通知は `site.seadCompleted`、残存数は `SEADSites.CountAliveSiteTargets` と `site.remainingTargetCount` で管理し、DEAD可否をPrimary結果の値から決めない。SA-6レーダー破壊後も生存Launcherが1両以上あれば継続可能、Suppressed時は生存レーダーも対象、全残存対象0でDEAD不可。
 - Immediateは同じSEAD recordを `RTB_PENDING → DEAD_ACTIVE → RTB_PENDING` とし、新規Acquireは行わない。SEADの結果・任務IDを維持し、Continue時に満額と追加DEAD採点用IDを固定する。両目標達成＋帰還はSEAD150＋DEAD150、両目標達成後事故は各90、DEAD未達成事故はSEAD90／DEAD0、任意中止は両方0。精算済み・途中終了者への遡及採点をせず、追加DEADはscoreOnlyとして任務・帰還等の統計を二重に数えない。
-- Preserveを明示選択した場合だけRETAINとし、`retainedAt` を保存する。元SEADの全員終了までSiteを予約し、終了後はGroupを残して予約だけ解除する。
-- Preserve時の操縦中の登録長機を保持者として固定し、UCIDでログアウトを検出したらRETAIN SiteをCleanupする。未照合UCIDは取得済み接続player IDを使い、観戦・スロット変更と切断を区別する。元SEAD精算前でもSite予約だけ解除し、採点・Wing/UCIDロックは維持する。DEADでIN_USEのSiteは対象外、API不明時は削除せず、削除失敗は再試行する。
+- Preserveを明示選択した場合だけRETAINとし、最初の選択時の `retainedAt` を保存する。通常は元SEADの全員終了（精算・中止・喪失）までSiteを予約し、終了後は予約を解除してGroupを残す。ただし残存対象の全滅・保持者の切断が確認されたSiteはCleanupする。残存観測不能を全滅とはみなさない。予約解除後の保持Siteは別ウィングもGenerate DEADで取得できる。
+- Continue時には以前の着陸確認を解除するが、Immediate DEAD未達成でもその後の着地からSEAD帰還評価を行う。帰還成功はBLUE基地・対応空母で5 knots以下を連続10秒維持して確定し、その時点でDEAD未達成ならSEAD150／DEAD0で個別終了する。未精算の僚機は継続可能。確認中のDEAD達成では着陸タイマーを維持し、帰還確定前の達成なら各150。復行時は現在のphase（未達成ならDEAD_ACTIVE、達成後ならRTB_PENDING）へ戻す。全員終了でIN_USE SiteをCleanupし、精算済み参加者へ遡及採点しない。
+- Preserve時点で未精算かつ操縦中の登録参加者のうち、機体番号が最小の長機を保持者として固定する。UCIDで接続喪失が確認されたRETAIN SiteをCleanupする。UCID未照合なら取得済み接続player IDを使い、観戦・スロット変更を切断扱いしない。元SEAD精算前でもSite予約だけ解除し、採点・Wing/UCIDロックは維持する。DEADでIN_USEになったSiteは保持者切断Cleanupの対象外。接続APIの結果が不明なら切断を根拠とする削除を行わず、削除失敗は再試行する。
+- RETAINは同じミッション実行中の次Sortie向け保持であり、Site・生成Group・進行中任務はミッション再開始／サーバー再起動後に復元しない。永続保存するのはUCIDごとの精算済み成績だけ。
 - 通常の `Generate DEAD` は予約なしのRETAIN Siteから長機に最も近いものを取得。既存のWing/UCID排他とSite予約を併用し、準備失敗では予約とロックをrollbackする。
 - Follow-on DEADは新しいDEAD recordをAcquireし、受注時の生存RED ground targetsを固定。地上ならARMED、全員離陸検出でACTIVEへ移行する。既存SAMを隠さず、20秒のSpawn待ちは設けない。
 - DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
@@ -342,12 +344,13 @@ CAS: 720
 
 成績保存は `docs/PERSISTENCE.md` を参照する。実装済み・DCS内確認待ち。
 
-- ミッション側のio / lfsをunsanitizeしない。サーバーのSaved Games Hookがa_do_scriptでデータのみを受け渡し、固定schemaの `DynamicTraining/scores.dat` と正常backupを管理する。
+- ミッション側のio / lfsをunsanitizeしない。サーバーのSaved Games Hookがnet.dostring_in("server", code)でデータのみを受け渡し、固定schemaの `DynamicTraining/scores.dat` と正常backupを管理する。Hook環境のa_do_scriptは使わない。型付き文字列返信を検証し、通信例外・API拒否・不正返信を保存成功にしない。
 - `src/score_data.lua` はschemaとcodec、`src/persistence.lua` はsnapshotと復元・確認通知、`server/score_store.lua` は検証付き保存・復旧、`server/DynamicTrainingPersistenceHook.lua` はサーバーcallbackを担う。
 - UCID累計・カテゴリ別Score・任務／帰還／失敗／中止／出撃喪失数を保存する。進行中任務・Wingロック・SAM Siteは保存しない。
 - run番号を保存してから復元する。遅延接続前の精算差分は1回だけ統合する。snapshotの再送は累計置換で、保存revisionの確認前に保存済みと表示しない。
 - dual corruptionではゼロで上書きしない。I/O失敗はゲームを止めず保存未確認として再試行する。Immediate DEADの追加Scoreでは任務・死亡統計を増やさない。
 - Hookは `scripts/Build-PersistenceHook.ps1` で結合し、`scripts/Install-PersistenceHook.ps1 -SavedGamesPath <DCSユーザーディレクトリ>` で配置する。導入・更新後はDCS再起動が必要。MissionScripting.luaと他Hookを変更しない。
+- ホスト導入時はinstallerに `-ConfigureHost` を付け、autoexec.cfgへuserhooksからserverへのAPI許可だけを追加する。既存設定・許可を維持し、変更前にbackup、再実行はidempotent。不完全・重複管理ブロックや不正文字コードでは変更を拒否する。
 - Lua7スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
 
 ---

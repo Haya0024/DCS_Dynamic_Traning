@@ -19,12 +19,13 @@ env.lfs = { writedir = function() return root end,
         if file then file:close(); return field and "file" or { mode = "file" } end
     end,
     mkdir = function() error("Fixture directory must already exist") end }
-env.log = { ERROR = 1, WARNING = 2, write = function(_, level, message)
+env.log = { ERROR = 1, WARNING = 2, INFO = 3, write = function(_, level, message)
     if level == 1 then error(message) end
 end }
-env.a_do_script = function(code)
+env.net = { dostring_in = function(state, code)
+    assert(state == "server")
     local chunk = assert(loadstring(code)); setfenv(chunk, s.env); return chunk()
-end
+end }
 local chunk = assert(loadfile("build/DynamicTrainingPersistenceHook.lua")); setfenv(chunk, env); chunk()
 h.callbacks.onSimulationFrame()
 if phase == "write" or phase == "restore" then

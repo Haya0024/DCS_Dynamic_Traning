@@ -20,13 +20,13 @@
 | WING | [Test-Wing.lua](../scripts/Test-Wing.lua) | 27 | MP2、参加者固定、共有目標、個別精算、排他 |
 | PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 16 | 複数ウィングの並行処理と独立性 |
 | SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 62 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止 |
-| DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 80 | Primary/Site分離、Group継承、保持・予約・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup |
-| PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 20 | schema、保存確認、再起動・遅延復元、I/O失敗、backup、run、死亡統計 |
+| DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 86 | Primary/Site分離、Group継承、保持・予約・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
+| PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 25 | schema、保存確認、再起動・遅延復元、I/O失敗、backup、run、死亡統計、別Lua環境・文字列通信 |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
-| INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 3確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧 |
+| INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 
-Luaは合計247ケース（既存227＋PERSIST20）。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、20ケースには含めない。
+Luaは合計258ケース（既存233＋PERSIST25）。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、25ケースには含めない。
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 
@@ -352,7 +352,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-42 | Follow-on DEAD達成後、移動中の空母へ着艦 | 既存の相対速度・停止10秒判定でDEAD150 |
 | DEAD-43 | UCID未照合でFollow-on DEAD完了・帰還 | 採点なし、任務とCleanupは完了 |
 | DEAD-44 | Follow-on DEAD受注後に途中参加者が事故 | snapshot参加者を増やさず、元任務に影響しない |
-| DEAD-45 | 着陸確認中にContinue、DEAD未達成で再着陸 | 旧着陸確認を解除、DEAD完了後の着地からSEAD帰還精算 |
+| DEAD-45 | 着陸確認中にContinue、DEAD未達成で再着陸 | 旧着陸確認を解除、新しい着地の10秒確認でSEAD150／DEAD0、Cleanup |
 | DEAD-46 | 2WingのFollow-on DEADを並行実行、片方を中止 | 対象・Group・削除・採点を混同せず、他方は継続 |
 | DEAD-47 | DEAD参加者と同UCIDが別Wingから受注 | UCIDロックで3カテゴリの二重受注を防ぐ |
 | DEAD-48 | MP2 Follow-on DEADの達成前に長機事故、僚機が達成・帰還 | 長機のDEAD0を維持、僚機DEAD150 |
@@ -388,6 +388,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-78 | 両DEAD経路の最後の対象がnilを3tick、trueへ回復、falseで喪失 | 未達成・lost=falseを維持、Site残数不明、DEAD観測不能ログ1回。trueで不明解除、falseで達成・帰還300 |
 | DEAD-79 | 両DEAD経路の対象がnil、各対象の死亡イベントが届く | 明示的死亡を優先、全対象lostで達成。nilのwrapperを再観測して完了を妨げず、帰還300・Cleanup |
 | DEAD-80 | 保持GroupのGetUnitsがnil/空、正常化、false確認済みで再度nil/空 | 一覧欠落だけで全滅・削除しない。回復時は候補復帰、既知対象すべてfalse確認済みの場合は全滅・Cleanup |
+| DEAD-81 | Immediate DEAD未達成でBLUE基地／移動空母へ帰還、着陸・事故重複通知 | 9秒では未精算、10秒でSEAD150／DEAD0を一度だけ付与。残敵CleanupでDEAD達成を誤認せず、任務・RTB各1 |
+| DEAD-82 | MP2 Immediate途中に長機だけ帰還、僚機が後で全対象破壊・RTB | 長機150固定、僚機300。僚機終了まで同record・Site予約・受注ロック維持、遡及採点なし |
+| DEAD-83 | Immediate未達成で着陸確認後Takeoff／RunwayTakeoff／空中polling | 確認解除後はDEAD_ACTIVEへ戻る。再着陸・安全帰還でSEAD150／DEAD0 |
+| DEAD-84 | Immediate未達成の着陸確認9秒時にCrash、重複Dead | SEAD90／DEAD0を一度だけ付与、Recovery Failure1、Site Cleanup |
+| DEAD-85 | Immediate着陸確認中にDEAD達成、そのまま停止／復行して再着陸 | タイマー維持、解除時の戻り先はRTB_PENDING、帰還成功はSEAD150＋DEAD150 |
+| DEAD-86 | Follow-on DEAD未達成でRED／BLUE基地へ帰還 | 達成前の帰還評価は開始しない。目標達成後の新しい着地からDEAD150を精算 |
 
 ### 成績永続化（PERSIST）
 
@@ -403,7 +409,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | PERSIST-08 | 重複死亡・snapshot再送 | Score90・任務1・喪失1を維持 |
 | PERSIST-09 | 古いrevision、別run、未来revisionの確認 | 新しい精算を誤って保存済みにしない |
 | PERSIST-10 | flush／close失敗後、正常復帰 | 未保存表示を維持し、再試行成功で保存済み |
-| PERSIST-11 | Hookなし、a_do_scriptなし、保存無効 | セッション内の訓練・採点を継続し未保存を明示 |
+| PERSIST-11 | Hookなし、net.dostring_inなし、保存無効 | セッション内の訓練・採点を継続し未保存を明示 |
 | PERSIST-12 | 非サーバー上のHook | ミッション通信・ファイル書込みなし |
 | PERSIST-13 | 次frame前にSimulationStop | 最後の90を保存・確認 |
 | PERSIST-14 | UCID取得不可 | 仮アカウントを保存しない |
@@ -413,6 +419,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | PERSIST-18 | primaryとbackup破損、訓練継続 | 元ファイル保持、ログを連発せず、未保存の90をメモリに保持 |
 | PERSIST-19 | 復元時の数値上限超過、正常データで再試行 | 途中まで加算せず、正常復元で240 |
 | PERSIST-20 | 保存済み・精算なしで一時通信障害、正常復帰 | 健全なpollで保存状態を回復し、再加算なし |
+| PERSIST-21 | Hookにa_do_scriptも任務のglobalも存在しない別環境、文字列のみ返すAPI | server宛の型付き通信で初期化・90保存・確認が成立、接続ログは1回 |
+| PERSIST-22 | API拒否／例外を繰り返し、許可を復旧 | エラーログ1回、接続前は保存ファイルを作らず、復旧後に未保存90を1回保存 |
+| PERSIST-23 | 空・untagged・不正tag・不正数値・booleanのAPI返信 | 初期化や保存成功と誤認せず、保存ファイルを作らない |
+| PERSIST-24 | mission初期化で例外、再試行、snapshotがtable、その後復旧 | 例外を文字列で通知、同runで安全に再試行、不正snapshotを保存せず、正常化後90を保存 |
+| PERSIST-25 | 書込み後のAcknowledgeがfalse、その後正常化 | 保存済みと誤表示せず、正常化後に確認回復、90の再加算なし |
 
 ### ビルド・同期・導入（PowerShell）
 
@@ -426,6 +437,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | INSTALL-01 | 旧Hook・別Hookがある一時DCSディレクトリへ導入、再導入 | 同名旧Hookをbackup、新bundleと一致、別Hookを維持、再導入は無変更 |
 | INSTALL-02 | Configを持たないディレクトリへ導入 | 拒否して書き込まない |
 | INSTALL-03 | 実ファイルを使うwrite／restore／recoverを別Luaプロセスで実行 | 保存90→復元・追加180→primary破損時backup90復旧。実Saved Gamesには触れない |
+| INSTALL-04 | BOMあり／なし・空のautoexec、既存DLSSとAPI許可、ConfigureHostを再実行 | 元設定・正確なbackupを維持、内容はidempotent、Lua実行で既存許可＋userhooks/serverのみを追加 |
+| INSTALL-05 | 不完全・重複・不正形式の管理block、不正UTF-8 | 設定とHookを変更せず拒否 |
 
 ## DCS内の手動テスト
 
@@ -483,6 +496,8 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-39 | MP2 Immediateで両目標達成後、1人帰還・1人事故。別試行で1人をDEAD達成前に喪失 | 帰還300／達成後事故180、DEAD達成前喪失90。精算済み参加者へ追加採点せず、任務数各1 |
 | MAN-40 | Hook未導入／保存無効で受注・精算 | Session only表示で訓練・採点を継続し、保存済みと表示しない |
 | MAN-41 | 保存先の書込みを一時的に失敗させ、精算後に権限を復旧（テスト用コピー） | 保存未確認表示とログ、正常復帰で同じ累計を1回保存。MissionScripting.luaの変更なし |
+| MAN-42 | SEAD達成→Continue、車両を残してBLUE基地／空母へRTB | 5 knots以下（空母は甲板相対）を10秒維持するとSEAD150／DEAD0、全員終了で残Site Cleanup。着陸確認中の事故はSEAD90／DEAD0 |
+| MAN-43 | MP2 Immediateで1人がDEAD未達成のままRTB、もう1人が攻撃継続 | 帰還者SEAD150／DEAD0で固定。僚機終了までSite・ロック維持、僚機が達成して帰還すれば300。着陸確認中の目標達成では確認タイマーを維持 |
 
 MAN-10〜14は、実際にLife減少とRadar ON/OFFの前提を確認できたときに実施済みとする。
 HARMの命中やRWR表示だけからLife/Radar状態を推測しない。Mission Statusの状態とDCS/MOOSEの観測を併せて確認する。
@@ -502,7 +517,7 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | DEAD対象・phase・保持・予約 | DEAD | MAN-24〜34、SEAD-45〜61の回帰 |
 | player/missions/runtime | WING/PAR | INT/SCORE/SEAD、UCID・F10のマルチ確認 |
 | scoring/recovery・採点設定 | SCORE | WING/SEAD、MAN-15〜18/21/22 |
-| 成績永続化・サーバーHook | PERSIST / INSTALL | Lua全7スイート、MAN-22/34/40/41、DCSでのa_do_script・停止callback順の確認 |
+| 成績永続化・サーバーHook | PERSIST / INSTALL | Lua全7スイート、MAN-22/34/40/41、DCSでのnet.dostring_in(server)接続・停止callback順の確認 |
 | 結合・同期・Watch | BUILD/SYNC | 実 `.miz` に対する `-Check` |
 | MEのスロット・テンプレート・Zone変更 | 対応するLuaスイート | 実 `.miz` 確認と該当する手動ケース。fixtureだけではME変更を検出できない |
 
@@ -520,7 +535,9 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 2026-10-05のSEADブリーフィング重複修正後はLua全226ケース（INT15、SCORE26、WING27、PAR16、SEAD62、DEAD80）が通過した。BUILDの2確認グループ、SYNCの3確認グループ、実ミッションのLua同期・Checkも成功。DCS内の自動表示回数とStatus再確認（MAN-07/08）は未実施。
 同日の座標表示時間延長・Intercept受注通知整理後はLua全227ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD80）が通過した。表示時間の初期60秒と設定変更後90秒、Intercept開始表示1回を模擬検証。BUILDの2確認グループ、SYNCの3確認グループ、実ミッションのLua同期・Checkも成功。DCS内の表示時間・回数確認は未実施。
 同日の成績永続化実装後はLua全247ケース（既存227＋PERSIST20）、BUILD2確認グループ、SYNC3確認グループ、INSTALL3確認グループが通過した。INSTALLでは実ファイル保存・別Luaプロセスでの復元・破損primaryのbackup復旧も確認。実ミッションのLua同期・Checkも成功。DCS内のHook接続・再起動復元・停止callback順は未確認。
+同日のImmediate DEAD未達成からのSEAD帰還修正後はLua全253ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD86、PERSIST20）、BUILD2、SYNC3、INSTALL3確認グループが通過した。未達成RTBのSEAD150／DEAD0、MP2個別精算と僚機継続、復行、確認中事故、確認中DEAD達成を模擬検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-42/43は未確認。
 同日、ユーザー承認後に `C:\Users\hayat\Saved Games\DCS\Scripts\Hooks\DynamicTrainingPersistenceHook.lua` へ導入し、生成bundleとのハッシュ一致を確認した。DCS再起動後の実機確認は未実施。
+同日の保存Hook通信修正後はLua全258ケース（既存233＋PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。Hookとミッションの別Lua環境・文字列通信・API拒否・不正返信・再接続、ホスト設定の保持・backup・idempotence・不正設定拒否を検証。実ミッションのLua同期・Checkも成功。ユーザー承認後に実Saved GamesのHookとautoexec.cfgをbackup付きで更新し、Hookハッシュ一致・既存DLSS設定維持・userhooks→server許可ブロック1件を確認した。DCS再起動後の接続・精算保存・再起動復元は未確認。
 本書のLuaケース数・番号と実行ファイルの対応、READMEと本書のリンク先も確認済み。
 DCS内のSEAD状態遷移・DEAD継続・サイト管理・採点の各手動ケースは個別結果の記録待ち。
 過去の「ゲーム内で動いている」という報告は、未記録の手動ケースすべての合格とは扱わない。

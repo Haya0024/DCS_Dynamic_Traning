@@ -508,13 +508,15 @@ test("late joins do not enter Follow-on DEAD's frozen participants or affect its
     finish(s, r); recover(s); s:score(300); s:score(0, s.wingman); s:assertClean()
 end)
 
-test("Immediate continuation clears an existing landing hold and permits recovery only after DEAD completion", function()
+test("Immediate continuation clears the old landing hold but permits a fresh SEAD-only recovery", function()
     local s, r = ready(1, false); s:land(s:base(), s.time + 1); s:tick(s.time)
     assert(r.participants[1].landing and r.participants[1].state == "LANDING_CHECK")
     s:command("Continue as DEAD"); assert(not r.participants[1].landing)
-    s:land(s:base(), s.time + 1); s:tick(s.time + 20)
+    s:land(s:base(), s.time + 1); local landed = s.time
+    s:tick(landed); s:tick(landed + 9)
     assert(r.state == "DEAD_ACTIVE" and not r.participants[1].done)
-    finish(s, r); recover(s); s:score(300); s:assertClean()
+    s:tick(landed + 10); assert(not s:mission() and r.site.cleaned)
+    s:score(150); s:lastMessageContains("DEAD Score: 0"); s:assertClean()
 end)
 
 test("parallel Follow-on DEAD assignments isolate losses, abort cleanup, scoring and source groups", function()
@@ -969,6 +971,94 @@ test("missing group lists cannot erase unconfirmed site targets and false observ
         assert(site.cleaned and site.state == "DESTROYED" and site.remainingTargetCount == 0)
         s:assertClean()
     end
+end)
+
+test("unfinished Immediate DEAD recovers SEAD once at a BLUE field or moving carrier and cleans remaining targets", function()
+    for _, carrier in ipairs({ false, true }) do
+        local s, r, site, g = ready(1, false); s.cleanupEvents = true
+        s:command("Continue as DEAD")
+        local base = s:base()
+        if carrier then
+            base = s:carrier(); s.player.velocity = { x = 12, y = 0, z = 0 }
+        end
+        local time = s.time + 1
+        s:land(base, time); s:tick(time)
+        for t = time + 1, time + 9 do s:tick(t) end
+        assert(not r.participants[1].done and not g.destroyed and not r.deadCompletedAt)
+        s:event("Land", s.player, base); s:tick(time + 10)
+        local p = r.participants[1]
+        assert(p.receipt.points == 150 and p.deadReceipt.points == 0 and p.deadReceipt.result == "FAILED")
+        assert(not r.deadCompletedAt and site.cleaned and g.destroyed and not s:mission())
+        s:event("Land", s.player, base); s:event("Crash", s.player); s:tick(time + 20)
+        s:score(150); s:lastMessageContains("SEAD Score: 150"); s:lastMessageContains("DEAD Score: 0")
+        s:lastMessageContains("Settled Missions: 1"); s:lastMessageContains("RTB Success: 1"); s:assertClean()
+    end
+end)
+
+test("MP2 early SEAD-only RTB leaves Immediate DEAD and locks for the remaining pilot without retroactive points", function()
+    local s = setup(); s:occupyWing(); local r = begin(s); primary(s, r, false)
+    s:command("Continue as DEAD"); recover(s)
+    local p = r.participants[1]
+    assert(p.done and p.deadReceipt.points == 0 and not p.deadScoring.primaryCompletedAt)
+    assert(s:mission() == r and r.state == "DEAD_ACTIVE" and not r.site.cleaned)
+    assert(r.site.disposition == "IN_USE" and r.site.reservedByAssignmentID == r.assignmentID)
+    s:command("Generate Intercept"); assert(s:mission() == r and #s.spawns == 1)
+    finish(s, r); recover(s, s.wingman)
+    assert(not p.deadScoring.primaryCompletedAt and p.deadReceipt.points == 0 and r.site.cleaned)
+    s:score(150); s:lastMessageContains("DEAD Score: 0")
+    s:score(300, s.wingman); s:lastMessageContains("Settled Missions: 1"); s:assertClean()
+end)
+
+test("unfinished Immediate DEAD recovery resets to its combat phase on bolter or airborne polling and permits relanding", function()
+    for _, takeoffEvent in ipairs({ "Takeoff", "RunwayTakeoff", "poll" }) do
+        local s, r = ready(1, false); s:command("Continue as DEAD")
+        local base, time = s:base(), s.time + 1
+        s:land(base, time); s:tick(time); s:tick(time + 5)
+        s.player.airborne = true
+        if takeoffEvent ~= "poll" then s:event(takeoffEvent, s.player) end
+        s:tick(time + 6)
+        local p = r.participants[1]
+        assert(not p.landing and p.state == "DEAD_ACTIVE" and r.state == "DEAD_ACTIVE")
+        s:tick(time + 20); assert(not p.done)
+        recover(s); assert(p.receipt.points == 150 and p.deadReceipt.points == 0)
+        s:score(150); s:assertClean()
+    end
+end)
+
+test("unfinished Immediate DEAD crash during an early recovery hold pays SEAD90 and DEAD0 once", function()
+    local s, r = ready(1, false); s:command("Continue as DEAD")
+    local time = s.time + 1; s:land(s:base(), time); s:tick(time); s:tick(time + 9)
+    s:event("Crash", s.player); s:event("Dead", s.player); s:tick(time + 10)
+    assert(r.site.cleaned and not r.deadCompletedAt)
+    s:score(90); s:lastMessageContains("DEAD Score: 0")
+    s:lastMessageContains("Recovery Failure: 1"); s:assertClean()
+end)
+
+test("Immediate DEAD completion during SEAD recovery preserves its hold and updates the bolter return phase", function()
+    for _, bolter in ipairs({ false, true }) do
+        local s, r = ready(1, false); s:command("Continue as DEAD")
+        local base, time = s:base(), s.time + 1
+        s:land(base, time); s:tick(time); s:tick(time + 5)
+        local p, landing = r.participants[1], r.participants[1].landing
+        finish(s, r)
+        assert(p.landing == landing and p.state == "LANDING_CHECK" and landing.stableSince == time)
+        assert(landing.resumeState == "RTB_PENDING" and p.deadScoring.primaryCompletedAt == s.time)
+        if bolter then
+            s.player.airborne = true; s:event("RunwayTakeoff", s.player)
+            assert(not p.landing and p.state == "RTB_PENDING")
+            recover(s)
+        else s:tick(time + 9); assert(not p.done); s:tick(time + 10) end
+        s:score(300); assert(r.site.cleaned); s:assertClean()
+    end
+end)
+
+test("incomplete Follow-on DEAD still rejects early landing and requires its own objective before scoring", function()
+    local s = preserved(1, false); local r = followOnDead(s)
+    recover(s, nil, s:base(1)); recover(s)
+    assert(r.state == "ACTIVE" and not r.participants[1].done and not r.participants[1].landing)
+    assert(not r.primaryCompletedAt and not r.site.cleaned); s:score(150)
+    finish(s, r); recover(s)
+    s:score(300); s:lastMessageContains("DEAD Score: 150"); assert(r.site.cleaned); s:assertClean()
 end)
 
 print(string.format("All %d DEAD tests passed (simulated DCS/MOOSE).", count))

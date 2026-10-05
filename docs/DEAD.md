@@ -105,6 +105,7 @@ Siteはセッション内のみ。保持timeout・Delete retained siteメニュ�
 SEAD ACTIVE → Primary Complete → RTB_PENDING
                                    ↓ Continue
                               DEAD_ACTIVE
+                                   ├─ 未達成で個別RTB → SEAD150／DEAD0
                                    ↓ 全対象破壊
                               RTB_PENDING → 個別精算 → Close/Cleanup
 ```
@@ -112,16 +113,20 @@ SEAD ACTIVE → Primary Complete → RTB_PENDING
 Continue時点の生存RED ground unitsを `record.deadTargets` に固定し、`deadStartedAt` を記録する。
 SEAD中に破壊済みの車両を除外する。後からGroupに加わった車両や別Siteは対象にしない。
 既に精算した参加者は再登録・再採点せず、未精算の参加者だけをDEAD phaseへ移す。
-進行中の着陸確認は解除する。DEAD phase中は帰還満額の確認を開始せず、DEAD達成後の着地から既存Recoveryを使用する。
-帰還する方針ならContinueを選ばず通常RTB、またはPreserveを選ぶ。
+Continue時に進行中の着陸確認は解除する。その後はDEAD未達成でも、新しい着地から既存RecoveryでSEADの帰還評価を開始できる。
+`DEAD_ACTIVE` の目標監視と参加者ごとの着陸確認を並行する。帰還成功が確定した時点でDEAD未達成ならSEAD150／DEAD0を精算し、その参加者は終了する。これは任意Abortではない。
+MP2では未精算の僚機がDEADを継続でき、Wing/UCIDロックとSiteは全員終了まで維持する。後で僚機が達成しても精算済み参加者のDEAD0は変更しない。
+復行・再離陸で着陸確認を解除した参加者はDEAD_ACTIVEへ戻り、再着陸できる。全員がDEAD未達成のまま帰還・終了した場合はCloseし、IN_USE SiteをCleanupする。
+個人の状態遷移は `DEAD_ACTIVE → LANDING_CHECK → RTB_SUCCESS`、確認解除時は `LANDING_CHECK → DEAD_ACTIVE` とする。Wing全体を帰還待ちへ変える必要はない。
 
 全対象破壊で `deadCompletedAt` を保存し、SiteをDESTROYED/CLEANUP、recordをRTB_PENDINGへ移す。
 Immediate DEADにもDEAD報酬を付与する。Continue時に `dead.fullReward` と独立した採点用IDを固定し、未精算参加者に追加採点項目を持たせる。Mission record・Wing予約は増やさない。
-DEAD全対象破壊時に、未精算参加者のDEAD達成時刻を保存する。既存Recovery確定時にSEADとDEADをそれぞれ一度だけ精算する。
+DEAD全対象破壊時に、未精算参加者のDEAD達成時刻を保存する。着陸確認中ならタイマーを維持し、確認解除後の戻り先をRTB_PENDINGに変更する。帰還成功確定前にDEADが達成された場合は、その確認でSEADとDEADを各150精算する。
 DEAD途中の事故でもSEAD Primary成功を失わず、SEAD90／DEAD0。両目標達成後の事故は各90、帰還成功は各150、任意Abortは両方0。
 追加DEAD精算はTotal/Career/DEAD Scoreだけを更新し、Mission Count・Primary Success・Recovery等の統計は元SEAD精算の1件を維持する。
 完了前に終了した参加者やContinue前に精算済みの参加者へDEAD達成を遡って付与しない。イベント時刻がDEAD達成前の事故もDEAD0とする。
 全員終了時にIN_USEならCLEANUPへ倒す。
+未達成のまま帰還した場合も、残Siteを自動保持はしない。
 
 ## PreserveとFollow-on DEAD
 
@@ -166,6 +171,7 @@ Return to base.
 | Follow-on DEAD | 150 | 90 | 0 | DEAD Score |
 
 満額は `dead.fullReward = 150`、失敗率は既存の `recoveryFailurePercent = 60`。
+Immediate DEAD未達成での帰還成功は追加DEAD0とし、達成済みSEADだけを満額精算する。
 Follow-on DEADは受注時、Immediate DEADはContinue時に満額を固定。既存のScoring.SettleでUCIDごと・採点用IDごとに一度だけTotal/Career/DEAD Scoreを更新する。
 初期設定ではImmediate DEADの両目標達成＋帰還で合計300、両目標達成後事故で180、DEAD未達成事故で90。Continueを選ばないSEADでは追加DEAD採点を作らない。
 未照合UCIDは採点なし。MP2の報酬は分割せず各自に付与し、全員終了までWing/UCID/Siteの予約を維持する。
@@ -203,8 +209,10 @@ Player StatisticsへDEAD Scoreを追加。
 10. 保持後に味方の攻撃で全滅したSiteは受注候補から消える。
 11. Mission Status・Statistics・一時メニューが遷移に一致し、再起動でSiteはリセット。Hook導入時は保存済み成績だけを復元し、進行中任務は復元しない。
 12. Preserve後に保持者がログアウトするとSiteが削除される。観戦席への移動では残り、DEAD使用中のSiteは元保持者のログアウトで削除されない。
+13. Continue後にDEADを倒しきれずRTBしても、10秒の安全帰還確認でSEAD150／DEAD0となる。MP2の未精算者は継続でき、先に帰還した人へ後からDEAD報酬を付けない。
 
 自動検証は [scripts/Test-DEAD.lua](../scripts/Test-DEAD.lua) と既存5スイート、Build/Syncテストを使用する。
 nil観測・不明からの回復・明示死亡優先・Group一覧欠落はDEAD-77〜80で検証する。DEAD-16/29/52はDDM精度3、実配置点のSITE LOCATION表示、座標API失敗時のrollbackと保存済みbriefingの再利用を検証する。DCS内の座標確認はMAN-28で行う。
 Immediate追加採点はDEAD-67〜76で、事故5種、配点固定、MP2個別精算、達成前喪失、イベント順序・時刻、UCID未照合、Abort、不正設定、精算再試行と統計維持を検証する。DCS内ではMAN-25/26/39を確認する。
 自動検証の対応と手動結果は [TESTING.md](TESTING.md) に記録する。
+Immediate未達成RTB・MP2継続・復行・確認中事故・確認中DEAD達成とFollow-on境界はDEAD-81〜86、実機確認はMAN-42/43を参照する。

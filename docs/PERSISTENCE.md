@@ -12,7 +12,9 @@ Death Countは登録機の墜落・死亡・脱出・UnitLostによる出撃喪�
 ## 構成
 
 ミッション側は累計と精算台帳を更新し、保存用snapshotを公開する。サーバー側HookだけがSaved Gamesへ読み書きする。MissionScripting.luaの制限解除は不要。
-Hookはサーバー実行時のみ動作する。DCS同梱の `API/Sim_ControlAPI.md` に記載された `a_do_script`、Simulation callbacks、lfs / io / osを使用する。旧バージョンでa_do_scriptが利用できない場合は保存未接続とし、unsafe APIを自動で有効にしない。
+Hookはサーバー実行時のみ動作する。Simulation callbacksとHook環境のlfs / io / osを使用し、`net.dostring_in("server", code)` でミッションのLua環境へ接続する。Hook環境に存在しない `a_do_script` を直接呼ばない。
+通信結果は型付き文字列として返し、nil・boolean・number・保存データのstringを区別する。API例外、拒否、空・不正な返信、ミッション側例外は保存成功にしない。保存データや返信文字列をLuaとして実行しない。未接続時は保存ファイルを新規作成せず、ミッション側の採点は継続する。
+ホストのAPI許可は `Config/autoexec.cfg` で、呼出元 `userhooks` と接続先 `server` だけを追加する。既存の設定・許可項目は維持する。ミッション側へnet・io・lfsを追加公開しない。DCSのAPI制限の説明は [ED公式告知](https://forum.dcs.world/topic/376636-changes-to-the-behaviour-of-netdostring_in/) と同梱API文書を参照する。制限が撤回された版でも同じHookを使う。
 
 | ファイル | 責務 |
 |---|---|
@@ -48,12 +50,15 @@ primaryが欠落・破損なら正常backupから復旧する。primaryとbackup
 次を実行する。専用モジュールを結合した1つのHookを配置し、既存の別Hookには触れない。同名の旧ファイルは更新前にbackupする。
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Install-PersistenceHook.ps1 -SavedGamesPath "C:\Users\hayat\Saved Games\DCS"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Install-PersistenceHook.ps1 -SavedGamesPath "C:\Users\hayat\Saved Games\DCS" -ConfigureHost
 ```
 DCSを再起動し、更新した `.miz` を使用する。参加者側のHook配置は不要。
+`-ConfigureHost` は既存autoexec.cfgをbackupし、管理用ブロックを追加する。再実行では内容が同じなら書き換えない。不完全・重複した管理ブロックや不正な文字コードでは変更を拒否する。DLSS等の既存設定、別Hook、MissionScripting.lua、保存済み成績は変更しない。
+Hookだけを更新する場合は `-ConfigureHost` を省略できる。API未公開・接続拒否時はDCSログの `DynamicTrainingPersistence` とautoexec.cfgの許可を確認する。
 `src/config.lua` の `persistence.enabled` でミッション側の接続を無効にできる。保存ファイルは削除しない。
 
 ## 確認
 
 自動テストでrestart復元、遅延接続、重複精算／snapshot、古い確認、破損backup復旧、書き込み失敗、複数run、非サーバー無動作、停止時保存、UCID未照合、Immediate DEAD、死亡統計を確認する。
 DCSでは150 / 90 / 0の精算後に保存済み表示を確認し、ミッション再開始とDCS再起動で同じUCIDの累計が戻ること、別UCIDの成績が混ざらないこと、Hookなしでは未保存表示になることを確認する。
+接続時には `Connected via net.dostring_in(server)` をログへ1回記録する。Hookとホスト設定の更新は実装・模擬確認とし、この接続ログ・保存済み表示・再起動復元を確認するまでDCS動作確認済みとは記録しない。

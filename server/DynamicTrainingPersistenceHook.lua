@@ -10,8 +10,35 @@ local function report(message)
     end
 end
 local function mission(code)
-    assert(type(a_do_script) == "function", "DCS a_do_script unavailable; storage bridge not connected")
-    return a_do_script(code)
+    assert(net and type(net.dostring_in) == "function",
+        "DCS net.dostring_in unavailable; configure Config/autoexec.cfg: userhooks -> server, then restart DCS")
+    -- The hook and mission have different Lua states. DCS's older bridge only
+    -- returns strings, so use a tagged scalar reply on both old and new APIs.
+    -- Never loadstring the reply or expose filesystem APIs to mission scripts.
+    local wrapped = [[local ok, value = pcall(function()
+]] .. code .. "\n" .. [[end)
+if not ok then return "DTBR1:E" .. tostring(value) end
+local kind = type(value)
+if kind == "nil" then return "DTBR1:N" end
+if kind == "boolean" then return value and "DTBR1:B1" or "DTBR1:B0" end
+if kind == "number" then return "DTBR1:D" .. tostring(value) end
+if kind == "string" then return "DTBR1:S" .. value end
+return "DTBR1:EUnsupported bridge result type: " .. kind]]
+    local reply, problem = net.dostring_in("server", wrapped)
+    assert(type(reply) == "string" and reply:sub(1, 6) == "DTBR1:",
+        "DCS mission bridge rejected/invalid reply; check autoexec.cfg userhooks -> server: " .. tostring(problem))
+    local tag, value = reply:sub(7, 7), reply:sub(8)
+    if tag == "N" and value == "" then return nil end
+    if tag == "B" and (value == "1" or value == "0") then return value == "1" end
+    if tag == "D" then
+        local number = tonumber(value)
+        assert(number and number == number and number ~= math.huge and number ~= -math.huge,
+            "Invalid numeric bridge reply")
+        return number
+    end
+    if tag == "S" then return value end
+    if tag == "E" then error("Mission persistence bridge: " .. value) end
+    error("Invalid typed mission bridge reply")
 end
 local fs = {}
 function fs.read(path)
@@ -59,6 +86,7 @@ local function poll()
         local initialized = mission("return DynamicTrainingPersistence.Initialize(" .. string.format("%q", bootstrap) .. ")")
         assert(initialized == true, "Persistence initialization rejected")
         attached = true
+        log.write("DynamicTrainingPersistence", log.INFO, "Connected via net.dostring_in(server)")
     end
     local payload = mission("return DynamicTrainingPersistence.ExportSnapshot()")
     assert(type(payload) == "string", "Persistence snapshot unavailable")

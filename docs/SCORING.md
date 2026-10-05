@@ -37,6 +37,7 @@ Intercept/SEADの満額は敵生成成功時、Follow-on DEADは受注時、Imme
 各Scoreはカテゴリ別累計であり、Ratingではない。両DEADの満額は `dead.fullReward = 150`。
 
 Immediate DEADは同じRecovery結果でSEADと追加DEAD報酬を別々に精算する。両目標達成＋帰還なら各150で合計300、両目標達成後事故なら各90で180、DEAD未達成事故ならSEAD90＋DEAD0。任意Abortは両方0。
+DEAD未達成で安全帰還した場合はSEAD150＋DEAD0。その後の僚機による達成で精算済み報酬を変更しない。
 Continue前の精算済み参加者やDEAD達成前の終了者へ追加報酬を遡って与えない。任務数・Primary成功数・Recovery等は元SEADの1件を維持し、追加DEAD精算で二重に数えない。
 
 受注時に同じグループへ搭乗する人間全員への達成報酬。満額は各自150で、編隊人数で分割しない。
@@ -88,7 +89,8 @@ UCID の全文をゲーム内表示や通常のログに出力しない。
 
 Intercept は `ARMED` → `TAKEOFF_DELAY` → `ACTIVE`、SEADは計画作成の `PLANNING` を経て同じ離陸待ちへ進む。
 各カテゴリとも主要目標達成後は `RTB_PENDING` → 全員終了で解除、の順に進む。
-ImmediateはSEAD達成後に `DEAD_ACTIVE` を挟み、全対象破壊で `RTB_PENDING` に戻る。未精算者の着陸確認を解除し、DEAD達成後の着地から確認を開始する。
+ImmediateはSEAD達成後に `DEAD_ACTIVE` を挟み、全対象破壊で `RTB_PENDING` に戻る。Continue時の既存着陸確認は解除するが、その後はDEAD未達成でも新しい着地からSEADの帰還を評価する。帰還成功確定時にDEAD未達成ならSEAD150／DEAD0、確定前にDEADも達成していれば各150を精算する。DEAD達成時は進行中の確認を維持し、復行時の戻り先をRTB_PENDINGへ変更する。
+DEAD未達成の帰還は個別終了とし、未精算の僚機は戦闘を継続できる。全員終了でIN_USE SiteをCleanupし、精算済み参加者へ後からDEAD報酬を付けない。
 Follow-on DEADは地上受注ならARMED、全員離陸でACTIVE。20秒待ち・再Spawnはなく、地上予約の事故・中止は0で精算する。
 帰還待ちの各参加者は `RTB_PENDING` → `LANDING_CHECK` → 個別精算へ進む。
 Intercept は全員が空中で要求した場合に `ACTIVE` へ即座に進む。

@@ -36,6 +36,11 @@ local function HasPending(record)
     return false
 end
 
+local function CanRecover(record)
+    return record.state == "RTB_PENDING" or
+        (record.category == "SEAD" and record.state == "DEAD_ACTIVE" and record.primaryCompletedAt ~= nil)
+end
+
 local function Close(record)
     -- Release before cleanup: generated destroy events cannot award a win.
     if not Missions.Release(record) then return end
@@ -132,7 +137,12 @@ local function DeadComplete(record, time)
     record.state = "RTB_PENDING"
     for _, p in ipairs(record.participants) do
         if not p.done then
-            p.state, p.landing = "RTB_PENDING", nil
+            if p.landing then
+                -- An already valid SEAD recovery hold survives DEAD completion.
+                p.landing.resumeState = "RTB_PENDING"
+            else
+                p.state = "RTB_PENDING"
+            end
             p.deadScoring.primaryCompletedAt = time
         end
     end
@@ -621,7 +631,10 @@ local function TickMission(record, time)
                 if result then PrimaryComplete(record, time, result) end
             elseif Intercept.AllGone(record.spawn) then PrimaryComplete(record, time) end
         end
-    elseif record.state == "RTB_PENDING" then
+    end
+    -- Immediate DEAD cannot block settlement of the achieved SEAD objective.
+    -- Poll targets first so completion before confirmed RTB is counted.
+    if Missions.IsActive(record) and CanRecover(record) then
         for _, p in ipairs(record.participants) do
             if not p.done and p.state == "LANDING_CHECK" then
                 if Recovery.Update(p, time) == "SUCCESS" then
@@ -666,15 +679,16 @@ local function HandleEvent(record, event)
             end
         end
     elseif event.id == EVENTS.RunwayTouch or event.id == EVENTS.Land then
-        if record.state == "RTB_PENDING" then
+        if CanRecover(record) then
             for _, p in ipairs(record.participants) do
-                if not p.done then Recovery.Start(p, event) end
+                if not p.done then Recovery.Start(p, event, record.state) end
             end
         end
     elseif event.id == EVENTS.Takeoff or event.id == EVENTS.RunwayTakeoff then
         for _, p in ipairs(record.participants) do
             if not p.done and Player.EventMatches(p.owner, event) and p.landing then
-                p.landing, p.state = nil, "RTB_PENDING"
+                p.state = p.landing.resumeState
+                p.landing = nil
             end
         end
     end

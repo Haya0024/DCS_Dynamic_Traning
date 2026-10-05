@@ -39,14 +39,19 @@ local function filesystem()
 end
 local path = "saved/DynamicTraining/scores.dat"
 local function hook(s, fs)
-    local h = { time = 0, errors = {}, server = true }
+    local h = { time = 0, errors = {}, messages = {}, server = true, calls = 0 }
     local env = setmetatable({}, { __index = _G })
     env.Sim = { isServer = function() return h.server end, getRealTime = function() return h.time end,
         setUserCallbacks = function(callbacks) h.callbacks = callbacks end }
-    env.log = { ERROR = 1, WARNING = 2, write = function(_, _, message) h.errors[#h.errors + 1] = message end }
-    env.a_do_script = function(code)
+    env.log = { ERROR = 1, WARNING = 2, INFO = 3, write = function(_, level, message)
+        local messages = level == 1 and h.errors or h.messages
+        messages[#messages + 1] = message
+    end }
+    -- Real hooks have no a_do_script. Only the server state sees mission globals.
+    env.net = { dostring_in = function(state, code)
+        assert(state == "server"); h.calls = h.calls + 1
         local chunk = assert(loadstring(code)); setfenv(chunk, s.env); return chunk()
-    end
+    end }
     env.lfs = { writedir = function() return "saved/" end,
         mkdir = function() fs.directory = true; return true end,
         attributes = function(name, field)
@@ -191,7 +196,7 @@ end)
 
 test("hook missing, bridge unavailable and disabled persistence remain session only", function()
     local s = scenario(); earn(s, false); statistics(s, "Session only")
-    local fs = filesystem(); local h = hook(s, fs); h.env.a_do_script = nil; h:frame(0)
+    local fs = filesystem(); local h = hook(s, fs); h.env.net.dostring_in = nil; h:frame(0)
     assert(not fs.files[path] and #h.errors == 1); statistics(s, "Session only")
     s = scenario(); module(s, "Config").persistence.enabled = false
     -- Runtime already published the endpoint; Initialize still rejects disabled config.
@@ -201,7 +206,7 @@ end)
 
 test("non-server hook does not access mission or write scores", function()
     local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
-    h.server = false; h.env.a_do_script = function() error("client must not invoke bridge") end
+    h.server = false; h.env.net.dostring_in = function() error("client must not invoke bridge") end
     h:frame(0); h.callbacks.onSimulationStop()
     assert(not fs.files[path] and #h.errors == 0)
 end)
@@ -274,12 +279,85 @@ end)
 test("an idle healthy poll clears a transient bridge error without another settlement", function()
     local fs = filesystem(); local s = scenario(); local h = hook(s, fs); h:frame(0)
     earn(s, false); h:frame(1)
-    local bridge = h.env.a_do_script
-    h.env.a_do_script = function() error("temporary bridge failure") end
+    local bridge = h.env.net.dostring_in
+    h.env.net.dostring_in = function() error("temporary bridge failure") end
     h:frame(2)
     s.env.DynamicTrainingPersistence.SetError("temporary bridge failure")
     statistics(s, "Persistence unavailable")
-    h.env.a_do_script = bridge; h:frame(3)
+    h.env.net.dostring_in = bridge; h:frame(3)
+    statistics(s, "Persistent scores saved.")
+    assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+end)
+
+test("separate hook and server states connect through string-only replies without hook a_do_script", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+    assert(h.env.a_do_script == nil and h.env.DynamicTrainingPersistence == nil)
+    local bridge = h.env.net.dostring_in
+    h.env.net.dostring_in = function(state, code)
+        local reply = bridge(state, code)
+        assert(type(reply) == "string")
+        return reply, nil -- Older DCS string-only transport.
+    end
+    h:frame(0); assert(h.calls >= 4 and #h.messages == 1)
+    earn(s, false); h:frame(1); h:frame(2)
+    statistics(s, "Persistent scores saved.")
+    assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+    assert(#h.errors == 0 and #h.messages == 1)
+end)
+
+test("API denial logs once, creates no storage and reconnects after permission recovery", function()
+    for _, mode in ipairs({ "denied", "exception" }) do
+        local fs = filesystem(); local s = scenario(); earn(s, false)
+        local h = hook(s, fs); local bridge = h.env.net.dostring_in
+        h.env.net.dostring_in = function()
+            if mode == "exception" then error("not allowed") end
+            return nil, "server state not allowed"
+        end
+        h:frame(0); h:frame(1)
+        assert(#h.errors == 1 and not fs.files[path]); statistics(s, "Session only")
+        h.env.net.dostring_in = bridge; h:frame(2); h:frame(3)
+        statistics(s, "Persistent scores saved.")
+        assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+    end
+end)
+
+test("empty, untagged and malformed typed replies never become a successful connection", function()
+    for _, reply in ipairs({ "", "true", "1", "return os.execute('bad')", "DTBR1:Nextra",
+        "DTBR1:Btrue", "DTBR1:Dnan", "DTBR1:Dinf", "DTBR1:D1junk", "DTBR1:X", false }) do
+        local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+        h.env.net.dostring_in = function() return reply end
+        h:frame(0); assert(#h.errors == 1 and not fs.files[path])
+        statistics(s, "Session only")
+    end
+end)
+
+test("mission-side exceptions and unsupported replies are rejected and initialization safely retries", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+    local initialize = s.env.DynamicTrainingPersistence.Initialize
+    s.env.DynamicTrainingPersistence.Initialize = function() error("hydration failed") end
+    h:frame(0); assert(#h.errors == 1 and h.errors[1]:find("hydration failed", 1, true))
+    s.env.DynamicTrainingPersistence.Initialize = initialize
+    assert(not module(s, "Scoring").sessionID)
+    h:frame(1)
+    assert(Data.Decode(fs.files[path]).counter == 1)
+    earn(s, false)
+    local snapshot = s.env.DynamicTrainingPersistence.ExportSnapshot
+    s.env.DynamicTrainingPersistence.ExportSnapshot = function() return {} end
+    h:frame(2); statistics(s, "Persistence unavailable")
+    assert(Data.Decode(fs.files[path]).players["ucid-a"] == nil)
+    s.env.DynamicTrainingPersistence.ExportSnapshot = snapshot; h:frame(3)
+    statistics(s, "Persistent scores saved.")
+    assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+end)
+
+test("false acknowledgements cannot confirm a saved revision and recover without adding points", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs); h:frame(0)
+    earn(s, false)
+    local acknowledge = s.env.DynamicTrainingPersistence.Acknowledge
+    s.env.DynamicTrainingPersistence.Acknowledge = function() return false end
+    h:frame(1); statistics(s, "Persistence unavailable")
+    assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+    s.env.DynamicTrainingPersistence.Acknowledge = acknowledge; h:frame(2)
     statistics(s, "Persistent scores saved.")
     assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
 end)

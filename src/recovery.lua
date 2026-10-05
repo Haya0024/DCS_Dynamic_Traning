@@ -5,7 +5,7 @@ local function distance(a, b)
     return math.sqrt((a.x - b.x)^2 + (a.z - b.z)^2)
 end
 
-function Recovery.Start(mission, event)
+function Recovery.Start(mission, event, resumeState)
     if not mission.primaryCompletedAt or not Player.EventMatches(mission.owner, event)
         or not Player.IsControlling(mission.owner) then return false end
     local base = event.Place
@@ -27,7 +27,8 @@ function Recovery.Start(mission, event)
     if mission.landing and mission.landing.base:GetName() == base:GetName() then return true end
     mission.landing = { base = base, carrier = carrier,
         carrierObjectID = carrier and carrier:GetID(),
-        height = point.y - basePoint.y, stableSince = nil }
+        height = point.y - basePoint.y, stableSince = nil,
+        resumeState = resumeState or "RTB_PENDING" }
     mission.state = "LANDING_CHECK"
     return true
 end
@@ -47,7 +48,7 @@ function Recovery.Update(mission, time)
         or (landing.carrier and math.abs(point.y - basePoint.y - landing.height)
             > Config.carrierHeightToleranceMeters) then
         mission.landing = nil
-        mission.state = "RTB_PENDING"
+        mission.state = landing.resumeState
         return "RESET"
     end
     local v = unit:GetVelocityVec3()

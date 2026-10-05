@@ -182,7 +182,7 @@ local function Start(record)
         record.state, record.deadStartedAt = "ACTIVE", timer.getTime()
         for _, p in ipairs(record.participants) do if not p.done then p.state = "ACTIVE" end end
         Message(record.group, record.deadBriefing .. "\nDEAD TRAINING START\nRemaining targets: " ..
-            DEAD.Remaining(record), 25)
+            DEAD.Remaining(record), Config.coordinateBriefingSeconds)
         Log(record.id .. " started using retained site " .. record.site.id)
         return
     end
@@ -197,7 +197,8 @@ local function Start(record)
         record.spawn, record.state = spawn, "ACTIVE"
         record.site = SEADSites.Register(record)
         local pilots = BeginScoring(record, Config.sead.fullReward)
-        Message(record.group, "SEAD TRAINING START\n" .. SEAD.Briefing(record.plan) ..
+        -- The full briefing was shown when planning completed; status can recall it.
+        Message(record.group, "SEAD TRAINING START" ..
             string.format("\nObjective: destroy primary emitter, or damage it and keep radar OFF for %g seconds; then RTB.\nPilots: %s",
                 spawn.suppressionHoldSeconds, table.concat(pilots, ", ")), 25)
         Log(record.id .. " started; mode=" .. record.plan.attackMode .. " template=" .. spawn.template .. " zone=" .. spawn.zone)
@@ -267,7 +268,8 @@ local function Generate(groupName, category)
         if airborne then Start(record) else
             record.state = "ARMED"
             for _, p in ipairs(record.participants) do p.state = "ARMED" end
-            Message(group, record.deadBriefing .. "\nSite reserved. Waiting for ALL registered pilots to take off.", 25)
+            Message(group, record.deadBriefing .. "\nSite reserved. Waiting for ALL registered pilots to take off.",
+                Config.coordinateBriefingSeconds)
         end
         return
     end
@@ -287,15 +289,16 @@ local function Generate(groupName, category)
         end
         record.selection, record.plan, record.state = job, job.plan, "PLANNING"
         for _, p in ipairs(record.participants) do p.state = "PLANNING" end
-        Message(group, SEAD.Briefing(record.plan) .. "\nMission planning in progress.", 20)
+        Message(group, "SEAD mission accepted.\nMODE: " .. record.plan.attackMode ..
+            "\nMission planning in progress.", 10)
         return
     end
     local _, airborne = Ready(record)
     if airborne then Start(record) else
         record.owner = roster[1]
         Message(group, string.format(
-            "Intercept mission armed. Registered pilots: %d.\nHostiles will spawn %d seconds after ALL registered pilots take off.",
-            #roster, Config.takeoffDelaySeconds))
+            "Intercept mission armed. Registered pilots: %d.\nWaiting for ALL registered pilots to take off.",
+            #roster))
     end
 end
 
@@ -322,8 +325,11 @@ local function Status(groupName)
     local roster = Player.ForGroup(groupName)
     local records = Missions.ForGroup(groupName, roster)
     if #records == 0 then Message(group, "Intercept: Idle.\nSEAD: Idle.\nDEAD: Idle."); return end
-    local texts = {}
+    local texts, displaySeconds = {}, 20
     for _, record in ipairs(records) do
+        if record.category == "DEAD" or (record.category == "SEAD" and record.plan.estimatedPoint) then
+            displaySeconds = Config.coordinateBriefingSeconds
+        end
         local text = (record.category or "Intercept") .. ": " .. record.state .. "\nWing: " .. record.groupName ..
             "\nLead reference: " .. record.owner.name
         if record.state == "DEAD_ACTIVE" then
@@ -363,7 +369,7 @@ local function Status(groupName)
         end
         texts[#texts + 1] = text
     end
-    Message(group, table.concat(texts, "\n\n"), 20)
+    Message(group, table.concat(texts, "\n\n"), displaySeconds)
 end
 
 local function CanManage(groupName, target)
@@ -574,7 +580,7 @@ local function TickMission(record, time)
             for _, p in ipairs(record.participants) do if not p.done then p.state = "ARMED" end end
             Message(record.group, SEAD.Briefing(record.plan) .. string.format(
                 "\nReward per pilot: %d points.\nRegistered pilots: %d.\nGround acceptance: SAM spawns %d seconds after ALL registered pilots take off.",
-                Config.sead.fullReward, #record.participants, Config.takeoffDelaySeconds), 30)
+                Config.sead.fullReward, #record.participants, Config.takeoffDelaySeconds), Config.coordinateBriefingSeconds)
             local _, airborne = Ready(record)
             if record.airborneAtAcceptance and airborne then Start(record) end
         end

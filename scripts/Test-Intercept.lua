@@ -232,4 +232,49 @@ test("new assignments redraw templates and concurrent wings remain independent",
     end
 end)
 
+test("solo and MP2 show one start briefing; acceptance does not repeat countdown instructions", function()
+  for _, mp2 in ipairs({ false, true }) do
+    for _, airborne in ipairs({ false, true }) do
+        local s = scenario()
+        if mp2 then s:occupyWing() end
+        s.player.airborne, s.wingman.airborne = airborne, airborne
+        local function messages(fragment)
+            local n = 0
+            for _, message in ipairs(s.messages) do
+                if string.find(message.text, fragment, 1, true) then n = n + 1 end
+            end
+            return n
+        end
+        s.generate()
+        if not airborne then
+            s:lastMessageContains("Waiting for ALL registered pilots to take off.")
+            assert(messages("Hostiles will spawn") == 0)
+            s.generate()
+            if mp2 then s:command("Generate Intercept", s.wingman) end
+            s.player.airborne, s.wingman.airborne = true, true
+            s:event("Takeoff", s.player); s:tick(2); s:tick(4)
+            assert(messages("Hostiles will spawn") == 1)
+            s.player.airborne = false; s:tick(6)
+            s:lastMessageContains("countdown reset")
+            s.player.airborne = true; s:tick(8)
+            assert(messages("Hostiles will spawn") == 2)
+            for time = 10, 26, 2 do s:tick(time) end
+            assert(messages("Intercept MISSION START") == 0)
+            s:tick(28)
+        else assert(messages("Hostiles will spawn") == 0) end
+        s:lastMessageContains("Intercept MISSION START")
+        assert(s.messages[#s.messages].seconds == 15)
+        s.generate()
+        if mp2 then s:command("Generate Intercept", s.wingman) end
+        s:event("Takeoff", s.player)
+        s:tick(32); s:tick(34)
+        assert(#s.spawns == 1 and messages("Intercept MISSION START") == 1)
+        s:command("Mission Status"); s:lastMessageContains("Intercept: ACTIVE")
+        assert(s.messages[#s.messages].seconds == 20)
+        assert(messages("Intercept MISSION START") == 1)
+        s:assertClean()
+    end
+  end
+end)
+
 print(string.format("All %d Intercept tests passed (simulated DCS/MOOSE).", count))

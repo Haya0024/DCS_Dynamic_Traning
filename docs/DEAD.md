@@ -1,6 +1,6 @@
 # SEAD → DEAD follow-on仕様
 
-更新日: 2026-10-04
+更新日: 2026-10-05
 
 ## 目的と実装境界
 
@@ -175,6 +175,7 @@ Follow-on DEADは受注時、Immediate DEADはContinue時に満額を固定。�
 
 Follow-on DEADは地域、SAM種類、主要レーダーの履歴（Primary radar destroyed / Previously suppressed）、残存車両全滅の指示と既存Site位置を表示する。
 既存Siteの実配置点（actualSpawnPoint、ない場合はspawn.coordinate）を `SITE LOCATION:` としてDDM（度＋小数分、分の小数3桁）で表示する。MOOSEのToStringLLDDMへLL_Accuracy=3を明示する。SEAD TOO/PBの推定点・秘匿仕様には影響しない。
+座標付きブリーフィングとMission Statusの表示時間は共通設定 `coordinateBriefingSeconds`（初期60秒）を使用する。地上受注時の予約通知と開始表示にも適用する。
 SEADのTOO/PB秘匿はFollow-on DEADには適用しない。内部Group名・object IDは表示しない。
 Immediate DEADはSEAD情報の秘匿を維持し、残数・follow-on phaseを追加表示する。
 

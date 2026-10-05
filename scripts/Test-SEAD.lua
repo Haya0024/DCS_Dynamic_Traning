@@ -51,7 +51,7 @@ test("SA6 and SA8 airborne acceptance plans then ground-spawns with ME layouts, 
         assert(#g.units == (index == 1 and 4 or 1))
         assert(g.alarmRed and g.openFire and g.stopped and zone.calls == 1)
         for _, u in ipairs(g.units) do assert(u.position.y == 175) end
-        s:lastMessageContains("SEAD TRAINING START"); s:lastMessageContains("ESTIMATED LOCATION: LL")
+        s:lastMessageContains("SEAD TRAINING START")
         status(s, "ACTIVE"); s:lastMessageContains("THREAT: " .. (index == 1 and "SA-6" or "SA-8"))
         s:command("Abort Mission"); assert(g.destroyed); status(s, "Idle")
         s:score(0); s:assertClean()
@@ -278,6 +278,7 @@ test("zone draw chooses one eligible zone without changing the configured pool",
         generate(s); s:tick(1)
         local expected = second and names[2] or names[1]
         assert(s.zones[expected].calls == 1)
+        status(s, "ACTIVE")
         s:lastMessageContains("THREAT AREA: " .. (second and "Salamiyah" or "Palmyra"))
         s:assertClean()
     end
@@ -975,6 +976,79 @@ test("abort cleanup is independent of success and releases only its own site", f
     assert(s:sites()[second.id] == second.site and not second.spawn.group.destroyed)
     s:tick(5); assert(second.state == "ACTIVE")
     s:score(0); s:assertClean()
+end)
+
+test("TOO and PB automatically brief coordinates once; spawn and countdown resets do not repeat them", function()
+  for mode = 1, 2 do
+    for _, airborne in ipairs({ false, true }) do
+        local s, zone = setup()
+        s.player.airborne = airborne
+        s.randomValues = { 1, mode, 1 }
+        local duration = airborne and 90 or 60
+        local configured = false
+        for i = 1, 100 do
+            local name, value = debug.getupvalue(s.timers[1].callback, i)
+            if name == "Config" then
+                assert(value.coordinateBriefingSeconds == 60)
+                value.coordinateBriefingSeconds, configured = duration, true
+                break
+            end
+        end
+        assert(configured)
+        -- Two rejected candidates keep planning open for a second tick.
+        zone.points = { { x = 9000, y = 0 }, { x = 9000, y = 0 }, zone.center }
+        local function briefings()
+            local n = 0
+            for _, message in ipairs(s.messages) do
+                if string.find(message.text, "SEAD MISSION\n", 1, true) then n = n + 1 end
+            end
+            return n
+        end
+        generate(s)
+        s:lastMessageContains("SEAD mission accepted.")
+        s:lastMessageContains("MODE: " .. (mode == 1 and "TOO" or "PB"))
+        assert(briefings() == 0)
+        s:tick(1); assert(s:mission().state == "PLANNING" and briefings() == 0)
+        s:tick(2); assert(briefings() == 1)
+        local r = s:mission()
+        local location = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
+        local label = mode == 1 and "THREAT AREA: " or "ESTIMATED LOCATION: "
+        local briefing
+        for _, message in ipairs(s.messages) do
+            if string.find(message.text, "SEAD MISSION\n", 1, true) then
+                briefing = message.text
+                assert(message.seconds == duration)
+            end
+        end
+        assert(string.find(briefing, label .. location, 1, true))
+        if mode == 1 then
+            assert(not string.find(briefing, "HARM PB CODE", 1, true))
+            assert(not string.find(briefing, "SA-6", 1, true))
+        else assert(string.find(briefing, "HARM PB CODE: 108", 1, true)) end
+        if not airborne then
+            assert(#s.spawns == 0)
+            s:tick(3); s:tick(5); assert(briefings() == 1)
+            s.player.airborne = true; s:tick(7)
+            s:lastMessageContains("Hostiles will spawn in 20 seconds.")
+            s.player.airborne = false; s:tick(9)
+            s:lastMessageContains("countdown reset")
+            s.player.airborne = true; s:tick(11); s:tick(31)
+        end
+        s:lastMessageContains("SEAD TRAINING START")
+        assert(not string.find(s.messages[#s.messages].text, location, 1, true))
+        assert(not string.find(s.messages[#s.messages].text, "HARM PB CODE", 1, true))
+        assert(#s.spawns == 1 and briefings() == 1)
+        for time = 32, 35 do s:tick(time) end
+        assert(briefings() == 1 and r.state == "ACTIVE")
+        for n = 1, 2 do
+            status(s, "ACTIVE"); s:lastMessageContains(label .. location)
+            assert(s.messages[#s.messages].seconds == duration)
+            assert(briefings() == 1 + n)
+        end
+        s:tick(36); assert(briefings() == 3)
+        s:assertClean()
+    end
+  end
 end)
 
 print(string.format("All %d SEAD tests passed (simulated DCS/MOOSE).", count))

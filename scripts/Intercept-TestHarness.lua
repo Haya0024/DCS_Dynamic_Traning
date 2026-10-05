@@ -240,9 +240,9 @@ local function scenario(options)
     }
     env.UNIT = { FindByName = function(_, name) return s.units[name] end }
     env.GROUP = { FindByName = function(_, name) return s.groups[name] end }
-    env.MESSAGE = { New = function(_, text)
+    env.MESSAGE = { New = function(_, text, seconds)
         return { ToGroup = function(_, group)
-            s.messages[#s.messages + 1] = { text = text, group = group:GetName() }
+            s.messages[#s.messages + 1] = { text = text, group = group:GetName(), seconds = seconds }
         end }
     end }
     env.timer = { getTime = function() return s.time end,

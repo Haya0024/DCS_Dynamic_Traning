@@ -1,6 +1,6 @@
 # SEAD 訓練ミッション仕様
 
-更新日: 2026-10-04
+更新日: 2026-10-05
 
 ## 今回の実装範囲
 
@@ -20,8 +20,8 @@ Follow-onの境界・採点・予約は [DEAD.md](DEAD.md) を参照する。SEA
 長機は受注した人ではなく、搭乗中の登録者のうち機体番号が最小の機体。受注後の移動・長機変更で距離判定をやり直さない。
 候補がなければ受注ロックを解除し、生成失敗を通知する。
 
-地点選定は `PLANNING` として段階的に処理する。抽選した方式を最初に表示し、安全な予定点が見つかったら完全なブリーフィングを表示する。
-TOOの捜索座標、PBの推定座標は計画完成まで `Planning in progress` と表示する。
+地点選定は `PLANNING` として段階的に処理する。受注直後は抽選した方式と計画中の短い通知だけを表示し、安全な予定点が見つかったら完全なブリーフィングを1回だけ自動表示する。
+計画完成前に `Mission Status` を開いた場合、TOOの捜索座標、PBの推定座標は `Planning in progress` と表示する。
 選定中も実体は生成しない。受注計画が完成するまで通常1秒、全候補不合格なら通常約25秒かかる。
 確定後はテンプレート・方式・Zone・予定点・推定点・コード・IDを変更しない。
 
@@ -30,10 +30,10 @@ TOOの捜索座標、PBの推定座標は計画完成まで `Planning in progres
 | TOO | `MODE: TOO`、`THREAT AREA`として捜索用座標（DDM：度＋小数分）、`TARGET TYPE: UNKNOWN`、座標付近でHARM TOOのエミッターを捜索・攻撃する指示 |
 | PB | `MODE: PB`、SAM種類、推定位置の緯度経度（DDM：度＋小数分）、3桁のHARM PBコード、攻撃と帰還の指示 |
 
-両方式とも分の小数部は3桁。MOOSEの `COORDINATE:ToStringLLDDM({ LL_Accuracy = 3 })` を使用し、受注・開始・Mission Statusで同じDDM形式を表示する。MOOSE全体の座標表示設定には依存しない。
+両方式とも分の小数部は3桁。MOOSEの `COORDINATE:ToStringLLDDM({ LL_Accuracy = 3 })` を使用し、計画確定時とMission Statusで同じDDM形式を表示する。MOOSE全体の座標表示設定には依存しない。
 
 TOOの `THREAT AREA` は地域名から捜索用座標へ変更した。実配置予定点からランダム方位へ3～5 NMずらした座標を渡す。
-誤差の設定は `tooEstimateErrorMinNM` / `tooEstimateErrorMaxNM`。計画完成時に座標を固定し、受注・開始・`Mission Status` に同じ座標を表示する。
+誤差の設定は `tooEstimateErrorMinNM` / `tooEstimateErrorMaxNM`。計画完成時に座標を固定し、その時のブリーフィングと `Mission Status` に同じ座標を表示する。
 TOOでは正確な位置・SAM機種・PBコード・車両数を表示しない。開始時だけでなく `Mission Status` も同じ情報制限を適用する。
 PBでも正確な実配置座標は表示しない。安全な実配置予定点を先に選び、その地点からランダム方位へ1～3 NMずらした推定点を渡す。
 PBの実配置点と推定点の水平距離は `pbEstimateErrorMinNM` / `pbEstimateErrorMaxNM` の範囲内。
@@ -274,7 +274,9 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 
 ## 表示・操作
 
-受注・開始・`Mission Status` は共通の計画ブリーフィングを使い、TOO / PBの情報制限を維持する。
+座標付きブリーフィングの自動表示は計画確定時の1回だけ。地上・空中受注のどちらでも、受注直後は方式と計画中の通知、SAM生成時は開始・成功条件・参加者の短い通知を表示し、座標やPBコードを再掲しない。
+座標付き表示は `src/config.lua` の `coordinateBriefingSeconds` で設定し、初期値は60秒。計画確定時と座標を含むMission Statusの両方へ適用する。
+離陸待ち・カウントダウンのリセット・ACTIVE中の監視でもブリーフィングを再掲しない。必要な場合は `Mission Status` から何度でも同じ計画ブリーフィングを確認でき、TOO / PBの情報制限を維持する。
 地域表示名は `sead.zoneLabels`、SAM表示名はテンプレートの `type` に置き、ME の参照名と分離する。
 `Mission Status` では方式別の情報に加え、計画中の地点選定回数・生成までの残り時間・各参加者の状態を表示する。
 生成後は `Emitter state: ACTIVE / SUPPRESSION PENDING / SUPPRESSED / DESTROYED` と、計測中の継続時間を表示する。
@@ -294,13 +296,14 @@ SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSi
   状態遷移、60秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
 
 `Build-Mission.ps1` で結合後、Lua 5.1 で `scripts/Test-SEAD.lua`、`scripts/Test-DEAD.lua` と既存4種類のテストを実行する。
-SEAD61件と既存84件を維持し、DEAD follow-onの検証は [TESTING.md](TESTING.md) にまとめる。
+SEAD62件と既存85件、DEAD80件を検証し、詳細は [TESTING.md](TESTING.md) にまとめる。
 実際のDCSでのRadar状態・損傷Life・イベント順序・残存SAMのCleanupはゲーム内確認待ち。
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。
 
 DCS 内では4 Zone それぞれで SA-6／SA-8 の車両位置、建物からの離隔、地面への配置、レーダー・発射動作を確認する。
 地上受注で計画を受け取ってもSAMが出現せず、全員の離陸後20秒で同じ計画のSAMが出現することを確認する。
+地上・空中受注のTOO / PBで座標付きブリーフィングが自動で1回だけ表示され、生成時には繰り返されず、Mission Statusでは同じ座標を再確認できることを確認する。
 TOOで捜索座標が表示され、機種・正確な座標・PBコードが表示されないこと、PBのコードと推定座標を使ってHARMを設定・攻撃できることを確認する。
 Intercept との二重受注拒否、選定中の中止、MP2 の共有操作、別ウィングの同時受注も確認する。
 SA-6 は発射機を残してレーダーだけ破壊し、SA-8 は車両を破壊して帰還待ちになることを確認する。

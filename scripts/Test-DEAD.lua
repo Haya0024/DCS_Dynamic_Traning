@@ -206,9 +206,12 @@ end)
 
 test("Follow-on DEAD briefing exposes existing site information without internal object names", function()
     local s, site, g = preserved(1, false)
+    assert(module(s, "Config").coordinateBriefingSeconds == 60)
+    module(s, "Config").coordinateBriefingSeconds = 90
     s.env.COORDINATE.ToStringLLDMS = function() error("Follow-on DEAD must display DDM") end
     followOnDead(s)
     local text = s.messages[#s.messages].text
+    assert(s.messages[#s.messages].seconds == 90)
     local location = s.env.COORDINATE:NewFromVec2(site.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
     for _, expected in ipairs({ "DEAD MISSION", "AREA: Palmyra", "TARGET SITE: SA-6", "Primary radar destroyed", "SITE LOCATION:\n" .. location }) do
         assert(string.find(text, expected, 1, true), text)
@@ -217,6 +220,7 @@ test("Follow-on DEAD briefing exposes existing site information without internal
     assert(not string.find(text, g.name, 1, true) and not string.find(text, "objectID", 1, true))
     s:command("Mission Status"); s:lastMessageContains("DEAD: ACTIVE"); s:lastMessageContains("Remaining targets: 3")
     s:lastMessageContains("SITE LOCATION:\n" .. location)
+    assert(s.messages[#s.messages].seconds == 90)
     s:assertClean()
 end)
 
@@ -224,10 +228,12 @@ test("ground Follow-on DEAD reserves immediately, snapshots at acceptance and st
     local s, site, g = preserved(1, false); s:occupyWing(); s.wingman.airborne = false
     local r = followOnDead(s, false)
     assert(r.state == "ARMED" and site.reservedByAssignmentID == r.assignmentID and #r.deadTargets == 3)
+    assert(s.messages[#s.messages].seconds == 60)
     destroy(s, g.units[2]); assert(r.state == "ARMED" and not r.primaryCompletedAt)
     s.player.airborne = true; s:tick(s.time + 1); assert(r.state == "ARMED")
     s.wingman.airborne = true; s:tick(s.time + 2)
     assert(r.state == "ACTIVE" and r.deadStartedAt == s.time and not r.spawnAt and #s.spawns == 1)
+    assert(s.messages[#s.messages].seconds == 60)
     assert(#r.deadTargets == 3); s:assertClean()
 end)
 

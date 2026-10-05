@@ -201,7 +201,7 @@ Player StatisticsへDEAD Scoreを追加。
 8. MP2の一部精算・途中参加・長機喪失でも対象と採点を混同しない。
 9. 別Wingが同Siteを二重取得できず、複数保持Siteでは受注長機に近いものを取得。
 10. 保持後に味方の攻撃で全滅したSiteは受注候補から消える。
-11. Mission Status・Statistics・一時メニューが遷移に一致し、再起動でSite・成績はリセット。
+11. Mission Status・Statistics・一時メニューが遷移に一致し、再起動でSiteはリセット。Hook導入時は保存済み成績だけを復元し、進行中任務は復元しない。
 12. Preserve後に保持者がログアウトするとSiteが削除される。観戦席への移動では残り、DEAD使用中のSiteは元保持者のログアウトで削除されない。
 
 自動検証は [scripts/Test-DEAD.lua](../scripts/Test-DEAD.lua) と既存5スイート、Build/Syncテストを使用する。

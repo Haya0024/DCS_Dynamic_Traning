@@ -6,6 +6,7 @@ return {
     takeoffCheckSeconds = 2,
     takeoffDelaySeconds = 20,
     coordinateBriefingSeconds = 60, -- Coordinate briefings and status recall (SEAD / DEAD).
+    persistence = { enabled = true }, -- Requires the server-side Saved Games hook.
     fullReward = 150,
     recoveryFailurePercent = 60,
     landingHoldSeconds = 10,

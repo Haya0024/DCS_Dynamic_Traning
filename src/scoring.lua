@@ -1,13 +1,12 @@
-local Scoring = { players = {}, settlements = {}, sequence = 0 }
+local Scoring = { players = {}, settlements = {}, sequence = 0, revision = 0 }
 local scoreFields = { Intercept = "interceptScore", SEAD = "seadScore", DEAD = "deadScore" }
 
 function Scoring.NextID(category)
-    -- This prototype has no disk persistence: IDs need only be unique within
-    -- this mission run. Persistent session IDs will be added with storage.
+    -- The hook assigns a durably allocated namespace after storage attachment.
     category = category or "Intercept"
     assert(scoreFields[category], "Unsupported scoring category: " .. tostring(category))
     Scoring.sequence = Scoring.sequence + 1
-    return category .. ":" .. tostring(Scoring.sequence)
+    return (Scoring.sessionID and (Scoring.sessionID .. ":") or "") .. category .. ":" .. tostring(Scoring.sequence)
 end
 
 function Scoring.Get(ucid, name)
@@ -16,7 +15,7 @@ function Scoring.Get(ucid, name)
     if not p then
         p = { totalScore = 0, careerPoints = 0, interceptScore = 0, seadScore = 0, deadScore = 0,
             missionCount = 0, primarySuccessCount = 0, rtbSuccessCount = 0,
-            recoveryFailureCount = 0, failedCount = 0, abortCount = 0 }
+            recoveryFailureCount = 0, failedCount = 0, abortCount = 0, deathCount = 0 }
         Scoring.players[ucid] = p
     end
     p.lastKnownName = name or p.lastKnownName
@@ -53,6 +52,7 @@ function Scoring.Settle(mission, result, reason)
             if result == "RTB_FAILURE" then p.recoveryFailureCount = p.recoveryFailureCount + 1 end
             if result == "FAILED" then p.failedCount = p.failedCount + 1 end
             if result == "ABORT" then p.abortCount = p.abortCount + 1 end
+            if mission.failureEvent then p.deathCount = p.deathCount + 1 end
         end
     end
     local receipt = { missionID = mission.id, category = category, ownerUCID = mission.owner.ucid,
@@ -60,6 +60,7 @@ function Scoring.Settle(mission, result, reason)
         points = p and points or 0, total = p and p.totalScore or 0 }
     ledger[key] = receipt
     Scoring.settlements[mission.id] = ledger
+    if p then Scoring.revision = Scoring.revision + 1 end
     return receipt
 end
 

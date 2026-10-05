@@ -6,7 +6,7 @@
 
 訓練任務の受注・生成・目標達成・帰還評価・採点・終了処理が仕様通りに動作し、別プレイヤーや別ウィングへ影響しないことを確認する。
 対象は現在実装されているIntercept、SEAD、Immediate/Follow-on DEAD、ウィング共有、UCID採点、Lua結合、`.miz`同期。
-永続保存、動的Clientスロット、保持Siteのtimeout・明示削除は今回の検証対象外。
+動的Clientスロット、保持Siteのtimeout・明示削除・Site永続化は今回の検証対象外。成績の永続保存は対象とする。
 
 動作の根拠は [Intercept.md](Intercept.md)、[SEAD.md](SEAD.md)、[DEAD.md](DEAD.md)、[WING.md](WING.md)、[SCORING.md](SCORING.md)。
 本書はテスト条件と期待結果を記録し、実装済みの自動テストとDCS内で行う手動確認を区別する。
@@ -21,10 +21,12 @@
 | PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 16 | 複数ウィングの並行処理と独立性 |
 | SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 62 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止 |
 | DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 80 | Primary/Site分離、Group継承、保持・予約・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup |
+| PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 20 | schema、保存確認、再起動・遅延復元、I/O失敗、backup、run、死亡統計 |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
+| INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 3確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧 |
 
-Luaは合計227ケース（INT/SCORE/WING/PAR/SEAD147＋DEAD80）。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。
+Luaは合計247ケース（既存227＋PERSIST20）。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、20ケースには含めない。
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 
@@ -49,6 +51,7 @@ MOOSE本体や実際のSyria地形・SAM AI・DCSのイベント配信・サー�
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Mission.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-PersistenceHook.ps1
 ```
 
 `lua` がPATHにある場合は以下を実行する。
@@ -60,6 +63,7 @@ lua scripts/Test-Wing.lua
 lua scripts/Test-ParallelWings.lua
 lua scripts/Test-SEAD.lua
 lua scripts/Test-DEAD.lua
+lua scripts/Test-Persistence.lua
 ```
 
 DCS付属の `luae.exe` を使う場合のPowerShell実行例。インストール先が違う場合は `$luaPath` を変更する。
@@ -72,7 +76,8 @@ $suites = @(
     'scripts/Test-Wing.lua',
     'scripts/Test-ParallelWings.lua',
     'scripts/Test-SEAD.lua',
-    'scripts/Test-DEAD.lua'
+    'scripts/Test-DEAD.lua',
+    'scripts/Test-Persistence.lua'
 )
 foreach ($suite in $suites) {
     Get-Content -Encoding UTF8 -LiteralPath $suite | & $luaPath -
@@ -87,6 +92,7 @@ BUILDはソースも一時プロジェクトへコピーして検証する。Wat
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-MissionBuild.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-MissionSync.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-PersistenceInstall.ps1
 ```
 
 Luaはすべてのケースが `PASS:` となり、最後に `All N ... tests passed` が出て終了コード0なら合格。
@@ -383,7 +389,32 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-79 | 両DEAD経路の対象がnil、各対象の死亡イベントが届く | 明示的死亡を優先、全対象lostで達成。nilのwrapperを再観測して完了を妨げず、帰還300・Cleanup |
 | DEAD-80 | 保持GroupのGetUnitsがnil/空、正常化、false確認済みで再度nil/空 | 一覧欠落だけで全滅・削除しない。回復時は候補復帰、既知対象すべてfalse確認済みの場合は全滅・Cleanup |
 
-### ビルド・同期（PowerShell）
+### 成績永続化（PERSIST）
+
+| ID | 条件・操作 | 期待結果 |
+|---|---|---|
+| PERSIST-01 | 日本語・引用符を含む名前、改ざん・切断・Luaコード・不正数値 | 正常データのみ復元し、コードは実行しない |
+| PERSIST-02 | 150→240を保存して再読込 | primaryは240、backupは直前の150 |
+| PERSIST-03 | primary欠落／破損、backup正常／破損 | 正常backupで復旧。両方不正なら空データを作らない |
+| PERSIST-04 | write失敗、読戻し不一致、Windows rename失敗 | 元150を保持し、再試行で240を保存 |
+| PERSIST-05 | primary読取権限エラー | 新規ファイルと誤認せず保存停止 |
+| PERSIST-06 | 150保存後、別ミッションで復元・90精算・二重初期化 | 合計240、任務2、帰還1、帰還失敗1、喪失1 |
+| PERSIST-07 | 未接続で90精算後、既存150へ遅延接続 | 240へ1回だけ統合 |
+| PERSIST-08 | 重複死亡・snapshot再送 | Score90・任務1・喪失1を維持 |
+| PERSIST-09 | 古いrevision、別run、未来revisionの確認 | 新しい精算を誤って保存済みにしない |
+| PERSIST-10 | flush／close失敗後、正常復帰 | 未保存表示を維持し、再試行成功で保存済み |
+| PERSIST-11 | Hookなし、a_do_scriptなし、保存無効 | セッション内の訓練・採点を継続し未保存を明示 |
+| PERSIST-12 | 非サーバー上のHook | ミッション通信・ファイル書込みなし |
+| PERSIST-13 | 次frame前にSimulationStop | 最後の90を保存・確認 |
+| PERSIST-14 | UCID取得不可 | 仮アカウントを保存しない |
+| PERSIST-15 | 事故5種類の重複、任意Abort | 喪失は最初の精算で1回、Abortは0 |
+| PERSIST-16 | Immediate SEAD＋DEADを事故精算 | 合計180、カテゴリ各90、任務・喪失は1 |
+| PERSIST-17 | 次runの任務ID、旧runのsnapshot | IDを分離し、旧runの保存は拒否 |
+| PERSIST-18 | primaryとbackup破損、訓練継続 | 元ファイル保持、ログを連発せず、未保存の90をメモリに保持 |
+| PERSIST-19 | 復元時の数値上限超過、正常データで再試行 | 途中まで加算せず、正常復元で240 |
+| PERSIST-20 | 保存済み・精算なしで一時通信障害、正常復帰 | 健全なpollで保存状態を回復し、再加算なし |
+
+### ビルド・同期・導入（PowerShell）
 
 | ID | 条件・操作 | 期待結果 |
 |---|---|---|
@@ -392,6 +423,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | SYNC-01 | 古いLua入りZIPへCheck→同期→Check→同じ内容で再同期 | 初回Checkは不一致検出のみ。同期後一致、元ZIPのバックアップあり。エントリ数・名前・時刻・非Lua内容を保持し、再同期はZIP・backupを書き換えない |
 | SYNC-02 | 埋め込みLua欠落、ZIPエントリ重複、破損ZIP | 各理由で拒否し、元ファイルのハッシュを変更せずbackupも作らない |
 | SYNC-03 | Watch中に古いミッションへ外部上書き保存 | ME保存相当の変更を検知し、埋め込みLuaを復元してCheck成功 |
+| INSTALL-01 | 旧Hook・別Hookがある一時DCSディレクトリへ導入、再導入 | 同名旧Hookをbackup、新bundleと一致、別Hookを維持、再導入は無変更 |
+| INSTALL-02 | Configを持たないディレクトリへ導入 | 拒否して書き込まない |
+| INSTALL-03 | 実ファイルを使うwrite／restore／recoverを別Luaプロセスで実行 | 保存90→復元・追加180→primary破損時backup90復旧。実Saved Gamesには触れない |
 
 ## DCS内の手動テスト
 
@@ -429,7 +463,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-19 | MP2空席へ受注後に途中参加し、その人が着陸・事故 | 今回の登録参加者・報酬に追加しない。共有任務の状態を消さない |
 | MAN-20 | 別ウィングがSEAD/Interceptを並行受注し、片方を中止・達成 | 敵Group・タイマー・採点・ロックを他方と共有しない |
 | MAN-21 | 参加者が切断・同じ機体へ復帰、別スロットへの移動・再スポーン | 切断中の停止時間を加算しない。別機体で元出撃の満額を受け取らず、元任務のUCIDロックを維持 |
-| MAN-22 | 複数任務を精算してStatistics確認、ミッション再開始 | Total/Careerとカテゴリ別Scoreが一致し、再開始後は0。永続保存を期待しない |
+| MAN-22 | Hook導入下で複数任務を精算、保存済み表示を確認してミッション・DCSを再開始 | 同じUCIDのTotal/Career・カテゴリ別Score・任務／帰還／死亡統計を復元する。別UCIDの成績は混ざらない |
 | MAN-23 | 最後の参加者が精算・中止し、残存SAMと次の受注を確認 | 残存Groupが削除され、次の受注が可能。完了時点では削除されない |
 | MAN-24 | SA-6レーダーだけ破壊・Suppress、別試行でSA-8を全滅 | 残存がある場合だけContinue/Preserve。SA-8全滅では選択肢なし |
 | MAN-25 | SEADからContinueし、損傷・発信状態と車両を確認、残存全滅してRTB | 同じGroupを使用、SEAD150＋DEAD150、合計300、任務1件 |
@@ -441,12 +475,14 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-31 | 2つのFollow-on DEADを並行実行し、片方だけ中止・達成 | 対象・敵・ポイント・ロック・Cleanupを混同しない |
 | MAN-32 | 保持Siteを味方が外部攻撃で全滅、Generate DEAD | 全滅したSiteは候補にならず、再生成しない |
 | MAN-33 | Immediate・Follow-on DEADのStatusと一時メニューを遷移ごとに確認 | disposition・予約可否・残数・DEAD Scoreが一致し、不要になったContinue/Preserveを消す |
-| MAN-34 | 保持・DEAD精算後にミッション再開始 | Siteと成績はセッション内のみ。再開始後の保持・永続ポイントを期待しない |
+| MAN-34 | 保持・DEAD精算後にミッション再開始 | Siteと進行中任務は復元しない。Hookで保存済みの成績だけを復元する |
 | MAN-35 | Preserve時の長機がRTB後にログアウト、別試行で精算前にログアウト | 1秒監視でRETAIN Site削除、SEAD採点・任務ロックを巻き戻さない |
 | MAN-36 | MP2僚機がPreserveを選び、観戦へ移動・僚機切断・長機切断 | 保持者は最初の登録長機、観戦・僚機切断では保持、長機ログアウトで削除 |
 | MAN-37 | 他WingがFollow-on DEADを取得、元保持者がログアウト | IN_USE Siteを削除せず、DEAD目標・採点を継続 |
 | MAN-38 | SA-6レーダーだけ破壊し、Launcherを1/3両残して両DEAD経路を実施 | Primary DESTROYED・Site SUPPRESSED・残数1/3、残存だけ対象。別試行でSuppressedレーダーを残す場合はレーダーも全滅対象 |
 | MAN-39 | MP2 Immediateで両目標達成後、1人帰還・1人事故。別試行で1人をDEAD達成前に喪失 | 帰還300／達成後事故180、DEAD達成前喪失90。精算済み参加者へ追加採点せず、任務数各1 |
+| MAN-40 | Hook未導入／保存無効で受注・精算 | Session only表示で訓練・採点を継続し、保存済みと表示しない |
+| MAN-41 | 保存先の書込みを一時的に失敗させ、精算後に権限を復旧（テスト用コピー） | 保存未確認表示とログ、正常復帰で同じ累計を1回保存。MissionScripting.luaの変更なし |
 
 MAN-10〜14は、実際にLife減少とRadar ON/OFFの前提を確認できたときに実施済みとする。
 HARMの命中やRWR表示だけからLife/Radar状態を推測しない。Mission Statusの状態とDCS/MOOSEの観測を併せて確認する。
@@ -466,10 +502,11 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | DEAD対象・phase・保持・予約 | DEAD | MAN-24〜34、SEAD-45〜61の回帰 |
 | player/missions/runtime | WING/PAR | INT/SCORE/SEAD、UCID・F10のマルチ確認 |
 | scoring/recovery・採点設定 | SCORE | WING/SEAD、MAN-15〜18/21/22 |
+| 成績永続化・サーバーHook | PERSIST / INSTALL | Lua全7スイート、MAN-22/34/40/41、DCSでのa_do_script・停止callback順の確認 |
 | 結合・同期・Watch | BUILD/SYNC | 実 `.miz` に対する `-Check` |
 | MEのスロット・テンプレート・Zone変更 | 対応するLuaスイート | 実 `.miz` 確認と該当する手動ケース。fixtureだけではME変更を検出できない |
 
-共通モジュールの変更や機能追加の完了時は、結合後にLua6本を実行し、既存カテゴリへの回帰を確認する。
+共通モジュールの変更や機能追加の完了時は、両bundleの結合後にLua7本を実行し、既存カテゴリへの回帰を確認する。
 ツール変更ではBUILD/SYNCも実行する。通過後の追加検証は、変更・失敗・未解決の懸念がある場合に行う。
 表のID範囲は重点確認するケースを示す。現在、個別ケースを指定するrunnerはないので、対応するスイート全体を実行する。
 
@@ -482,6 +519,8 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 同日のSite/DEAD nil観測修正・SEAD FSMのnil観測経路修正・Follow-on DEAD DDM統一後はLua全225ケース（INT15、SCORE26、WING27、PAR16、SEAD61、DEAD80）が通過した。BUILDの2確認グループ、SYNCの3確認グループも通過。DCS内のFollow-on座標確認（MAN-28）は未実施。
 2026-10-05のSEADブリーフィング重複修正後はLua全226ケース（INT15、SCORE26、WING27、PAR16、SEAD62、DEAD80）が通過した。BUILDの2確認グループ、SYNCの3確認グループ、実ミッションのLua同期・Checkも成功。DCS内の自動表示回数とStatus再確認（MAN-07/08）は未実施。
 同日の座標表示時間延長・Intercept受注通知整理後はLua全227ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD80）が通過した。表示時間の初期60秒と設定変更後90秒、Intercept開始表示1回を模擬検証。BUILDの2確認グループ、SYNCの3確認グループ、実ミッションのLua同期・Checkも成功。DCS内の表示時間・回数確認は未実施。
+同日の成績永続化実装後はLua全247ケース（既存227＋PERSIST20）、BUILD2確認グループ、SYNC3確認グループ、INSTALL3確認グループが通過した。INSTALLでは実ファイル保存・別Luaプロセスでの復元・破損primaryのbackup復旧も確認。実ミッションのLua同期・Checkも成功。DCS内のHook接続・再起動復元・停止callback順は未確認。
+同日、ユーザー承認後に `C:\Users\hayat\Saved Games\DCS\Scripts\Hooks\DynamicTrainingPersistenceHook.lua` へ導入し、生成bundleとのハッシュ一致を確認した。DCS再起動後の実機確認は未実施。
 本書のLuaケース数・番号と実行ファイルの対応、READMEと本書のリンク先も確認済み。
 DCS内のSEAD状態遷移・DEAD継続・サイト管理・採点の各手動ケースは個別結果の記録待ち。
 過去の「ゲーム内で動いている」という報告は、未記録の手動ケースすべての合格とは扱わない。

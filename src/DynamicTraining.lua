@@ -8,6 +8,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     return
 end
 DynamicTrainingRuntime = { version = "SEAD-DEAD-follow-on-trial-7" }
+Persistence.Publish()
 
 local menus = {}
 local nextPlayerScan = 0
@@ -78,8 +79,8 @@ local function SettleParticipant(record, p, result, reason, time)
                 points, total = points + p.deadReceipt.points, p.deadReceipt.total
                 text = text .. string.format("\nSEAD Points: +%d\nDEAD Points: +%d", receipt.points, p.deadReceipt.points)
             end
-            text = text .. string.format("\nPoints: +%d\nTotal Score: %d\nSession only; not saved.",
-                points, total)
+            text = text .. string.format("\nPoints: +%d\nTotal Score: %d\n%s",
+                points, total, Persistence.Status())
         else text = text .. "\nUnscored sortie (UCID unavailable)." end
         Log(string.format("%s %s points=%d scored=%s", record.id, result,
             receipt.points, tostring(receipt.scored)))
@@ -312,12 +313,12 @@ local function Statistics(groupName)
         if p then
             texts[#texts + 1] = string.format(
                 "PLAYER STATISTICS: %s [%s]\nTotal Score: %d\nCareer Points: %d\nIntercept Score: %d\nSEAD Score: %d\nDEAD Score: %d\n" ..
-                "Settled Missions: %d\nPrimary Success: %d\nRTB Success: %d\nRecovery Failure: %d",
+                "Settled Missions: %d\nPrimary Success: %d\nRTB Success: %d\nRecovery Failure: %d\nDeath Count: %d",
                 owner.name, owner.unitName, p.totalScore, p.careerPoints, p.interceptScore, p.seadScore, p.deadScore,
-                p.missionCount, p.primarySuccessCount, p.rtbSuccessCount, p.recoveryFailureCount)
+                p.missionCount, p.primarySuccessCount, p.rtbSuccessCount, p.recoveryFailureCount, p.deathCount)
         else texts[#texts + 1] = "PLAYER STATISTICS: " .. owner.name .. "\nUCID unavailable; unscored." end
     end
-    Message(group, table.concat(texts, "\n\n") .. "\nSession only; not saved.", 25)
+    Message(group, table.concat(texts, "\n\n") .. "\n" .. Persistence.Status(), 25)
 end
 
 local function Status(groupName)
@@ -645,6 +646,7 @@ local function HandleEvent(record, event)
         for _, p in ipairs(record.participants) do
             if Player.EventMatches(p.owner, event) then
                 if p.done then return end
+                p.failureEvent = reason
                 if p.primaryCompletedAt and time >= p.primaryCompletedAt then
                     SettleParticipant(record, p, "RTB_FAILURE", reason .. " before safe recovery (60%).", time)
                 else
@@ -709,4 +711,4 @@ end
 
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
-trigger.action.outText("Dynamic Training ready. Wing UCID scoring trial; session scores are not saved.", 10)
+trigger.action.outText("Dynamic Training ready. Wing UCID scoring.\n" .. Persistence.Status(), 10)

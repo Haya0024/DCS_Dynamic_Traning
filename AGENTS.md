@@ -156,7 +156,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - `src/sead_objective.lua` に判定を分離し、成功後は再判定を停止する。`sead.suppressionHoldSeconds` に60秒を集約する。
 - `sead.templates` の `name` / `type` / `pbCode` / `primaryUnitType` に対応をまとめる。TypeNameは `.miz` で確認済みの値を使い、複数の主要レーダーがある場合は全対象の破壊または損傷＋OFF継続時間達成を要求する。
 - 満額は `sead.fullReward = 150`。目標達成後の帰還成功で各自150、墜落・死亡・脱出で90、達成前の事故・任意中止は0。UCID ごとの既存帰還評価と重複防止を使う。
-- Total Score / Career Points / SEAD Score を更新し、Intercept Score と分ける。永続保存は未実装。
+- Total Score / Career Points / SEAD Score を更新し、Intercept Score と分ける。UCID累計はサーバーHookで保存・復元する。未接続時はセッション内のみ。
 - 目標達成時にSAM Groupを削除しない。Siteのdispositionは初期CLEANUP。保持を選ばなければ全参加者終了後に独立した `src/sead_sites.lua` へ削除を依頼し、失敗時は参照を保持して再試行する。Siteは `Missions.sites` に置き、残存車両の追加撃破はSEAD報酬に影響しない。
 - 仕様変更では先に `docs/SEAD.md` と `docs/DEAD.md` に状態遷移と終了方針を書く。
 - 仕様は `docs/SEAD.md`、模擬検証は `scripts/Test-SEAD.lua` を参照する。
@@ -176,7 +176,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
 - Site/DEAD対象のIsAliveはtrue=生存、false=死亡、nil=観測不能とする。未確認対象のnil・例外・不正値・ID不一致を全滅根拠にせず、Site残数は不明・継続候補から除外、DEADは残存側に数える。観測不能ログは移行時だけ記録する。明示死亡のlostを優先し、Group一覧欠落だけでも既知対象を全滅扱いしない。
 - Follow-on DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Estimated表現は使わず、SEAD TOO/PBの推定点と秘匿表示は維持する。
-- 全員終了時にIN_USEならCLEANUPへ倒す。明示RETAIN以外はCleanupが標準。保持timeout・明示削除メニュー・永続化は未実装。
+- 全員終了時にIN_USEならCLEANUPへ倒す。明示RETAIN以外はCleanupが標準。保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
 - 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
 - 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。既存5 LuaスイートとBuild/Syncテストも通す。
 
@@ -251,7 +251,7 @@ Difficulty ごとに使用可能な Threat Budget を決め、
 - 未クリアの墜落・死亡・脱出ではクリア報酬を付与しない。
 - 精算は任務IDと開始時の UCID に対応付け、一度だけ実行する。
 - UCID を取得できない場合、表示名や仮の UCID へ自動的に置き換えて採点しない。
-- 採点・帰還評価の試用実装は `docs/SCORING.md` を参照する。満額150ポイント、帰還失敗90ポイントでメモリ内に保持する。永続保存は未実装。
+- 採点・帰還評価は `docs/SCORING.md` を参照する。満額150ポイント、帰還失敗90ポイント。サーバーHook導入時は保存済み累計を復元し、未接続／保存待ち／保存済みを区別する。
 
 ### ウィング共有任務と受注ブロッカー
 
@@ -340,7 +340,15 @@ CAS: 720
 - Kill Statistics
 - 推奨 Difficulty
 
-保存形式は後で決定する。
+成績保存は `docs/PERSISTENCE.md` を参照する。実装済み・DCS内確認待ち。
+
+- ミッション側のio / lfsをunsanitizeしない。サーバーのSaved Games Hookがa_do_scriptでデータのみを受け渡し、固定schemaの `DynamicTraining/scores.dat` と正常backupを管理する。
+- `src/score_data.lua` はschemaとcodec、`src/persistence.lua` はsnapshotと復元・確認通知、`server/score_store.lua` は検証付き保存・復旧、`server/DynamicTrainingPersistenceHook.lua` はサーバーcallbackを担う。
+- UCID累計・カテゴリ別Score・任務／帰還／失敗／中止／出撃喪失数を保存する。進行中任務・Wingロック・SAM Siteは保存しない。
+- run番号を保存してから復元する。遅延接続前の精算差分は1回だけ統合する。snapshotの再送は累計置換で、保存revisionの確認前に保存済みと表示しない。
+- dual corruptionではゼロで上書きしない。I/O失敗はゲームを止めず保存未確認として再試行する。Immediate DEADの追加Scoreでは任務・死亡統計を増やさない。
+- Hookは `scripts/Build-PersistenceHook.ps1` で結合し、`scripts/Install-PersistenceHook.ps1 -SavedGamesPath <DCSユーザーディレクトリ>` で配置する。導入・更新後はDCS再起動が必要。MissionScripting.luaと他Hookを変更しない。
+- Lua7スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
 
 ---
 
@@ -464,7 +472,8 @@ DCS-Dynamic-Training/
 ### Lua と .miz の同期
 
 - `src/*.lua` と `vendor/MOOSE/Moose.lua` を編集元とする。設定値は `src/config.lua` に集約する。
-- `scripts/Build-Mission.ps1` が設定・プレイヤー・採点・任務ロック・Intercept・SEAD目標判定・SEAD配置・サイト管理・DEAD・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
+- `scripts/Build-Mission.ps1` が設定・保存データcodec・プレイヤー・採点・永続化bridge・任務ロック・Intercept・SEAD目標判定・SEAD配置・サイト管理・DEAD・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
+- 保存codecまたはserver側Luaを変更したらHookも再結合し、導入用bundleと保存テストを確認する。導入済みHookの更新にはinstallerとDCS再起動を使う。
 - Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、`mission/Syria.miz` も更新する。
   1. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1`
   2. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Check`
@@ -524,7 +533,7 @@ DCS-Dynamic-Training/
 - 各グループの F10 メニューが対象プレイヤーの任務を開始すること
 - 敵全滅後は帰還待ちに移り、味方基地・空母で5 knots以下を連続10秒維持すると150ポイントを付与すること
 - クリア後の墜落・死亡・脱出では90ポイントを一度だけ付与すること
-- `Player Statistics` にセッション内の累計を表示すること（再起動後の保存は未実装）
+- `Player Statistics` に累計・Death Count・保存状態を表示し、Hook導入時は保存済み成績が再起動後に戻ること（DCS内確認待ち）
 - MP2 の2人で受注し、全員離陸待ち・個別帰還・長機喪失後の継続・個人中止・二重受注ブロックが動作すること
 - 複数ウィングが同時に受注でき、各ウィングの目標・帰還・中止・ロック解除が他の任務に影響しないこと
 - 敵の5種類の編隊指定を接敵前に確認すること（初期相対座標はテンプレートから継承し、AI が指定形状へ移行する）

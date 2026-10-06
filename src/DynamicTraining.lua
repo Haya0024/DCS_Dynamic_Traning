@@ -786,6 +786,7 @@ local function Tick(_, time)
     return time + Config.pollSeconds
 end
 
+MapOverlay.RefreshFriendlyAirbases()
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
 GlobalMessage("Dynamic Training ready. Wing UCID scoring.\n" .. Persistence.Status(), 10)

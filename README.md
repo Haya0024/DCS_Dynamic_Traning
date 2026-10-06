@@ -49,6 +49,8 @@ Dynamic Training
 `Mission Status` で任務の進行状況、`Player Statistics` で自分の成績を確認できます。
 `Abort Mission` はウィング全体の中止です。参加者ごとの `Abort Sortie` が表示されている場合は、その人だけ離脱できます。
 
+BLUE所属の陸上AirbaseはF10上に青色Drawingで表示します。表示対象はruntimeでcoalitionから自動取得し、半径2,500 mの薄い青色Circleと `BLUE AIRBASE`・基地名をBLUE側だけに表示します。文字は基地中心から南へ1,000 mずらしています。Carrier・Ship・FARP・Helipadは対象外です。Allies OnlyとFog of Warの設定は維持します。詳細は [BLUE Airbase表示仕様](docs/MAP_OVERLAY.md) を参照してください。オフセット表示の見やすさはユーザーから改善報告がありますが、DCS内の全確認ケースは未実施です。
+
 ## SEADの後は、帰還も継続攻撃も選べる
 
 SEAD達成後に車両が残っていると、F10に `Continue as DEAD` と `Preserve Site for DEAD` が追加されます。

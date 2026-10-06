@@ -7,6 +7,16 @@ return {
     takeoffDelaySeconds = 20,
     coordinateBriefingSeconds = 60, -- Coordinate briefings and status recall (SEAD / DEAD).
     persistence = { enabled = true }, -- Requires the server-side Saved Games hook.
+    mapOverlay = {
+        radiusMeters = 2500,
+        textOffsetSouthMeters = 1000, -- Below the base label when the F10 map is north-up.
+        outlineColor = { 0.2, 0.55, 1, 0.65 },
+        fillColor = { 0.2, 0.55, 1, 0.04 },
+        textColor = { 0.35, 0.7, 1, 1 },
+        textFillColor = { 0, 0, 0, 0 },
+        fontSize = 16,
+        minimumDrawingID = 1000000 -- Shared MOOSE allocator continues above this floor.
+    },
     fullReward = 150,
     recoveryFailurePercent = 60,
     landingHoldSeconds = 10,

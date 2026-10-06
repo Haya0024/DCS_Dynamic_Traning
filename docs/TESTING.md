@@ -5,7 +5,7 @@
 ## 目的と対象
 
 訓練任務の受注・生成・目標達成・帰還評価・採点・終了処理が仕様通りに動作し、別プレイヤーや別ウィングへ影響しないことを確認する。
-対象は現在実装されているIntercept、SEAD、Immediate/Follow-on DEAD、ウィング共有、UCID採点、Lua結合、`.miz`同期。
+対象は現在実装されているIntercept、SEAD、Immediate/Follow-on DEAD、ウィング共有、UCID採点、BLUE陸上Airbase Drawing、Lua結合、`.miz`同期。
 動的Clientスロット、専用保持Siteのtimeout・明示削除・Site永続化は今回の検証対象外。成績の永続保存と予約解除済み共有Siteの未予約30分Cleanupは対象とする。
 
 動作の根拠は [Intercept.md](Intercept.md)、[SEAD.md](SEAD.md)、[DEAD.md](DEAD.md)、[WING.md](WING.md)、[SCORING.md](SCORING.md)。
@@ -22,17 +22,19 @@
 | SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 62 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止 |
 | DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 103 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
 | PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 25 | schema、保存確認、再起動・遅延復元、I/O失敗、backup、run、死亡統計、別Lua環境・文字列通信 |
+| MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 
-Luaは合計275ケース（既存250＋PERSIST25）。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、25ケースには含めない。
+Luaは合計293ケース（既存275＋MAP18）。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、25ケースには含めない。
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 
 ### 自動テストの前提と限界
 
-Luaテストは `build/DynamicTraining.lua` を読み込み、本番の結合済みコードに対して操作・時刻・イベントを入力する。
+任務のLuaテストは `build/DynamicTraining.lua` を読み込み、本番の結合済みコードに対して操作・時刻・イベントを入力する。
+MAPは `src/config.lua` と `src/map_overlay.lua` を独立した模擬環境で読み込み、最終ケースではbundle初期化も検証する。ID allocatorは同梱MOOSEの実際の関数を抜き出して実行する。実DCSのDrawing描画・可視性・MOOSEの地形判定は手動確認が必要。
 DCS/MOOSEのユニット、グループ、座標、地形、障害物、F10、接続情報、Life、Radar、ログを模擬する。
 採点台帳の単体確認では `src/config.lua` と `src/scoring.lua` も直接読み込む。
 
@@ -64,6 +66,7 @@ lua scripts/Test-ParallelWings.lua
 lua scripts/Test-SEAD.lua
 lua scripts/Test-DEAD.lua
 lua scripts/Test-Persistence.lua
+lua scripts/Test-MapOverlay.lua
 ```
 
 DCS付属の `luae.exe` を使う場合のPowerShell実行例。インストール先が違う場合は `$luaPath` を変更する。
@@ -77,7 +80,8 @@ $suites = @(
     'scripts/Test-ParallelWings.lua',
     'scripts/Test-SEAD.lua',
     'scripts/Test-DEAD.lua',
-    'scripts/Test-Persistence.lua'
+    'scripts/Test-Persistence.lua',
+    'scripts/Test-MapOverlay.lua'
 )
 foreach ($suite in $suites) {
     Get-Content -Encoding UTF8 -LiteralPath $suite | & $luaPath -
@@ -457,6 +461,31 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | INSTALL-04 | BOMあり／なし・空のautoexec、既存DLSSとAPI許可、ConfigureHostを再実行 | 元設定・正確なbackupを維持、内容はidempotent、Lua実行で既存許可＋userhooks/serverのみを追加 |
 | INSTALL-05 | 不完全・重複・不正形式の管理block、不正UTF-8 | 設定とHookを変更せず拒否 |
 
+### BLUE Airbase Drawing（MAP）
+
+仕様は [MAP_OVERLAY.md](MAP_OVERLAY.md)。BLUE=2・AIRDROME=0、HELIPAD=1、SHIP=2を模擬し、実DCSへ渡す引数と所有Drawingを確認する。
+
+| ID | 条件・操作 | 期待結果 |
+|---|---|---|
+| MAP-01 | BLUE陸上基地1件、基地中心と生のDCS位置が異なる | 中心にCircle、Textのみ南1,000 m（x減少、y/z不変）。BLUEのみ、readOnly、2,500 m・RGBA・透明Text背景・実基地名 |
+| MAP-02 | RED陸上基地 | Drawingなし |
+| MAP-03 | Neutral陸上基地 | Drawingなし |
+| MAP-04 | BLUE Carrier/Shipに陸上基地風の名前を付ける | 名前で判断せずCategoryで除外 |
+| MAP-05 | FARP/Helipadと補正済みheliport/ship flag | Drawingなし |
+| MAP-06 | BLUE基地3件、既存・後続MOOSE Drawingも確保 | Circle/Textは別ID、allocatorを巻き戻さず競合なし |
+| MAP-07 | 同基地の重複列挙、Refresh再実行、他所有Markerあり | 1基地2 Drawing、旧所有IDだけ削除、他Marker保持、ID再利用なし |
+| MAP-08 | module再初期化後Refresh | 所有IDを保持して旧Drawing削除、重複なし |
+| MAP-09 | 既存基地をRED、TiyasをBLUEにしてRefresh | 旧基地表示を削除、Tiyasを名前リスト変更なしで表示 |
+| MAP-10 | BLUE基地が0件になりRefresh | 旧Overlayのみ削除 |
+| MAP-11 | 全体列挙APIが例外 | falseを返し、旧Drawing維持、既存進行を止めない |
+| MAP-12 | 個別基地観測失敗・不正中心 | その基地を除外し、他基地は描画 |
+| MAP-13 | Text部分生成後に例外 | Circle/Text両方をrollback、次回成功可能 |
+| MAP-14 | Circle部分生成後に例外 | 確保IDを削除 |
+| MAP-15 | Refreshの旧Drawing削除に失敗 | 所有ID維持、新描画を停止、次回再試行後に描画 |
+| MAP-16 | Drawing API欠落 | 例外を外へ出さずOverlayをskip |
+| MAP-17 | 生成rollbackの削除にも失敗 | 所有ID保持、次回Refreshで除去して再作成 |
+| MAP-18 | bundle初期化・通常Tick・bundle二重読み込み | 初期化時だけ描画、Tickと既存Runtime guardの再読込では追加なし |
+
 ## DCS内の手動テスト
 
 ### 実施前提
@@ -519,6 +548,8 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-45 | 元WingがRelease Site Reservation、別WingでGenerate DEAD。別試行ではMP2精算前に開放 | 同じ残存Groupを別Wingが取得、二重受注なし。元SEAD全員終了までは別Wingを拒否、採点・任務ロック維持 |
 | MAN-46 | 開放したSiteを未予約で30分放置。専用保持・地上DEAD受注も別試行 | 共有未予約30分でCleanup。専用保持中・ARMED使用予約中は削除なし。元保持者切断は共有Siteに影響しない |
 | MAN-47 | Intercept／SEAD／Follow-on DEADを地上・空中受注し、待機中着地・再離陸、StatusとDCSログを確認 | 指定した詳細はDEBUGのみ、Intercept画面はRange／Altitude／HOT。SEAD受注にMODEなし、計画に生成待ち説明なし、開始にPilotsなし。DEADも受注→座標1回→短い開始で自動再掲なし。Statusで座標を再確認可能 |
+| MAN-48 | 同期済みSyria.mizを開き直して開始。BLUE/REDでF10確認、ズーム・地図回転・通常Marker入力・任務メニューを操作 | 現在BLUEのAkrotiri/Beirut-Rafic Hariri/Incirlik/Ramat Davidに薄青Circleと青文字1枚の基地名。RED/Neutral/Ship/FARPは追加Drawingなし、BLUE側だけ表示。readOnly、南オフセットで文字可読、黒い複製文字なし。Marker入力・任務・帰還・採点が従来どおり。Allies Only/Fog of War維持。ログの描画数4を確認 |
+| MAN-49 | テスト用コピーをMEでTiyas BLUEへ変更して再開始。Luaの空港名リストは編集しない | Tiyasが自動追加され、Circle/Textが他基地と独立。元4基地も引き続き表示。結果を標準設定と区別して記録 |
 
 MAN-10〜14は、実際にLife減少とRadar ON/OFFの前提を確認できたときに実施済みとする。
 HARMの命中やRWR表示だけからLife/Radar状態を推測しない。Mission Statusの状態とDCS/MOOSEの観測を併せて確認する。
@@ -540,9 +571,10 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | scoring/recovery・採点設定 | SCORE | WING/SEAD、MAN-15〜18/21/22 |
 | 成績永続化・サーバーHook | PERSIST / INSTALL | Lua全7スイート、MAN-22/34/40/41、DCSでのnet.dostring_in(server)接続・停止callback順の確認 |
 | 結合・同期・Watch | BUILD/SYNC | 実 `.miz` に対する `-Check` |
+| BLUE陸上Airbase Drawing | MAP全18件 | MAN-48/49、青文字・倍率/回転別の見え方、現在の `.miz` のBLUE airport IDと設定保持、既存7 Luaスイート回帰 |
 | MEのスロット・テンプレート・Zone変更 | 対応するLuaスイート | 実 `.miz` 確認と該当する手動ケース。fixtureだけではME変更を検出できない |
 
-共通モジュールの変更や機能追加の完了時は、両bundleの結合後にLua7本を実行し、既存カテゴリへの回帰を確認する。
+共通モジュールの変更や機能追加の完了時は、両bundleの結合後に既存Lua7本とMAPを実行し、既存カテゴリへの回帰を確認する。
 ツール変更ではBUILD/SYNCも実行する。通過後の追加検証は、変更・失敗・未解決の懸念がある場合に行う。
 表のID範囲は重点確認するケースを示す。現在、個別ケースを指定するrunnerはないので、対応するスイート全体を実行する。
 
@@ -568,6 +600,14 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 その後、ユーザー指定でInterceptのHostiles／Range／Altitude／HOTを画面開始通知へ戻した。Lua全275ケース、BUILD2、SYNC3が通過。INT-11/16で実編成との一致、開始15秒で1回、Pilotsとカウント通知はDEBUGのみ、通常本文のMESSAGE記録を検証。実ミッションのLua同期・Checkも成功。DCS内確認は未実施。
 
 同日の追加整理後もLua全275ケース、BUILD2、SYNC3が通過。InterceptのHostiles、SEAD受注のMODE・計画のGround acceptance説明・開始PilotsをDEBUG専用にした。Follow-on DEADは受注10秒→座標ブリーフィング1回→座標なし開始25秒へ統一し、INT-11/16、SEAD-62、DEAD-16/17で画面／DEBUG分離、地上・空中の表示回数、Status再確認、配点・状態不変を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-47は未確認。
+2026-10-06のBLUE陸上Airbase Drawing追加後はLua全293ケース（既存275＋MAP18）、BUILD2、SYNC3確認グループが通過した。既存7 Luaスイート・harnessは変更していない。作業開始時のmainはorigin/mainと一致するe3b98ad。実ミッションのBLUE airport ID6/16/30/44を静的確認し、4基地から8個のBLUE限定Drawingを作る追加模擬検証も通過した。Build・実 `.miz` のSync・Checkが成功し、同期前backupとの比較でDynamicTraining.lua以外の7 ZIP entryが不変、作業開始時のmission/warehouses/optionsも不変であることを確認した。ログはローカルの `build/map-overlay-inspection/` に置く。MAN-48/49のDCS内表示・可視性は未確認。
+
+同日のMapOverlay文字位置修正後もLua全293ケース、BUILD2、SYNC3が通過。MAP-01でCircleの基地中心を維持し、Textのみ南1,000 mへ移動することを検証した。Build・実ミッションSync・Checkも成功。ユーザー提供のIncirlik画像では中心配置文字と通常基地名の重なりを確認したが、オフセット修正後の実DCS表示は未確認。MAN-48で文字の離隔を再確認する。
+
+同日の黒縁追加後はLua全296ケース（既存275＋MAP21）、BUILD2、SYNC3が通過。青文字を維持したまま黒Textを8方向に描き、最後に青Textを描画すること、全10 IDのRefresh/rollback、縁幅変更/無効化を模擬検証した。Build・実ミッションSync・Checkも成功。ただしユーザー提供のBeirutの実DCS画像で黒文字が分離して見づらくなることが判明し、この方式は撤回した。模擬テストでは実描画の可読性を検証できていなかった。
+
+同日の撤回後は黒文字の生成処理・設定・追加3テストを取り除き、南1,000 mに青文字1枚を置く前の状態へ戻した。Lua全293ケース（既存275＋MAP18）、BUILD2、SYNC3が通過し、Build・実ミッションSync・Checkも成功。オフセット版の可読改善はユーザー報告あり（版・倍率未記録）。全手動ケースの合格とは扱わない。
+
 本書のLuaケース数・番号と実行ファイルの対応、READMEと本書のリンク先も確認済み。
 DCS内のSEAD状態遷移・DEAD継続・サイト管理・採点の各手動ケースは個別結果の記録待ち。
 過去の「ゲーム内で動いている」という報告は、未記録の手動ケースすべての合格とは扱わない。

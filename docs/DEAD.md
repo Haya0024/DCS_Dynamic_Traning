@@ -2,6 +2,9 @@
 
 更新日: 2026-10-06
 
+画面メッセージ・DCSログの本文、タイミング、表示時間は [MESSAGES.md](MESSAGES.md) を参照する。
+Follow-on DEADの通知はSEADと同じ流れにする。準備成功後に短い `DEAD mission accepted.`（10秒）、受注時の座標付きブリーフィング（60秒設定）を1回、ACTIVE移行時は座標を含まない `DEAD TRAINING START` と目標・RTB指示（25秒）を出す。地上受注後の離陸でもブリーフィングを自動再掲しない。予約待ち・開始時の残数などはDEBUGへ記録し、Statusでは座標・残数を任意確認できる。
+
 ## 目的と実装境界
 
 DEADは必ず既存SEADで生成されたSAM Siteを引き継ぐ継続任務とする。種類は次の2つだけ。
@@ -167,7 +170,7 @@ Site選定と使用予約の両方でWing所有を確認する。準備失敗の
 
 Follow-on DEADは `category = "DEAD"` の新recordをAcquireし、受注時の生存対象を固定する。
 取得・Acquire・準備の失敗はWing/UCIDロックを解除し、取得前のRETAINまたはAVAILABLE・followOnAvailable・予約状態・未予約開始時刻へrollbackする。
-参加者の操作・離陸状態とbriefingも予約トランザクション内で確認し、準備したbriefingはACTIVE移行時に再利用する。
+参加者の操作・離陸状態とbriefingも予約トランザクション内で確認する。準備したbriefingは受注時に画面へ1回出し、ACTIVE移行時はデバッグログに再利用する。
 受注後に正常な任務として中止・喪失・離陸予約取消した場合はrollbackせずCleanupする。
 
 全員空中なら即ACTIVE。地上参加者がいる場合は予約済みARMEDとし、全員離陸の検出でACTIVEへ移す。
@@ -202,7 +205,7 @@ Follow-on DEADは受注時、Immediate DEADはContinue時に満額を固定。�
 
 Follow-on DEADは地域、SAM種類、主要レーダーの履歴（Primary radar destroyed / Previously suppressed）、残存車両全滅の指示と既存Site位置を表示する。
 既存Siteの実配置点（actualSpawnPoint、ない場合はspawn.coordinate）を `SITE LOCATION:` としてDDM（度＋小数分、分の小数3桁）で表示する。MOOSEのToStringLLDDMへLL_Accuracy=3を明示する。SEAD TOO/PBの推定点・秘匿仕様には影響しない。
-座標付きブリーフィングとMission Statusの表示時間は共通設定 `coordinateBriefingSeconds`（初期60秒）を使用する。地上受注時の予約通知と開始表示にも適用する。
+受注時の座標付きブリーフィングとMission Statusの表示時間は共通設定 `coordinateBriefingSeconds`（初期60秒）を使用する。開始通知は座標なし25秒で、ブリーフィングの自動再掲はしない。
 SEADのTOO/PB秘匿はFollow-on DEADには適用しない。内部Group名・object IDは表示しない。
 Immediate DEADはSEAD情報の秘匿を維持し、残数・follow-on phaseを追加表示する。
 

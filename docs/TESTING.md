@@ -1,6 +1,6 @@
 # テスト仕様書
 
-更新日: 2026-10-05
+更新日: 2026-10-06
 
 ## 目的と対象
 
@@ -131,12 +131,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | INT-08 | 方位0/45/90/180/270/359°、偏角−60/0/60°、距離60/70/80 NM | 距離・左右範囲・HOT機首・プレイヤー後方20 NMへの経路が一致 |
 | INT-09 | 5種類の編隊をそれぞれ選ぶ、重複受注 | Openの編隊指定をControllerと経路へ適用し、既存生成を変更しない |
 | INT-10 | 別ウィングで異なる編隊を選ぶ | 各生成Groupの編隊が独立 |
-| INT-11 | 3テンプレートをそれぞれ選ぶ | ME由来の機種・機数を維持し、開始表示も一致 |
+| INT-11 | 3テンプレートをそれぞれ選ぶ | ME由来の機種・機数を維持し、デバッグ開始ログも一致。Hostilesは画面に出さない |
 | INT-12 | 1機編成を死亡イベントまたはpollingで全滅 | 目標達成後、既存の帰還・事故採点へ移る |
 | INT-13 | 2機編成の1機だけを破壊 | 残り1機が生存する間は未達成 |
 | INT-14 | 選ばれたテンプレートが見つからない | 予約解除後に別の受注を開始可能 |
 | INT-15 | 再受注と複数ウィングの受注 | 任務ごとにテンプレートを選び、他任務の抽選・敵に影響しない |
-| INT-16 | 単独・MP2の地上／空中受注、両者の連打、離陸イベント、カウントダウンリセット、定期監視 | 受注は離陸待ちだけ、20秒待ち通知はカウント開始ごとに1回、詳細開始表示は1回のみ。敵も1回だけ生成、開始15秒・Status20秒を維持 |
+| INT-16 | 単独・MP2の地上／空中受注、両者の連打、離陸イベント、カウントダウンリセット、定期監視 | 画面の開始はRange・Altitude・HOTの1回。Hostiles・Pilots・20秒待ち・リセットはDEBUGのみ。通常通知もMESSAGEへ記録。敵は1回生成、開始15秒・Status20秒を維持 |
 
 ### 採点・帰還（SCORE）
 
@@ -302,7 +302,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | SEAD-59 | ACTIVEまたはPENDINGからDESTROYED、残存車両破壊、精算 | 完了表示・終端状態が固定、追加報酬なし。精算まで保持し、Cleanup後も保持したsite参照の結果は不変 |
 | SEAD-60 | MP2片方だけ精算、全員終了後の削除が2回失敗、新任務受注 | 全員終了まで削除なし。ロックは解放し、site参照を保持して再試行、新任務へ干渉せず3回目で削除 |
 | SEAD-61 | 別ウィングと並行中に自任務を中止 | 自サイトだけ削除し、未達成を成功へ変えず、他サイトを維持 |
-| SEAD-62 | TOO/PBを地上・空中で受注、複数tickの計画、離陸待ち・カウントダウンリセット、生成、Status再確認、表示時間60／90秒を設定 | 座標付きブリーフィングは計画確定時に自動1回だけ。受注は方式＋計画中、生成は座標・コードなし。Statusでは同じDDM座標を何度でも確認でき、設定した表示時間を両方へ適用 |
+| SEAD-62 | TOO/PBを地上・空中で受注、複数tickの計画、離陸待ち・カウントダウンリセット、生成、Status再確認、表示時間60／90秒を設定 | 受注時MODE・計画時Ground acceptance説明・開始Pilots・20秒待ち・リセット・HARM攻撃指示はDEBUGのみ。方式と座標は計画確定で自動1回。DEBUGの計画に通常本文も含む。座標・コード秘匿、Status再確認と表示時間を維持 |
 
 ### DEAD follow-on（DEAD）
 
@@ -323,8 +323,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-13 | Preserve後にContinue、DEAD完了・RTB | RETAIN→IN_USE→CLEANUP、保持を解除して削除 |
 | DEAD-14 | 候補なしでGenerate DEAD、その後Intercept受注 | 定型通知で拒否、新規Site・Spawn・抽選なし、Wing/UCIDロックを残さない |
 | DEAD-15 | 保持後Follow-on DEAD受注、Spawn APIを拒否 | 元Group・計画・損傷を継承、新ID・category DEADで予約 |
-| DEAD-16 | Follow-on DEADの開始表示とStatus、DMS APIを使用不可にする、表示時間を90秒へ変更 | SITE LOCATIONに実配置点のDDM・分の小数3桁を表示、地域・種類・残数あり、内部Group/object ID・Estimated表現なし。共通設定を開始・Statusへ適用 |
-| DEAD-17 | 地上MP2受注、1対象喪失、全員離陸 | 受注時snapshot維持、ARMEDで予約済み、全員離陸で即ACTIVE、20秒待ちなし。座標付き予約通知・開始表示は初期60秒 |
+| DEAD-16 | Follow-on DEADの受注・開始とStatus、DMS APIを使用不可にする、表示時間を90秒へ変更 | 実配置点のDDMを受注時1回自動表示、Statusは同情報90秒で再確認、開始は座標なし25秒。内部Group/object ID・Estimated表現なし |
+| DEAD-17 | 地上MP2受注、1対象喪失、全員離陸 | snapshot維持、ARMEDで予約済み、全員離陸で即ACTIVE、20秒待ちなし。受注通知10秒1回、座標ブリーフィング60秒1回、開始25秒。予約待ち説明はDEBUGのみ |
 | DEAD-18 | 地上予約中に全対象喪失、後で離陸 | ARMED中は未達成、ACTIVEへ移ってから達成 |
 | DEAD-19 | Follow-on DEAD全対象破壊・RTB | DEAD150、元SEAD150、Total/Career300、独立した2精算、Cleanup |
 | DEAD-20 | Follow-on DEAD達成後の5種事故と重複通知 | DEAD90を一度だけ付与 |
@@ -474,7 +474,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 |---|---|---|
 | MAN-01 | 各基地・SCのHornetへ搭乗し、F10とStatisticsを開く | 自グループにメニューが現れ、マルチプレイでUCIDが照合される。初期は0、採点なしならその理由を調査 |
 | MAN-02 | Interceptを地上受注、離陸、別試行で待機中に着地、空中受注 | 地上は離陸検出後約20〜22秒、着地でリセット、空中は即生成 |
-| MAN-03 | Interceptを繰り返し、3テンプレート・5編隊を確認 | 距離60〜80 NM、左右60°内、HOT、高度15,000〜30,000 ft。表示の機種・機数が実体と一致、AIが指定編隊へ移行 |
+| MAN-03 | Interceptを繰り返し、3テンプレート・5編隊を確認 | 距離60〜80 NM、左右60°内、HOT、高度15,000〜30,000 ft。DEBUG開始ログの機種・機数が実体と一致、画面はRange／Altitude／HOTのみ、AIが指定編隊へ移行 |
 | MAN-04 | Interceptの2機編成を1機だけ破壊し、その後全滅 | 1機生存中は未達成、全滅で帰還指示 |
 | MAN-05 | SEADを地上受注して計画を確認し、移動して全員離陸 | 離陸前はSAM実体なし。全員離陸後に同じ計画で生成。方式・表示座標・コードを再抽選しない |
 | MAN-06 | SA-6/SA-8を4Zoneでそれぞれ生成し、観戦・ME等で実位置を確認 | 地面へ配置、全車両がZone内、建物等との離隔、ME相対配置、Radarの発信・交戦を確認。8組合せを個別記録 |
@@ -518,6 +518,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-44 | Preserve→SEAD全員RTB→再武装中に別WingがGenerate DEAD、その後元Wingで受注 | SEAD精算後も他Wingは候補なし。元Wingは同じ残存・損傷Groupを取得し、地上受注後の離陸でACTIVE。旧SEAD任務ロックは残らない |
 | MAN-45 | 元WingがRelease Site Reservation、別WingでGenerate DEAD。別試行ではMP2精算前に開放 | 同じ残存Groupを別Wingが取得、二重受注なし。元SEAD全員終了までは別Wingを拒否、採点・任務ロック維持 |
 | MAN-46 | 開放したSiteを未予約で30分放置。専用保持・地上DEAD受注も別試行 | 共有未予約30分でCleanup。専用保持中・ARMED使用予約中は削除なし。元保持者切断は共有Siteに影響しない |
+| MAN-47 | Intercept／SEAD／Follow-on DEADを地上・空中受注し、待機中着地・再離陸、StatusとDCSログを確認 | 指定した詳細はDEBUGのみ、Intercept画面はRange／Altitude／HOT。SEAD受注にMODEなし、計画に生成待ち説明なし、開始にPilotsなし。DEADも受注→座標1回→短い開始で自動再掲なし。Statusで座標を再確認可能 |
 
 MAN-10〜14は、実際にLife減少とRadar ON/OFFの前提を確認できたときに実施済みとする。
 HARMの命中やRWR表示だけからLife/Radar状態を推測しない。Mission Statusの状態とDCS/MOOSEの観測を併せて確認する。
@@ -561,6 +562,12 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 同日のPreserve元Wing専用予約への変更後はLua全262ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD90、PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。元SEAD精算・再武装後の保持予約、別Wing拒否、同Wing内最寄り選択、所有者不明時の拒否、rollback後の保持予約維持、同UCIDの別Wing移動を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-30/44は未確認。
 
 2026-10-06の明示予約解除・共有Site未予約30分Cleanup追加後はLua全275ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD103、PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。30分境界、元SEAD精算待ち、専用保持・地上使用予約中の保護、別Wing共有取得・二重取得拒否、期限前rollback、観測不能時timeout、削除再試行、複数Site個別解除、古いcallbackの拒否を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-45/46は未確認。
+
+同日の画面通知整理後もLua全275ケース、BUILD2、SYNC3、INSTALL5確認グループが通過した。INT-16／SEAD-62／WING-02を変更し、生成待ち・リセット・Intercept開始詳細・TOO/PB攻撃指示のDEBUG専用出力、短い開始通知、通常メッセージのログ複写、座標秘匿・表示時間・一度だけの生成を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-47は未確認。
+
+その後、ユーザー指定でInterceptのHostiles／Range／Altitude／HOTを画面開始通知へ戻した。Lua全275ケース、BUILD2、SYNC3が通過。INT-11/16で実編成との一致、開始15秒で1回、Pilotsとカウント通知はDEBUGのみ、通常本文のMESSAGE記録を検証。実ミッションのLua同期・Checkも成功。DCS内確認は未実施。
+
+同日の追加整理後もLua全275ケース、BUILD2、SYNC3が通過。InterceptのHostiles、SEAD受注のMODE・計画のGround acceptance説明・開始PilotsをDEBUG専用にした。Follow-on DEADは受注10秒→座標ブリーフィング1回→座標なし開始25秒へ統一し、INT-11/16、SEAD-62、DEAD-16/17で画面／DEBUG分離、地上・空中の表示回数、Status再確認、配点・状態不変を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-47は未確認。
 本書のLuaケース数・番号と実行ファイルの対応、READMEと本書のリンク先も確認済み。
 DCS内のSEAD状態遷移・DEAD継続・サイト管理・採点の各手動ケースは個別結果の記録待ち。
 過去の「ゲーム内で動いている」という報告は、未記録の手動ケースすべての合格とは扱わない。

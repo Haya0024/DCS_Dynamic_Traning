@@ -27,10 +27,12 @@ Follow-onの境界・採点・予約は [DEAD.md](DEAD.md) を参照する。SEA
 
 | 方式 | プレイヤーへ渡す情報 |
 |---|---|
-| TOO | `MODE: TOO`、`THREAT AREA`として捜索用座標（DDM：度＋小数分）、`TARGET TYPE: UNKNOWN`、座標付近でHARM TOOのエミッターを捜索・攻撃する指示 |
-| PB | `MODE: PB`、SAM種類、推定位置の緯度経度（DDM：度＋小数分）、3桁のHARM PBコード、攻撃と帰還の指示 |
+| TOO | `MODE: TOO`、`THREAT AREA`として捜索用座標（DDM：度＋小数分）、`TARGET TYPE: UNKNOWN`。HARM TOOの捜索・攻撃指示はDCSデバッグログだけに出す |
+| PB | `MODE: PB`、SAM種類、推定位置の緯度経度（DDM：度＋小数分）、3桁のHARM PBコード。HARM PBの攻撃指示はDCSデバッグログだけに出す |
 
 両方式とも分の小数部は3桁。MOOSEの `COORDINATE:ToStringLLDDM({ LL_Accuracy = 3 })` を使用し、計画確定時とMission Statusで同じDDM形式を表示する。MOOSE全体の座標表示設定には依存しない。
+全員離陸後の20秒待ちと着地によるカウントリセットは画面に出さず、DCSデバッグログだけに記録する。通常の画面通知は同じ本文をDCSログにも記録する。実際の出力例は [MESSAGES.md](MESSAGES.md) を参照する。
+受注直後は `SEAD mission accepted.` と計画中の通知だけを出し、MODEは計画確定のブリーフィングで初めて画面表示する。計画の20秒生成待ち説明と生成時のPilots一覧はDEBUGのみとする。座標・機種秘匿・PBコード・報酬／登録人数の表示は維持する。
 
 TOOの `THREAT AREA` は地域名から捜索用座標へ変更した。実配置予定点からランダム方位へ3～5 NMずらした座標を渡す。
 誤差の設定は `tooEstimateErrorMinNM` / `tooEstimateErrorMaxNM`。計画完成時に座標を固定し、その時のブリーフィングと `Mission Status` に同じ座標を表示する。

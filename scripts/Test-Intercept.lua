@@ -35,7 +35,8 @@ end)
 test("touchdown resets countdown until next takeoff", function()
     local s = scenario()
     s.generate(); s.player.airborne = true; s:tick(2)
-    s.player.airborne = false; s:tick(10); s:lastMessageContains("countdown reset")
+    s.player.airborne = false; s:tick(10)
+    assert(string.find(s.logs[#s.logs], "countdown reset", 1, true))
     s.player.airborne = true; s:tick(12)
     s:tick(22); s:tick(30); assert(#s.spawns == 0)
     s:tick(32); assert(#s.spawns == 1); s:assertClean()
@@ -162,7 +163,13 @@ test("three template draws preserve ME composition and display the actual enemy"
             local g = assert(s.spawns[1])
             assert(g.template == choice[1] and #g.units == choice[3])
             for _, unit in ipairs(g.units) do assert(unit:GetTypeName() == choice[2]) end
-            s:lastMessageContains("Hostiles: " .. choice[3] .. " x " .. choice[2])
+            s:lastMessageContains("Intercept MISSION START")
+            assert(not string.find(s.messages[#s.messages].text, "Hostiles:", 1, true))
+            local found = false
+            for _, text in ipairs(s.logs) do
+                if string.find(text, "Hostiles: " .. choice[3] .. " x " .. choice[2], 1, true) then found = true end
+            end
+            assert(found)
             assert(string.find(s.logs[#s.logs], "template=" .. choice[1], 1, true))
             assert(g.route and g.formation and g.openFire and #s.randomValues == 0)
             s.randomValues = { 80, 30000, 60, 5, 3 }; s.generate()
@@ -232,7 +239,7 @@ test("new assignments redraw templates and concurrent wings remain independent",
     end
 end)
 
-test("solo and MP2 show one start briefing; acceptance does not repeat countdown instructions", function()
+test("solo and MP2 show one range altitude aspect start; hostiles countdown and pilots stay debug-only", function()
   for _, mp2 in ipairs({ false, true }) do
     for _, airborne in ipairs({ false, true }) do
         local s = scenario()
@@ -245,7 +252,13 @@ test("solo and MP2 show one start briefing; acceptance does not repeat countdown
             end
             return n
         end
+        local function logs(fragment)
+            local n = 0
+            for _, text in ipairs(s.logs) do if string.find(text, fragment, 1, true) then n = n + 1 end end
+            return n
+        end
         s.generate()
+        assert(logs("MESSAGE [ALL]\nDynamic Training ready. Wing UCID scoring.") == 1)
         if not airborne then
             s:lastMessageContains("Waiting for ALL registered pilots to take off.")
             assert(messages("Hostiles will spawn") == 0)
@@ -253,25 +266,33 @@ test("solo and MP2 show one start briefing; acceptance does not repeat countdown
             if mp2 then s:command("Generate Intercept", s.wingman) end
             s.player.airborne, s.wingman.airborne = true, true
             s:event("Takeoff", s.player); s:tick(2); s:tick(4)
-            assert(messages("Hostiles will spawn") == 1)
+            assert(messages("Hostiles will spawn") == 0 and logs("Hostiles will spawn") == 1)
             s.player.airborne = false; s:tick(6)
-            s:lastMessageContains("countdown reset")
+            assert(messages("countdown reset") == 0 and logs("countdown reset") == 1)
             s.player.airborne = true; s:tick(8)
-            assert(messages("Hostiles will spawn") == 2)
+            assert(messages("Hostiles will spawn") == 0 and logs("Hostiles will spawn") == 2)
             for time = 10, 26, 2 do s:tick(time) end
             assert(messages("Intercept MISSION START") == 0)
             s:tick(28)
         else assert(messages("Hostiles will spawn") == 0) end
         s:lastMessageContains("Intercept MISSION START")
+        local text, spawn = s.messages[#s.messages].text, s:mission().spawn
+        assert(not string.find(text, "Hostiles:", 1, true))
+        assert(string.find(text, "Range: " .. spawn.distance .. " NM", 1, true))
+        assert(string.find(text, "Altitude: " .. spawn.altitude .. " ft", 1, true))
+        assert(string.find(text, "Aspect: HOT", 1, true) and not string.find(text, "Pilots:", 1, true))
         assert(s.messages[#s.messages].seconds == 15)
         s.generate()
         if mp2 then s:command("Generate Intercept", s.wingman) end
         s:event("Takeoff", s.player)
         s:tick(32); s:tick(34)
         assert(#s.spawns == 1 and messages("Intercept MISSION START") == 1)
+        assert(logs("[DEBUG] " .. s:mission().id .. "\nIntercept MISSION START") == 1)
+        assert(logs("MESSAGE [" .. s.player.group:GetName() .. "]\n" .. text) == 1)
+        assert(logs("Pilots:") == 1)
         s:command("Mission Status"); s:lastMessageContains("Intercept: ACTIVE")
         assert(s.messages[#s.messages].seconds == 20)
-        assert(messages("Intercept MISSION START") == 1)
+        assert(messages("Intercept MISSION START") == 1 and logs("Intercept MISSION START") == 2)
         s:assertClean()
     end
   end

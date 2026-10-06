@@ -1,10 +1,14 @@
 -- Runtime entry. Build-Mission.ps1 prepends the local gameplay modules.
+local function GlobalMessage(text, seconds)
+    env.info("[DynamicTraining] MESSAGE [ALL]\n" .. text)
+    trigger.action.outText(text, seconds)
+end
 if DynamicTrainingRuntime then
-    trigger.action.outText("Dynamic Training is already loaded.", 10)
+    GlobalMessage("Dynamic Training is already loaded.", 10)
     return
 end
 if not BASE or not SPAWN or not MENU_GROUP then
-    trigger.action.outText("ERROR: Load MOOSE before DynamicTraining.", 15)
+    GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
 DynamicTrainingRuntime = { version = "SEAD-DEAD-follow-on-trial-7" }
@@ -15,11 +19,19 @@ local nextPlayerScan = 0
 local ScanPlayers
 
 local function Message(group, text, seconds)
-    if group then pcall(function() MESSAGE:New(text, seconds or 10):ToGroup(group) end) end
+    if group then pcall(function()
+        env.info("[DynamicTraining] MESSAGE [" .. group:GetName() .. "]\n" .. text)
+        MESSAGE:New(text, seconds or 10):ToGroup(group)
+    end) end
 end
 
 local function Log(text)
     env.info("[DynamicTraining] " .. text)
+end
+
+local function DebugLog(record, text)
+    local id = record.id or (record.category .. " assignment " .. record.assignmentID)
+    Log("[DEBUG] " .. id .. "\n" .. text)
 end
 
 local function Safe(label, group, callback)
@@ -192,8 +204,9 @@ local function Start(record)
     if record.category == "DEAD" then
         record.state, record.deadStartedAt = "ACTIVE", timer.getTime()
         for _, p in ipairs(record.participants) do if not p.done then p.state = "ACTIVE" end end
-        Message(record.group, record.deadBriefing .. "\nDEAD TRAINING START\nRemaining targets: " ..
-            DEAD.Remaining(record), Config.coordinateBriefingSeconds)
+        local text = "DEAD TRAINING START\nObjective: destroy all remaining SAM site vehicles; then RTB."
+        DebugLog(record, record.deadBriefing .. "\n" .. text .. "\nRemaining targets: " .. DEAD.Remaining(record))
+        Message(record.group, text, 25)
         Log(record.id .. " started using retained site " .. record.site.id)
         return
     end
@@ -209,9 +222,11 @@ local function Start(record)
         record.site = SEADSites.Register(record)
         local pilots = BeginScoring(record, Config.sead.fullReward)
         -- The full briefing was shown when planning completed; status can recall it.
-        Message(record.group, "SEAD TRAINING START" ..
-            string.format("\nObjective: destroy primary emitter, or damage it and keep radar OFF for %g seconds; then RTB.\nPilots: %s",
-                spawn.suppressionHoldSeconds, table.concat(pilots, ", ")), 25)
+        local text = "SEAD TRAINING START" .. string.format(
+            "\nObjective: destroy primary emitter, or damage it and keep radar OFF for %g seconds; then RTB.",
+            spawn.suppressionHoldSeconds)
+        DebugLog(record, text .. "\nPilots: " .. table.concat(pilots, ", "))
+        Message(record.group, text, 25)
         Log(record.id .. " started; mode=" .. record.plan.attackMode .. " template=" .. spawn.template .. " zone=" .. spawn.zone)
         return
     end
@@ -224,9 +239,12 @@ local function Start(record)
     end
     record.spawn, record.state = spawn, "ACTIVE"
     local pilots = BeginScoring(record, Config.fullReward)
-    Message(record.group, string.format(
-        "Intercept MISSION START\nHostiles: %s\nRange: %d NM\nAltitude: %d ft\nAspect: HOT\nPilots: %s",
-        spawn.composition, spawn.distance, spawn.altitude, table.concat(pilots, ", ")), 15)
+    local details = string.format(
+        "Range: %d NM\nAltitude: %d ft\nAspect: HOT",
+        spawn.distance, spawn.altitude)
+    DebugLog(record, "Intercept MISSION START\nHostiles: " .. spawn.composition .. "\n" .. details ..
+        "\nPilots: " .. table.concat(pilots, ", "))
+    Message(record.group, "Intercept MISSION START\n" .. details, 15)
     Log(record.id .. " started; registered pilots=" .. tostring(#pilots) ..
         " template=" .. spawn.template ..
         " formation=" .. spawn.formation .. "/" .. spawn.formationSpacing)
@@ -276,11 +294,15 @@ local function Generate(groupName, category)
             else Message(group, "No preserved SAM sites available for DEAD.", 15) end
             return
         end
+        Message(group, "DEAD mission accepted.", 10)
+        local briefing = record.deadBriefing .. string.format("\nReward per pilot: %d points.\nRegistered pilots: %d.",
+            record.fullReward, #record.participants)
+        DebugLog(record, briefing .. "\nRemaining targets: " .. #record.deadTargets ..
+            (airborne and "" or "\nSite reserved. Waiting for ALL registered pilots to take off."))
+        Message(group, briefing, Config.coordinateBriefingSeconds)
         if airborne then Start(record) else
             record.state = "ARMED"
             for _, p in ipairs(record.participants) do p.state = "ARMED" end
-            Message(group, record.deadBriefing .. "\nSite reserved. Waiting for ALL registered pilots to take off.",
-                Config.coordinateBriefingSeconds)
         end
         return
     end
@@ -300,8 +322,8 @@ local function Generate(groupName, category)
         end
         record.selection, record.plan, record.state = job, job.plan, "PLANNING"
         for _, p in ipairs(record.participants) do p.state = "PLANNING" end
-        Message(group, "SEAD mission accepted.\nMODE: " .. record.plan.attackMode ..
-            "\nMission planning in progress.", 10)
+        DebugLog(record, "SEAD mission accepted.\nMODE: " .. record.plan.attackMode .. "\nMission planning in progress.")
+        Message(group, "SEAD mission accepted.\nMission planning in progress.", 10)
         return
     end
     local _, airborne = Ready(record)
@@ -626,9 +648,13 @@ local function TickMission(record, time)
             -- plan supplies briefing data, including after departure/spawn.
             record.state = "ARMED"
             for _, p in ipairs(record.participants) do if not p.done then p.state = "ARMED" end end
-            Message(record.group, SEAD.Briefing(record.plan) .. string.format(
-                "\nReward per pilot: %d points.\nRegistered pilots: %d.\nGround acceptance: SAM spawns %d seconds after ALL registered pilots take off.",
-                Config.sead.fullReward, #record.participants, Config.takeoffDelaySeconds), Config.coordinateBriefingSeconds)
+            local briefing = SEAD.Briefing(record.plan) .. string.format(
+                "\nReward per pilot: %d points.\nRegistered pilots: %d.",
+                Config.sead.fullReward, #record.participants)
+            DebugLog(record, briefing .. string.format(
+                "\nGround acceptance: SAM spawns %d seconds after ALL registered pilots take off.\n",
+                Config.takeoffDelaySeconds) .. SEAD.Instructions(record.plan))
+            Message(record.group, briefing, Config.coordinateBriefingSeconds)
             local _, airborne = Ready(record)
             if record.airborneAtAcceptance and airborne then Start(record) end
         end
@@ -646,13 +672,13 @@ local function TickMission(record, time)
         elseif not airborne then
             if record.spawnAt then
                 record.spawnAt, record.state = nil, "ARMED"
-                Message(record.group, record.category .. " countdown reset. Waiting for all registered pilots to take off.")
+                DebugLog(record, record.category .. " countdown reset. Waiting for all registered pilots to take off.")
             end
         elseif record.category == "DEAD" then
             Start(record) -- Existing SAM is already present; no spawn delay.
         elseif not record.spawnAt then
             record.spawnAt, record.state = time + Config.takeoffDelaySeconds, "TAKEOFF_DELAY"
-            Message(record.group, string.format("All registered pilots airborne. Hostiles will spawn in %d seconds.",
+            DebugLog(record, string.format("All registered pilots airborne. Hostiles will spawn in %d seconds.",
                 Config.takeoffDelaySeconds))
         elseif time >= record.spawnAt then
             record.spawnAt = nil
@@ -762,4 +788,4 @@ end
 
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
-trigger.action.outText("Dynamic Training ready. Wing UCID scoring.\n" .. Persistence.Status(), 10)
+GlobalMessage("Dynamic Training ready. Wing UCID scoring.\n" .. Persistence.Status(), 10)

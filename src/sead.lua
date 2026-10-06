@@ -271,12 +271,17 @@ function SEAD.Briefing(plan)
         or "Planning in progress"
     local text = "SEAD MISSION\nMODE: " .. plan.attackMode
     if plan.attackMode == "TOO" then
-        return text .. "\nTHREAT AREA: " .. location .. "\nTARGET TYPE: UNKNOWN\nINSTRUCTIONS:\n" ..
-            "Search near the reported area and engage the hostile radar emitter using HARM TOO mode."
+        return text .. "\nTHREAT AREA: " .. location .. "\nTARGET TYPE: UNKNOWN"
     end
     text = text .. "\nTHREAT AREA: " .. plan.areaLabel
     return text .. "\nTHREAT: " .. plan.samType .. "\nESTIMATED LOCATION: " .. location ..
-        string.format("\nHARM PB CODE: %03d\nINSTRUCTIONS:\nEngage the emitter using HARM PB mode, then RTB.", plan.pbCode)
+        string.format("\nHARM PB CODE: %03d", plan.pbCode)
+end
+
+function SEAD.Instructions(plan)
+    return "INSTRUCTIONS:\n" .. (plan.attackMode == "TOO"
+        and "Search near the reported area and engage the hostile radar emitter using HARM TOO mode."
+        or "Engage the emitter using HARM PB mode, then RTB.")
 end
 
 -- Objective transitions live in a dedicated module, independent of placement.

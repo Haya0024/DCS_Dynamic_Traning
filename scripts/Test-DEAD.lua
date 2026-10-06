@@ -212,8 +212,16 @@ test("Follow-on DEAD briefing exposes existing site information without internal
     module(s, "Config").coordinateBriefingSeconds = 90
     s.env.COORDINATE.ToStringLLDMS = function() error("Follow-on DEAD must display DDM") end
     followOnDead(s)
-    local text = s.messages[#s.messages].text
-    assert(s.messages[#s.messages].seconds == 90)
+    local text, briefings = nil, 0
+    for _, message in ipairs(s.messages) do
+        if string.find(message.text, "DEAD MISSION\n", 1, true) then
+            text, briefings = message.text, briefings + 1
+            assert(message.seconds == 90)
+        end
+    end
+    assert(text and briefings == 1)
+    s:lastMessageContains("DEAD TRAINING START")
+    assert(s.messages[#s.messages].seconds == 25 and not string.find(s.messages[#s.messages].text, "SITE LOCATION", 1, true))
     local location = s.env.COORDINATE:NewFromVec2(site.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
     for _, expected in ipairs({ "DEAD MISSION", "AREA: Palmyra", "TARGET SITE: SA-6", "Primary radar destroyed", "SITE LOCATION:\n" .. location }) do
         assert(string.find(text, expected, 1, true), text)
@@ -235,7 +243,15 @@ test("ground Follow-on DEAD reserves immediately, snapshots at acceptance and st
     s.player.airborne = true; s:tick(s.time + 1); assert(r.state == "ARMED")
     s.wingman.airborne = true; s:tick(s.time + 2)
     assert(r.state == "ACTIVE" and r.deadStartedAt == s.time and not r.spawnAt and #s.spawns == 1)
-    assert(s.messages[#s.messages].seconds == 60)
+    s:lastMessageContains("DEAD TRAINING START")
+    assert(s.messages[#s.messages].seconds == 25)
+    local briefings, accepted = 0, 0
+    for _, message in ipairs(s.messages) do
+        if string.find(message.text, "DEAD MISSION\n", 1, true) then briefings = briefings + 1 end
+        if message.text == "DEAD mission accepted." then accepted = accepted + 1; assert(message.seconds == 10) end
+        assert(not string.find(message.text, "Site reserved. Waiting", 1, true))
+    end
+    assert(briefings == 1 and accepted == 1 and not string.find(s.messages[#s.messages].text, "SITE LOCATION", 1, true))
     assert(#r.deadTargets == 3); s:assertClean()
 end)
 
@@ -741,7 +757,7 @@ test("SA6 destroyed radar with one or three live launchers supports both DEAD pa
             local dead = source
             if immediate then s:command("Continue as DEAD") else
                 s:command("Preserve Site for DEAD"); recover(s); dead = followOnDead(s)
-                s:lastMessageContains("STATUS: Primary radar destroyed")
+            s:command("Mission Status"); s:lastMessageContains("STATUS: Primary radar destroyed")
             end
             assert(dead.spawn.group == g and #dead.deadTargets == remaining and #s.spawns == 1)
             for _, target in ipairs(dead.deadTargets) do assert(target.unit.kind == "Kub 2P25 ln") end
@@ -759,7 +775,7 @@ test("SA6 suppression snapshots its surviving radar and launchers in Immediate a
         local dead = source
         if immediate then s:command("Continue as DEAD") else
             s:command("Preserve Site for DEAD"); recover(s); dead = followOnDead(s)
-            s:lastMessageContains("STATUS: Previously suppressed")
+            s:command("Mission Status"); s:lastMessageContains("STATUS: Previously suppressed")
         end
         assert(#dead.deadTargets == 4 and dead.deadTargets[1].unit == g.units[1])
         assert(g.units[1].alive and g.units[1].life == 99 and not g.units[1].radarEmitting)

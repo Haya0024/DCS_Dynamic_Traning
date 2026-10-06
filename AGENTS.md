@@ -102,7 +102,7 @@ Intercept ミッションを待機状態にする。
 - 高度は一定範囲からランダム
 - 生成には `intercept.templates` の3候補から各1/3の確率で選んだテンプレートを使用する
 
-Interceptの地上受注通知は人数と全員離陸待ちに絞る。20秒の生成待ちは全員の離陸検出時に1回、詳細な開始表示は生成成功時に1回だけ出し、通常の監視やメニュー更新で再掲しない。
+Interceptの地上受注通知は人数と全員離陸待ちに絞る。20秒の生成待ち・カウントリセット・Hostiles・PilotsはDCSログの `[DEBUG]` のみに出す。画面の開始通知は `Intercept MISSION START` とRange・Altitude・Aspect: HOTを15秒で1回だけ出し、デバッグにはHostilesとPilotsも残す。通常画面メッセージも同じ本文をDCSログのMESSAGEへ記録し、グローバル初期化通知も対象とする。
 
 将来的には以下を追加する。
 
@@ -142,7 +142,8 @@ BLUE 空港への RTB を追加評価対象とする。
 - 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
 - TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。
 - TOOの捜索座標とPBの推定座標はDDM（度＋小数分、分の小数3桁）で計画確定時とMission Statusに表示する。MOOSEのToStringLLDDMへ精度3を明示し、全体の表示設定から独立させる。
-- SEADの座標付きブリーフィングは計画確定時に1回だけ自動表示する。受注直後は方式と計画中の通知、生成時は短い開始通知とし、離陸待ち・カウントダウン再開・監視で座標を再掲しない。Mission Statusでは同じ計画情報を任意に再確認できる。
+- SEADの座標付きブリーフィングは計画確定時に1回だけ自動表示する。受注直後は受注と計画中の通知だけでMODEはDEBUGのみ、方式は計画確定時に画面へ出す。計画のGround acceptance説明と生成時のPilots一覧はDEBUGのみ。生成時は短い開始通知とし、離陸待ち・カウントダウン再開・監視で座標を再掲しない。Mission Statusでは同じ計画情報を任意に再確認できる。
+- SEADの20秒生成待ち・カウントリセット・TOO/PBのHARM攻撃指示は画面／Statusから除外し、DCSデバッグログだけに出す。計画確定時のデバッグログには通常ブリーフィングと攻撃指示をまとめる。座標・UNKNOWN・PB機種／コード・秘匿条件は維持する。
 - SEAD / DEADの座標付きブリーフィングと座標を含むMission Statusは共通設定 `coordinateBriefingSeconds`（初期60秒）で表示時間を決める。
 - 計画と実体生成を分離する。受注時から全員が空中なら計画確定後に生成、地上受注なら全登録者の離陸後20秒で生成する。生成時に計画を再抽選しない。
 - LAND、半径200 m内の標高差20 m以内、各車両が建物・障害物から200 m以上離れることを検査する。
@@ -175,6 +176,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - RETAINは同じミッション実行中の次Sortie向け保持であり、Site・生成Group・進行中任務はミッション再開始／サーバー再起動後に復元しない。永続保存するのはUCIDごとの精算済み成績だけ。
 - 通常の `Generate DEAD` は保持予約先が受注Wingと一致するRETAIN、または明示開放された期限内のAVAILABLE Siteから、使用中assignmentがない最寄り候補を取得。専用保持の候補選定と使用予約では両方でWing所有を照合する。既存のWing/UCID排他とSite使用予約を併用し、準備失敗では使用予約と任務ロックをrollbackし、元の保持予約・未予約時刻を維持する。同UCIDでも別グループのスロットは別Wingとする。
 - Follow-on DEADは新しいDEAD recordをAcquireし、受注時の生存RED ground targetsを固定。地上ならARMED、全員離陸検出でACTIVEへ移行する。既存SAMを隠さず、20秒のSpawn待ちは設けない。
+- Follow-on DEADの表示もSEAD型とし、短い受注通知10秒→受注時座標ブリーフィング60秒設定を1回→座標なし開始通知25秒にする。地上からの離陸後に座標を自動再掲しない。予約待ち・開始時の残数等はDEBUGに残し、Mission Statusで座標・残数を任意確認できる。
 - DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
 - Site/DEAD対象のIsAliveはtrue=生存、false=死亡、nil=観測不能とする。未確認対象のnil・例外・不正値・ID不一致を全滅根拠にせず、Site残数は不明・継続候補から除外、DEADは残存側に数える。観測不能ログは移行時だけ記録する。明示死亡のlostを優先し、Group一覧欠落だけでも既知対象を全滅扱いしない。
 - Follow-on DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Estimated表現は使わず、SEAD TOO/PBの推定点と秘匿表示は維持する。
@@ -463,6 +465,7 @@ DCS-Dynamic-Training/
 
 ### 機能別仕様書
 
+- 全任務の画面メッセージ・DCSログ・出力タイミング・表示時間は `docs/MESSAGES.md` に整理する。表示動作を変更したらこの一覧も合わせる。
 - 機能単位の仕様書を `docs/<機能名>.md` に作成する。Intercept は `docs/Intercept.md`、SEAD は `docs/SEAD.md`、DEADは `docs/DEAD.md` を参照する。
 - 仕様書では、現在の実装・既知の制約・将来仕様を区別する。
 - 機能の動作や設定値を変更したら、対応する仕様書も同じ作業で更新する。

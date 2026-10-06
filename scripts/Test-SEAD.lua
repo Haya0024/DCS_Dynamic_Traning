@@ -27,7 +27,7 @@ local function setup(templateIndex, options)
 end
 local function generate(s)
     s:command("Generate SEAD")
-    s:lastMessageContains("MODE:")
+    s:lastMessageContains("SEAD mission accepted.")
 end
 local function status(s, expected, pilot)
     s:command("Mission Status", pilot); s:lastMessageContains("SEAD: " .. expected)
@@ -444,7 +444,11 @@ end)
 
 test("missing UCID remains unscored after SEAD clearance and recovery", function()
     local s, g = started(2, { unscored = true })
-    s:lastMessageContains("(unscored)"); destroyRadar(s, g)
+    local unscored = false
+    for _, text in ipairs(s.logs) do
+        if string.find(text, "[DEBUG]", 1, true) and string.find(text, "(unscored)", 1, true) then unscored = true end
+    end
+    assert(unscored); destroyRadar(s, g)
     recover(s)
     s:lastMessageContains("Unscored sortie (UCID unavailable).")
     s:command("Player Statistics"); s:lastMessageContains("UCID unavailable; unscored.")
@@ -1006,7 +1010,8 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
         end
         generate(s)
         s:lastMessageContains("SEAD mission accepted.")
-        s:lastMessageContains("MODE: " .. (mode == 1 and "TOO" or "PB"))
+        assert(not string.find(s.messages[#s.messages].text, "MODE:", 1, true))
+        assert(string.find(s.logs[#s.logs - 1], "MODE: " .. (mode == 1 and "TOO" or "PB"), 1, true))
         assert(briefings() == 0)
         s:tick(1); assert(s:mission().state == "PLANNING" and briefings() == 0)
         s:tick(2); assert(briefings() == 1)
@@ -1021,6 +1026,16 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
             end
         end
         assert(string.find(briefing, label .. location, 1, true))
+        assert(not string.find(briefing, "INSTRUCTIONS", 1, true))
+        assert(not string.find(briefing, "Ground acceptance:", 1, true))
+        local instruction = mode == 1 and "Search near the reported area" or "Engage the emitter using HARM PB mode"
+        local foundDebug = false
+        for _, text in ipairs(s.logs) do
+            if string.find(text, "[DEBUG]", 1, true) and string.find(text, instruction, 1, true)
+                and string.find(text, label .. location, 1, true)
+                and string.find(text, "Ground acceptance: SAM spawns 20 seconds", 1, true) then foundDebug = true end
+        end
+        assert(foundDebug)
         if mode == 1 then
             assert(not string.find(briefing, "HARM PB CODE", 1, true))
             assert(not string.find(briefing, "SA-6", 1, true))
@@ -1029,12 +1044,19 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
             assert(#s.spawns == 0)
             s:tick(3); s:tick(5); assert(briefings() == 1)
             s.player.airborne = true; s:tick(7)
-            s:lastMessageContains("Hostiles will spawn in 20 seconds.")
+            assert(string.find(s.logs[#s.logs], "Hostiles will spawn in 20 seconds.", 1, true))
             s.player.airborne = false; s:tick(9)
-            s:lastMessageContains("countdown reset")
+            assert(string.find(s.logs[#s.logs], "SEAD countdown reset", 1, true))
             s.player.airborne = true; s:tick(11); s:tick(31)
         end
         s:lastMessageContains("SEAD TRAINING START")
+        assert(not string.find(s.messages[#s.messages].text, "Pilots:", 1, true))
+        local debugPilots = false
+        for _, text in ipairs(s.logs) do
+            if string.find(text, "[DEBUG]", 1, true) and string.find(text, "SEAD TRAINING START", 1, true)
+                and string.find(text, "Pilots:", 1, true) then debugPilots = true end
+        end
+        assert(debugPilots)
         assert(not string.find(s.messages[#s.messages].text, location, 1, true))
         assert(not string.find(s.messages[#s.messages].text, "HARM PB CODE", 1, true))
         assert(#s.spawns == 1 and briefings() == 1)
@@ -1042,10 +1064,16 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
         assert(briefings() == 1 and r.state == "ACTIVE")
         for n = 1, 2 do
             status(s, "ACTIVE"); s:lastMessageContains(label .. location)
+            assert(not string.find(s.messages[#s.messages].text, "INSTRUCTIONS", 1, true))
             assert(s.messages[#s.messages].seconds == duration)
             assert(briefings() == 1 + n)
         end
         s:tick(36); assert(briefings() == 3)
+        for _, message in ipairs(s.messages) do
+            assert(not string.find(message.text, "Hostiles will spawn", 1, true))
+            assert(not string.find(message.text, "countdown reset", 1, true))
+            assert(not string.find(message.text, instruction, 1, true))
+        end
         s:assertClean()
     end
   end

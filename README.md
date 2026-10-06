@@ -117,6 +117,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 | [Scoring](docs/SCORING.md) | UCID、帰還評価、採点と保存の制約 |
 | [Persistence](docs/PERSISTENCE.md) | サーバーHookの導入、成績保存・復元、バックアップ |
 | [Testing](docs/TESTING.md) | 自動テストの実行方法、DCS内の確認手順 |
+| [Messages](docs/MESSAGES.md) | 全任務の画面メッセージ・DCSログ、タイミング、表示時間 |
 | [AGENTS.md](AGENTS.md) | 設計方針と開発ルール |
 
 ## 開発・Luaの反映

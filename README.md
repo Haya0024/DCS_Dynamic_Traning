@@ -1,4 +1,4 @@
-# DCS Dynamic Training Syria
+# Persistent and Dynamic F/A-18C Training
 
 DCS World の Syria マップで、F/A-18C の迎撃・防空制圧・防空サイト破壊を繰り返し練習するための動的訓練ミッションです。
 F10から任務を受注すると敵が配置され、目標達成後は味方基地や空母への帰還まで評価します。
@@ -126,6 +126,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 | [Persistence](docs/PERSISTENCE.md) | サーバーHookの導入、成績保存・復元、バックアップ |
 | [Testing](docs/TESTING.md) | 自動テストの実行方法、DCS内の確認手順 |
 | [Messages](docs/MESSAGES.md) | 全任務の画面メッセージ・DCSログ、タイミング、表示時間 |
+| [Briefing](docs/BRIEFING.md) | Mission Editorへ貼り付ける日本語・英語のミッション説明 |
 | [AGENTS.md](AGENTS.md) | 設計方針と開発ルール |
 
 ## 開発・Luaの反映

@@ -653,7 +653,7 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 同日の座標表示時間延長・Intercept受注通知整理後はLua全227ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD80）が通過した。表示時間の初期60秒と設定変更後90秒、Intercept開始表示1回を模擬検証。BUILDの2確認グループ、SYNCの3確認グループ、実ミッションのLua同期・Checkも成功。DCS内の表示時間・回数確認は未実施。
 同日の成績永続化実装後はLua全247ケース（既存227＋PERSIST20）、BUILD2確認グループ、SYNC3確認グループ、INSTALL3確認グループが通過した。INSTALLでは実ファイル保存・別Luaプロセスでの復元・破損primaryのbackup復旧も確認。実ミッションのLua同期・Checkも成功。DCS内のHook接続・再起動復元・停止callback順は未確認。
 同日のImmediate DEAD未達成からのSEAD帰還修正後はLua全253ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD86、PERSIST20）、BUILD2、SYNC3、INSTALL3確認グループが通過した。未達成RTBのSEAD150／DEAD0、MP2個別精算と僚機継続、復行、確認中事故、確認中DEAD達成を模擬検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-42/43は未確認。
-同日、ユーザー承認後に `C:\Users\hayat\Saved Games\DCS\Scripts\Hooks\DynamicTrainingPersistenceHook.lua` へ導入し、生成bundleとのハッシュ一致を確認した。DCS再起動後の実機確認は未実施。
+同日、ユーザー承認後に `Saved Games/<ユーザーフォルダー>/Scripts/Hooks/DynamicTrainingPersistenceHook.lua` へ導入し、生成bundleとのハッシュ一致を確認した。DCS再起動後の実機確認は未実施。
 同日の保存Hook通信修正後はLua全258ケース（既存233＋PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。Hookとミッションの別Lua環境・文字列通信・API拒否・不正返信・再接続、ホスト設定の保持・backup・idempotence・不正設定拒否を検証。実ミッションのLua同期・Checkも成功。ユーザー承認後に実Saved GamesのHookとautoexec.cfgをbackup付きで更新し、Hookハッシュ一致・既存DLSS設定維持・userhooks→server許可ブロック1件を確認した。DCS再起動後の接続・精算保存・再起動復元は未確認。
 同日のPreserve元Wing専用予約への変更後はLua全262ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD90、PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。元SEAD精算・再武装後の保持予約、別Wing拒否、同Wing内最寄り選択、所有者不明時の拒否、rollback後の保持予約維持、同UCIDの別Wing移動を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-30/44は未確認。
 
@@ -693,6 +693,8 @@ CAP-trial-1追加後はLua全342ケース（INT16、CAP30、SCORE26、WING27、P
 2026-10-06 20:17〜20:56 JST、CAP-trial-1、DCS 2.9.30.28718（Windows MT）、ユーザーのマルチプレイホスト、標準設定で2回のCAP実行をログ検証した。run2:CAP:1（Beirut）はGolan/Su-27×1、進入20:30:19→24/48/72/96/120秒の通知、65秒で生成、時間達成後の敵全滅20:33:12、UnitLost20:33:25で90点。run2:CAP:2（空母）はGolan/MiG-29A×2、進入20:53:29→同じ通知、74秒で生成、120秒後も敵残存、1機撃破後のUnitLost20:56:23で0点。両任務の敵交戦・任務ロック終了と、revision1/2保存・Stop最終確認を記録。終了後schema2/run2/revision2の保存fileをcodecで読取検証し、Total/Career/CAP各90、任務2、Primary成功1、帰還失敗1、未達成失敗1、Death2が一致した。証跡はbuild/cap-live-20261006.log（元dcs.logのUTC表記をJSTへ換算）。任務関連Luaエラーなし。MAN-52/53/55の一部条件のみ確認済みであり、退出停止/再開・敵全滅先行・帰還150・MP2/並行・次セッションの90点復元は未実施。全ケースPASSとは扱わない。
 
 同日のCAP表示整理後は、CAP-01/03/25で受注/Statusの `CAP AREA: <DDM>`、Radius/PATROL CENTER行の非表示、進入時 `CAP on station.` のみを検証した。Lua全342ケース、BUILD2、SYNC3が通過し、実Syria.mizのSync/Checkも成功。時計・敵生成・達成・採点条件は変更していない。整理後の実DCS表示はMAN-52で確認待ち。
+
+2026-10-06 21:15〜21:16 JST、DCS更新後の2.9.30.28738（Windows MT）、同PCでのホスト実行を確認した。21:15:44のrun3/source=primary接続・保存確認と21:16:47のStop最終確認が成功。終了後primary schema2/run3/revision0とbackup run2/revision2を読取codec検証し、Total/Career/CAP各90、既存統計を保持していた。Hookと生成bundleのhash一致、autoexec.cfgの既知hash一致。更新後の接続失敗ログはない。MAN-51/55の次セッションへの累計引継ぎ部分を確認したが、Statistics画面・更新後の新規精算・帰還150・得点付き旧schema移行は未実施。証跡はbuild/persistence-update-20261006.log。実成績への直接書込みや実装修正は行っていない。
 
 手動・回帰確認の記録には、次の形式を使う。結果は `PASS / FAIL / 未実施 / 条件未成立` のいずれかとする。
 

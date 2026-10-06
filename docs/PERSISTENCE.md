@@ -78,7 +78,7 @@ fileのwrite/flush/closeは例外・false・エラー返信を拒否するが、
 次を実行する。専用モジュールを結合した1つのHookを配置し、既存の別Hookには触れない。同名の旧ファイルは更新前にbackupする。
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Install-PersistenceHook.ps1 -SavedGamesPath "C:\Users\hayat\Saved Games\DCS" -ConfigureHost
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Install-PersistenceHook.ps1 -SavedGamesPath "$env:USERPROFILE\Saved Games\DCS" -ConfigureHost
 ```
 DCSを再起動し、更新した `.miz` を使用する。参加者側のHook配置は不要。
 `-ConfigureHost` は既存autoexec.cfgをbackupし、管理用ブロックを追加する。再実行では内容が同じなら書き換えない。不完全・重複した管理ブロックや不正な文字コードでは変更を拒否する。DLSS等の既存設定、別Hook、MissionScripting.lua、保存済み成績は変更しない。
@@ -121,3 +121,5 @@ Lua全309ケース（PERSIST41）、BUILD2、SYNC3、INSTALL5が通過。最終H
 DCS終了後のscores.datは34 bytes、codec検証成功、counter/session=1、revision=0、accounts=0。ここまで確認できたのは空の成績の初期保存とrun採番であり、実ポイントの保存や再起動後の復元ではない。実プレイヤーの150/90/0精算→保存確認→ミッション再開始/DCS再起動の検証は引き続き必要。確認のために実成績を直接書き換えていない。
 
 同日20:17〜20:56 JST、CAP対応schema2 Hookでrun2/source=primaryの接続を確認。CAP:1の達成後UnitLostで90点を精算し、SNAPSHOT_COMMITTED revision1。CAP:2の未達成UnitLostで0点を精算しrevision2、Stopで最終snapshotと確認成功。終了後scores.datを読取検証し、schema2/run2/revision2、Total/Career/CAP各90、任務2・Primary成功1・帰還失敗1・未達成失敗1・Death2を確認。実ポイント保存は確認済み。今回のrun開始時の旧成績は空だったため、得点を持つ旧schema移行・次セッションでの90点復元・帰還150点保存はまだ実DCSで未確認。保存fileの直接編集は行っていない。
+
+同日21:15〜21:16 JST、ユーザーからDCS更新後の保存障害の疑いが報告されたため、このPCの最新ログと保存fileを確認した。DCSは2.9.30.28718から2.9.30.28738へ更新済み。21:15:44にBOOTSTRAP_COMMITTED run3/source=primary、storage and acknowledgement confirmed、CONNECTED、21:16:47にStopの最終snapshot/確認成功を記録。Hookは生成bundleと同一hash、autoexec.cfgも既知のhashと一致。終了後primaryはschema2/run3/revision0、backupはschema2/run2/revision2で、両方codec検証に通りTotal/Career/CAP各90と既存統計を保持していた。更新後の初期接続・新runへの累計引継ぎ・正常終了は確認済み。このログではStatistics操作や新規精算がなく、更新後の新ポイント保存と画面表示は未確認。保存fileやHookへの修正は行っていない。

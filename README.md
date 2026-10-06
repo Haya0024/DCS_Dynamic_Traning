@@ -39,6 +39,7 @@ Intercept / SEADを地上で受注した場合は、登録参加者全員の離�
 ```text
 Dynamic Training
 ├─ Generate Intercept
+├─ Generate CAP
 ├─ Generate SEAD
 ├─ Generate DEAD
 ├─ Mission Status
@@ -50,6 +51,9 @@ Dynamic Training
 `Abort Mission` はウィング全体の中止です。参加者ごとの `Abort Sortie` が表示されている場合は、その人だけ離脱できます。
 
 BLUE所属の陸上AirbaseはF10上に青色Drawingで表示します。表示対象はruntimeでcoalitionから自動取得し、半径2,500 mの薄い青色Circleと `BLUE AIRBASE`・基地名をBLUE側だけに表示します。文字は基地中心から南へ1,000 mずらしています。Carrier・Ship・FARP・Helipadは対象外です。Allies OnlyとFog of Warの設定は維持します。詳細は [BLUE Airbase表示仕様](docs/MAP_OVERLAY.md) を参照してください。オフセット表示の見やすさはユーザーから改善報告がありますが、DCS内の全確認ケースは未実施です。
+
+`Generate CAP` はMEの4候補空域から1つを等確率で選び、受注時に `CAP AREA: <中心DDM>` を案内します。登録参加者の誰かが空中で空域内にいる間だけ120秒を積算し、全員退出中は停止、20%ごとに通知します。敵は同じ累計時間の30〜120秒で1編隊出現します。累計120秒と敵機全滅の両方で達成し、その後の帰還成功150／達成後事故90ポイントをCAP Scoreに記録します。仕様は [CAP](docs/CAP.md)。コードと模擬テストは実装済み。2026-10-06のDCSログでGolanの進捗・敵生成/交戦・達成後90点/未達成0点・CAP Score保存を確認しました。退出停止/再開、帰還150、MP2、再開始後の得点復元は確認待ちです。
+CAP Scoreの保存形式version2は従来のversion1をCAP=0で読み込めます。CAP導入版では保存Hookも更新し、DCSを再起動してください。
 
 ## SEADの後は、帰還も継続攻撃も選べる
 
@@ -100,6 +104,7 @@ DEADを倒しきれず帰還した場合も、SEAD 150 ptを精算できます�
 
 成績はUCIDで管理し、カテゴリ別スコアと累計・任務・帰還・出撃喪失の統計を表示します。サーバー用の保存Hookを導入すると、保存済みの成績をミッション再開始・サーバー再起動後も引き継ぎます。
 Statisticsには保存済み／保存待ち／未接続を表示します。Hookなしの場合はセッション内のみの記録です。導入手順は [Persistence](docs/PERSISTENCE.md) を参照してください。
+2026-10-06に実DCSでHook接続・初回保存・確認通知・正常終了を確認しました。実プレイヤーのポイント精算保存とDCS再起動後の成績復元は確認待ちです。
 ホストには保存HookとAPI通信の許可を導入します。installerの `-ConfigureHost` で既存autoexec.cfgを残して設定でき、ミッション側のio・lfsの制限解除は不要です。導入後はDCSを再起動してください。
 UCIDを照合できない場合も訓練は続けられますが、採点は行いません。
 
@@ -113,6 +118,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 | ドキュメント | 内容 |
 |---|---|
 | [Intercept](docs/Intercept.md) | 敵生成、開始条件、経路、目標判定 |
+| [CAP](docs/CAP.md) | 空域抽選、滞在時間、敵生成、時間＋全滅の達成条件 |
 | [SEAD](docs/SEAD.md) | TOO / PB、配置条件、レーダーの状態遷移 |
 | [DEAD](docs/DEAD.md) | 継続攻撃、サイト保持・予約・削除 |
 | [Wing](docs/WING.md) | 共有任務、参加者、受注ブロック、中止 |

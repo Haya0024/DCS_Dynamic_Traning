@@ -391,6 +391,48 @@ Other states appear literally, for example `DEAD: ARMED` and `DEAD: RTB PENDING`
 A pending spawn adds `Spawn in 12 seconds.`; an unknown site count displays `Site remaining vehicles: UNKNOWN`.
 Status shows all matching assignments in one message. Any coordinate-bearing assignment selects the coordinate duration.
 
+## Screen: CAP acceptance, patrol and completion
+
+`Generate CAP` uses the existing group menu. Acceptance is shown for 10 seconds:
+
+```text
+CAP mission accepted.
+```
+
+The accepted area briefing is then shown once for `coordinateBriefingSeconds` (default 60 seconds):
+
+```text
+CAP AREA: LL DDM 035° 00.000'N   035° 30.000'E
+Objective: patrol inside for 120 seconds AND destroy all hostiles.
+Registered pilots: 2.
+Reward per pilot: 150 points.
+```
+
+The following group messages last 10 seconds. Clock messages appear on transitions; each progress threshold appears once per assignment:
+
+| Trigger | Message |
+|---|---|
+| First eligible entry | `CAP on station.` |
+| All eligible pilots leave | `CAP patrol paused. Return to the assigned area.` |
+| Reentry | `CAP patrol resumed.` |
+| 24/48/72/96 seconds | `CAP patrol progress: 20%` / `40%` / `60%` / `80%` |
+| 120 seconds, hostiles alive | `CAP patrol progress: 100%` followed by `Patrol time complete. Destroy all remaining hostiles.` |
+| 120 seconds, hostiles gone | `CAP patrol progress: 100%` followed by `Patrol time complete.` |
+
+Both objectives complete — 20 seconds:
+
+```text
+CAP PRIMARY OBJECTIVE COMPLETE
+Patrol time complete and all hostile aircraft destroyed.
+Each pilot: return to a BLUE airfield or carrier.
+Reward per pilot: 150 points; recovery failure: 90 points.
+```
+
+`Mission Status` lasts 60 seconds for CAP and appends the accepted briefing, `Patrol: 40% (48/120 seconds)`, `Clock: RUNNING` / `WAITING / PAUSED` / `TIME COMPLETE`, and `Hostiles remaining: 2` / `0` / `NOT SPAWNED`. It does not redraw or reroll the area.
+CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant messages, points, totals and persistence status. Setup failure shows `ERROR: CAP setup failed. See DCS log; Generate CAP to retry.` for 20 seconds. A monitor/spawn failure settles each registered participant with `CAP setup/spawn failed. No reward.` for 20 seconds.
+Acceptance selection and actual spawn details are DEBUG only: `CAP accepted; zone=<name> template=<name> enemy at on-station second <n>` and `CAP enemy spawned; template=<name> units=<n> altitude=<n> ft`. No separate hostile spawn message appears on screen. Normal CAP group messages are mirrored to the DCS MESSAGE log.
+Idle status now includes `CAP: Idle.` after the existing category lines.
+
 ## Screen: Player Statistics — 25 seconds, requested manually
 
 ```text
@@ -400,6 +442,7 @@ Career Points: 450
 Intercept Score: 150
 SEAD Score: 150
 DEAD Score: 150
+CAP Score: 0
 Settled Missions: 2
 Primary Success: 2
 RTB Success: 2
@@ -424,10 +467,12 @@ Startup — global, 10 seconds:
 
 ```text
 Dynamic Training ready. Wing UCID scoring.
-Session only; persistence hook not connected.
+Persistence initialization pending.
 ```
 
-Other persistence lines, used at startup, settlement or statistics:
+Startup reports initialization pending while the asynchronous Hook is still connecting. It does not report a storage result. Settlement and Statistics use the current persistence status. A disabled configuration still shows the disabled line at startup.
+
+Other persistence lines, used at settlement or statistics (disabled also at startup):
 
 ```text
 Session only; persistence disabled.
@@ -511,7 +556,7 @@ Global example:
 ```text
 [DynamicTraining] MESSAGE [ALL]
 Dynamic Training ready. Wing UCID scoring.
-Session only; persistence hook not connected.
+Persistence initialization pending.
 ```
 
 DCS adds its own timestamp/severity outside these bodies. User-requested Status and Statistics are also mirrored. They may repeat when requested again.
@@ -696,13 +741,36 @@ Persistence Hook entries use logger `DynamicTrainingPersistence`:
 
 | Timing | Message body | Frequency |
 |---|---|---|
-| Hook attachment | `Connected via net.dostring_in(server)` | Once per mission attachment |
+| Hook attachment | `Connected via mission/a_do_script+scalar-sentinel; storage and acknowledgement confirmed.` | Once after the first successful storage/acknowledgement cycle |
+| Run allocation saved | `BOOTSTRAP_COMMITTED: run=<number>; source=<new/primary/backup>` | Once after the bootstrap file is verified |
+| Settlement snapshot saved | `SNAPSHOT_COMMITTED: run=<number>; revision=<number>` | Once per newly committed revision; acknowledgement is a separate step |
 | Backup recovery | `Recovered score backup` | When bootstrapping from the backup |
-| Missing bridge API | `DCS net.dostring_in unavailable; configure Config/autoexec.cfg: userhooks -> server, then restart DCS` | On failure; Lua may prepend a source line |
-| Storage load failure | `Score storage unreadable; primary/backup preserved` | On failure; Lua may prepend a source line |
+| Missing bridge API | `DCS persistence bridge API unavailable` | On failure; prefixed with `phase=PROTOCOL` and a Lua source line |
+| Invalid bridge reply | `DCS mission bridge rejected/invalid reply; replyType=<type>; replyBytes=<length>; status=<value>` | On failure; may append the fixed type-only `DTBRIDGE_INVALID:first=<type>;second=<type>` diagnostic, never payload content |
+| Storage load failure | `Score storage unreadable; primary/backup preserved; primary=<state>; backup=<state>; primaryDetail=<detail>; backupDetail=<detail>` | On failure; I/O details identify numeric errno or directory inspection failure, never score contents |
+| Native write failure | `Score write/flush/close failed; <operation return/error types>` | On failure; does not log snapshot contents |
 | Acknowledgement rejected | `Persistence acknowledgement rejected` | On failure; Lua may prepend a source line |
 
-The Hook polls approximately once per real-time second and on Simulation Stop. Repeated identical errors are suppressed until a different error or successful poll occurs. Normal idle polls, successful saves and acknowledgements have no separate log entry.
+Errors carry `phase=<PROTOCOL/DIRECTORY/LOAD/BOOTSTRAP/ATTACH/SNAPSHOT/VALIDATE/SAVE/ACK>`. The Hook polls approximately once per real-time second after Mission Load End, on the host. Repeated identical errors are suppressed until a different error or successful poll occurs. Idle polls and acknowledgements have no separate log entry. Stop performs a final attempt only for an attached host session and disables later polling.
+
+Persistence connection diagnostics use the separate INFO logger `DynamicTrainingPersistenceDiagnostic`:
+
+| Timing | Message body | Frequency |
+|---|---|---|
+| Callback registration | `HOOK_REGISTERED: control=<Sim/DCS>; net.dostring_in=<type>; transport=mission/a_do_script+scalar-sentinel` | Once when the Hook loads |
+| Mission load begins | `MISSION_LOAD_BEGIN: Persistence connection state reset.` | Once per load callback |
+| Mission load finishes | `MISSION_LOAD_END: Persistence polling enabled.` | Once per load-end callback |
+| First simulation frame | `FIRST_SIMULATION_FRAME: Persistence callback received.` | Once per loaded mission |
+| Non-host execution | `NOT_SERVER: Persistence only runs on the host.` | On state transition |
+| Endpoint absent or incompatible | `WAITING_ENDPOINT: protocol=<value>; endpoint=<type>; trigger=<type>; timer=<type>; coalition=<type>; a_do_script=<type>` | On state transition; `type probe unavailable` if the optional probe fails |
+| Endpoint attachment | `CONNECTED: Mission endpoint attached; storage and acknowledgement confirmed.` | On state transition after acknowledgement |
+| Native I/O compatibility | `IO_COMPATIBILITY: writeReturn=<type>; writeError=<type>; flushReturn=<type>; flushError=<type>; closeReturn=<type>; closeError=<type>` | Once when successful calls omit returns; `flush=unavailable` replaces the flush fields if that method is absent. This is not a save acknowledgement |
+| Stop without attachment | `STOPPED: No attached session to flush.` | Once per stop |
+| Stop without host role | `STOPPED: Host unavailable; prior saves preserved.` | Once per stop |
+| Confirmed final flush | `STOPPED: Final snapshot and acknowledgement confirmed.` | Once per stop |
+| SSE unavailable during stop | `STOP_FLUSH_UNAVAILABLE: phase=<phase>; lastCommittedRevision=<number>` | Once per stop; previously committed saves remain valid |
+
+Diagnostics inspect SSE types only, do not log account/score data, and do not create storage before attachment. Repeated waiting frames are silent. They add no screen messages and dispatch through the mission manager. A trailing scalar preserves the tagged reply when the native dispatcher shifts returns and drops the last value.
 
 ## Repetition and silent transitions
 

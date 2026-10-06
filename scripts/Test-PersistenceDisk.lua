@@ -22,11 +22,17 @@ env.lfs = { writedir = function() return root end,
 env.log = { ERROR = 1, WARNING = 2, INFO = 3, write = function(_, level, message)
     if level == 1 then error(message) end
 end }
+local manager = setmetatable({ a_do_script = function(inner)
+    local run = assert(loadstring(inner)); setfenv(run, s.env)
+    local first = run(); return nil, first -- Shifted slots, final scalar dropped.
+end }, { __index = _G })
 env.net = { dostring_in = function(state, code)
-    assert(state == "server")
-    local chunk = assert(loadstring(code)); setfenv(chunk, s.env); return chunk()
+    assert(state == "mission" and env.DynamicTrainingPersistence == nil and manager.DynamicTrainingPersistence == nil)
+    local chunk = assert(loadstring(code)); setfenv(chunk, manager)
+    local reply = chunk(); assert(type(reply) == "string"); return reply, true
 end }
 local chunk = assert(loadfile("build/DynamicTrainingPersistenceHook.lua")); setfenv(chunk, env); chunk()
+h.callbacks.onMissionLoadEnd()
 h.callbacks.onSimulationFrame()
 if phase == "write" or phase == "restore" then
     if phase == "restore" then s:score(90) end

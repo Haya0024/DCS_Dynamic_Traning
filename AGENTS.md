@@ -268,7 +268,7 @@ Difficulty ごとに使用可能な Threat Budget を決め、
 - `src/missions.lua` の `Missions.Acquire` を予約・生成より前に使う。ウィング名と登録 UCID で二重受注を拒否する。
 - 参加者が別スロットへ移動しても、元のウィングが終了するまでは新たな受注を拒否する。
 - 任務はカテゴリを問わずウィングごとに同時に1件。別ウィングはそれぞれ別の任務を同時に進められる。BLUE 全体の1件制限は設けない。
-- 状態は `Missions.wings[groupName]` に集約し、`category` で Intercept / SEAD / DEAD を区別する。Immediate DEADはSEAD内のphase。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
+- 状態は `Missions.wings[groupName]` に集約し、`category` で Intercept / CAP / SEAD / DEAD を区別する。Immediate DEADはSEAD内のphase。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
 - 同じテンプレートから生成する敵は `SPAWN:NewWithAlias` と受注ごとの識別子で名前を分離し、テンプレート名は変更しない。
 - F10 はグループ共有。`Abort Mission` は全体中止、名前・機体を指定する `Abort Sortie` は個人中止。
 - 詳細は `docs/WING.md`。結合後に `scripts/Test-Wing.lua`、`scripts/Test-ParallelWings.lua` と既存の Intercept・採点テストで確認する。
@@ -346,16 +346,32 @@ CAS: 720
 - Kill Statistics
 - 推奨 Difficulty
 
-成績保存は `docs/PERSISTENCE.md` を参照する。実装済み・DCS内確認待ち。
+成績保存は `docs/PERSISTENCE.md` を参照する。実装済み。初期接続・初回保存・確認通知・正常終了はDCS内確認済み（2026-10-06）。実プレイヤーの精算保存と再起動後の成績復元は確認待ち。
 
-- ミッション側のio / lfsをunsanitizeしない。サーバーのSaved Games Hookがnet.dostring_in("server", code)でデータのみを受け渡し、固定schemaの `DynamicTraining/scores.dat` と正常backupを管理する。Hook環境のa_do_scriptは使わない。型付き文字列返信を検証し、通信例外・API拒否・不正返信を保存成功にしない。
-- `src/score_data.lua` はschemaとcodec、`src/persistence.lua` はsnapshotと復元・確認通知、`server/score_store.lua` は検証付き保存・復旧、`server/DynamicTrainingPersistenceHook.lua` はサーバーcallbackを担う。
+- ミッション側のio / lfsをunsanitizeしない。サーバーのSaved Games Hookがnet.dostring_in("mission", code)とmanager側a_do_scriptで実SSEへ接続し、データのみを受け渡す。型付き文字列に末尾scalarを添え、DCSの戻り値位置ずれ・末尾欠落を回避する。managerは最初の2位置から型付き文字列だけを返し、正常dispatcherにも対応する。固定schemaの `DynamicTraining/scores.dat` と正常backupを管理する。Hook自身でa_do_scriptを直接呼ばない。通信例外・API拒否・不正返信を保存成功にしない。
+- `src/score_data.lua` はschemaとcodec、`src/persistence.lua` はsnapshotと復元・確認通知、`server/score_store.lua` は検証付き保存・復旧、`server/persistence_fs.lua` はDCSのI/O差異と未作成/読み取り不能判別、`server/mission_bridge.lua` は固定endpoint通信、`server/persistence_service.lua` は保存手順と段階管理、`server/DynamicTrainingPersistenceHook.lua` はサーバーcallback寿命を担う。
 - UCID累計・カテゴリ別Score・任務／帰還／失敗／中止／出撃喪失数を保存する。進行中任務・Wingロック・SAM Siteは保存しない。
 - run番号を保存してから復元する。遅延接続前の精算差分は1回だけ統合する。snapshotの再送は累計置換で、保存revisionの確認前に保存済みと表示しない。
 - dual corruptionではゼロで上書きしない。I/O失敗はゲームを止めず保存未確認として再試行する。Immediate DEADの追加Scoreでは任務・死亡統計を増やさない。
+- io.openの数値errnoがない場合は親directoryの完全な列挙で不存在を確認する。既存fileの読み取り拒否・属性取得失敗・列挙不能を未作成に置き換えない。読み取り不能のprimaryからbackupへ戻して累計を巻き戻さない。
+- native file操作の返り値がない実装に対応する。例外・false・エラー返信は拒否し、close後の再読・同一bytes・schema検証まで保存成功にしない。flushが提供される場合は呼ぶ。rename/removeもfileの実状態を確認してから成功とする。OSの物理fsyncや複数host同時書込みを保証したものではない。
+- HookはMissionLoadEnd後にpollを開始しStop後のframeで通信・採番しない。DCSがStop前にSSEを破棄した場合は最終flush不能をログへ残し、直近の保存済みrevisionを維持する。ミッション側はInitializeだけで保存済みと表示せず、有効なAcknowledgeを受けて初めて確認済みとする。初期化はスロット選択やPlayer Statisticsに依存しない。
 - Hookは `scripts/Build-PersistenceHook.ps1` で結合し、`scripts/Install-PersistenceHook.ps1 -SavedGamesPath <DCSユーザーディレクトリ>` で配置する。導入・更新後はDCS再起動が必要。MissionScripting.luaと他Hookを変更しない。
-- ホスト導入時はinstallerに `-ConfigureHost` を付け、autoexec.cfgへuserhooksからserverへのAPI許可だけを追加する。既存設定・許可を維持し、変更前にbackup、再実行はidempotent。不完全・重複管理ブロックや不正文字コードでは変更を拒否する。
-- Lua7スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
+- ホスト導入時はinstallerに `-ConfigureHost` を付け、autoexec.cfgへ呼出元userhooks・接続先missionのAPI許可を追加する。従来のserver許可と既存設定・他の許可を維持し、変更前にbackup、再実行はidempotent。不完全・重複管理ブロックや不正文字コードでは変更を拒否する。
+- Lua全9スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
+
+---
+
+## CAP 訓練任務（実装済み・DCS内確認待ち）
+
+- `src/config.lua` のcap.zonesにあるMEの4円形Zoneから等確率で1つを固定し、受注時に `CAP AREA: <中心DDM>`（分の小数3桁）を案内する。半径・PATROL CENTER行は表示せず、進入通知は `CAP on station.` のみ。
+- 未精算・操作中・空中の登録参加者の誰かがZone内なら120秒を積算する。全員Zone外/観測不能なら停止、再進入で再開。AI・途中参加者・個人中止者は数えない。
+- 20/40/60/80/100%を各1回通知。120秒と今回の敵全滅の両方でPrimary達成。100%でも敵が残ればACTIVE。
+- 同じ累計時間30〜120秒から出現時刻を受注時に固定し、Config.intercept.templatesの3候補を暫定使用して1編隊だけ生成する。Zone外周から15〜25NM、15,000〜30,000ft、230m/sで空域へ進入・哨戒する。DT_CAP_<assignmentID>で他任務の敵と分離する。
+- 地上受注でも即ACTIVEで空域への到達待ち。CAPにInterceptの離陸待ち・20秒Spawn待ちを適用しない。個人中止でCAPをARMEDへ戻さない。
+- 既存Wing/UCIDロックと個別帰還を使い、満額150・達成後事故90・未達成事故/Abort0をCAP Scoreへ独立加算。全参加者終了で敵をCleanupし失敗を再試行する。
+- 保存schema2はcapScoreを追加し、schema1の従来成績をCAP=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
+- 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（30ケース）。CAP以外の既存Luaスイートも実行する。
 
 ---
 
@@ -480,7 +496,7 @@ DCS-Dynamic-Training/
 ### Lua と .miz の同期
 
 - `src/*.lua` と `vendor/MOOSE/Moose.lua` を編集元とする。設定値は `src/config.lua` に集約する。
-- `scripts/Build-Mission.ps1` が設定・保存データcodec・プレイヤー・採点・永続化bridge・任務ロック・Intercept・SEAD目標判定・SEAD配置・サイト管理・DEAD・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
+- `scripts/Build-Mission.ps1` が設定・保存データcodec・プレイヤー・採点・永続化bridge・任務ロック・Intercept・CAP・SEAD目標判定・SEAD配置・サイト管理・DEAD・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
 - 保存codecまたはserver側Luaを変更したらHookも再結合し、導入用bundleと保存テストを確認する。導入済みHookの更新にはinstallerとDCS再起動を使う。
 - Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、`mission/Syria.miz` も更新する。
   1. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1`

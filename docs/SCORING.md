@@ -1,8 +1,8 @@
 # プレイヤー採点・帰還評価仕様
 
-更新日: 2026-10-05
+更新日: 2026-10-06
 
-現在の採点対象は Intercept / SEAD / Immediate DEAD / Follow-on DEAD。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続60秒、DEADは開始時の残存対象全滅でクリアとする。
+現在の採点対象は Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続60秒、DEADは開始時の残存対象全滅でクリアとする。CAPはzone内累計120秒と敵航空機全滅の両方でクリア。詳細は [CAP.md](CAP.md)。
 Immediate DEADは同じSEAD sortie内のphaseとして、SEADのID・達成結果・報酬を維持し、独立したDEAD報酬を追加する。詳細は [DEAD.md](DEAD.md)。
 SEAD の対象レーダーと配置の仕様は [SEAD.md](SEAD.md) を参照する。SEAD の採点は模擬テスト済みで、ゲーム内確認は未実施。
 
@@ -18,6 +18,7 @@ UCID 取得・着陸・事故イベントの個別ケースの確認範囲は未
 設定は [src/config.lua](../src/config.lua) に集約する。
 初期の試用値は満額150ポイント、失敗率60%、着陸確認10秒、停止判定5 knots。
 Intercept の満額は `fullReward`、SEAD の満額は `sead.fullReward`、両DEADの満額は `dead.fullReward` で個別に設定する。
+CAPの満額は `cap.fullReward`（150）。CAP Scoreへ独立加算し、他カテゴリのScoreへ加算しない。Total/Careerと既存の任務・帰還・喪失統計は共通精算を使う。保存schema2でCAPを追加し、schema1の既存成績はCAP=0として読み込み、従来の累計を維持する。
 Difficulty / Threat Budget による配点、追加ボーナス、カテゴリ Rating は未実装。
 
 ## 採点規則（実装済み）

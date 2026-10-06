@@ -1,5 +1,5 @@
 local Scoring = { players = {}, settlements = {}, sequence = 0, revision = 0 }
-local scoreFields = { Intercept = "interceptScore", SEAD = "seadScore", DEAD = "deadScore" }
+local scoreFields = { Intercept = "interceptScore", SEAD = "seadScore", DEAD = "deadScore", CAP = "capScore" }
 
 function Scoring.NextID(category)
     -- The hook assigns a durably allocated namespace after storage attachment.
@@ -13,7 +13,7 @@ function Scoring.Get(ucid, name)
     if not ucid then return nil end
     local p = Scoring.players[ucid]
     if not p then
-        p = { totalScore = 0, careerPoints = 0, interceptScore = 0, seadScore = 0, deadScore = 0,
+        p = { totalScore = 0, careerPoints = 0, interceptScore = 0, seadScore = 0, deadScore = 0, capScore = 0,
             missionCount = 0, primarySuccessCount = 0, rtbSuccessCount = 0,
             recoveryFailureCount = 0, failedCount = 0, abortCount = 0, deathCount = 0 }
         Scoring.players[ucid] = p

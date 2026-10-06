@@ -2,7 +2,9 @@
 local ScoreData = {}
 ScoreData.fields = { "totalScore", "careerPoints", "interceptScore", "seadScore", "deadScore",
     "missionCount", "primarySuccessCount", "rtbSuccessCount", "recoveryFailureCount",
-    "failedCount", "abortCount", "deathCount" }
+    "failedCount", "abortCount", "deathCount", "capScore" }
+local legacyFields = {}
+for i = 1, #ScoreData.fields - 1 do legacyFields[i] = ScoreData.fields[i] end
 local function integer(n)
     return type(n) == "number" and n >= 0 and n <= 9007199254740991 and n == math.floor(n)
 end
@@ -31,16 +33,17 @@ function ScoreData.Validate(data)
     end
     return data
 end
-function ScoreData.Encode(data)
+local function encode(data, version)
     ScoreData.Validate(data)
-    local lines = { string.format("DT_SCORE\t1\t%.0f\t%.0f\t%.0f", data.counter, data.session, data.revision) }
+    local fields = version == 1 and legacyFields or ScoreData.fields
+    local lines = { string.format("DT_SCORE\t%d\t%.0f\t%.0f\t%.0f", version, data.counter, data.session, data.revision) }
     local keys = {}
     for ucid in pairs(data.players) do keys[#keys + 1] = ucid end
     table.sort(keys)
     for _, ucid in ipairs(keys) do
         local p = data.players[ucid]
         local parts = { "P", hex(ucid), hex(p.lastKnownName or "") }
-        for _, field in ipairs(ScoreData.fields) do parts[#parts + 1] = string.format("%.0f", p[field]) end
+        for _, field in ipairs(fields) do parts[#parts + 1] = string.format("%.0f", p[field]) end
         lines[#lines + 1] = table.concat(parts, "\t")
     end
     local body = table.concat(lines, "\n") .. "\n"
@@ -51,6 +54,7 @@ function ScoreData.Encode(data)
     assert(#text <= 4 * 1024 * 1024, "Score file exceeds limit")
     return text
 end
+function ScoreData.Encode(data) return encode(data, 2) end
 function ScoreData.Decode(text)
     assert(type(text) == "string" and #text <= 4 * 1024 * 1024, "Invalid score file size")
     local body, rows, expected = text:match("^(.*\n)END\t(%d+)\t(%d+)\n$")
@@ -59,18 +63,20 @@ function ScoreData.Decode(text)
     for i = 1, #body do sum = (sum * 31 + body:byte(i)) % 2147483647 end
     assert(sum == tonumber(expected), "Score checksum mismatch")
     local header, rest = body:match("^([^\n]+)\n(.*)$")
-    local counter, session, revision = header:match("^DT_SCORE\t1\t(%d+)\t(%d+)\t(%d+)$")
-    assert(counter, "Unsupported score schema")
+    local version, counter, session, revision = header:match("^DT_SCORE\t(%d+)\t(%d+)\t(%d+)\t(%d+)$")
+    version = tonumber(version)
+    assert(counter and (version == 1 or version == 2), "Unsupported score schema")
+    local fields = version == 1 and legacyFields or ScoreData.fields
     local data = { counter = tonumber(counter), session = tonumber(session), revision = tonumber(revision), players = {} }
     local count = 0
     for line in rest:gmatch("([^\n]+)\n") do
         local parts = {}
         for value in (line .. "\t"):gmatch("([^\t]*)\t") do parts[#parts + 1] = value end
-        assert(#parts == 3 + #ScoreData.fields and parts[1] == "P", "Invalid score row")
+        assert(#parts == 3 + #fields and parts[1] == "P", "Invalid score row")
         local ucid, name = unhex(parts[2]), unhex(parts[3])
         assert(not data.players[ucid], "Duplicate score identity")
-        local p = { lastKnownName = name }
-        for i, field in ipairs(ScoreData.fields) do
+        local p = { lastKnownName = name, capScore = 0 }
+        for i, field in ipairs(fields) do
             assert(parts[i + 3]:match("^%d+$"), "Invalid score number")
             p[field] = tonumber(parts[i + 3])
         end
@@ -78,7 +84,7 @@ function ScoreData.Decode(text)
     end
     assert(count == tonumber(rows), "Score row count mismatch")
     ScoreData.Validate(data)
-    assert(ScoreData.Encode(data) == text, "Noncanonical score file")
+    assert(encode(data, version) == text, "Noncanonical score file")
     return data
 end
 return ScoreData

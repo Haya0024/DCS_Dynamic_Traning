@@ -1,9 +1,9 @@
-local Persistence = { attached = false, savedRevision = 0, error = nil }
+local Persistence = { attached = false, confirmed = false, savedRevision = 0, error = nil }
 function Persistence.Initialize(payload)
     if not Config.persistence.enabled then return false end
     local data = ScoreData.Decode(payload)
     if Persistence.attached then return Persistence.session == data.session end
-    assert(data.session > 0 and data.revision == 0, "Invalid persistence bootstrap")
+    assert(data.session > 0 and data.session == data.counter and data.revision == 0, "Invalid persistence bootstrap")
     -- Current counters are session deltas until attachment. Preserve them even
     -- if the hook first becomes available after a player has already settled.
     for ucid, current in pairs(Scoring.players) do
@@ -26,9 +26,10 @@ function Persistence.ExportSnapshot()
         revision = Scoring.revision, players = Scoring.players })
 end
 function Persistence.Acknowledge(session, revision)
-    if session ~= Persistence.session or type(revision) ~= "number" or revision < 0
+    if not Persistence.attached or session ~= Persistence.session or type(revision) ~= "number" or revision < 0
         or revision > Scoring.revision or revision ~= math.floor(revision) then return false end
     Persistence.savedRevision = math.max(Persistence.savedRevision, revision)
+    Persistence.confirmed = true
     Persistence.error = nil
     return true
 end
@@ -39,8 +40,14 @@ function Persistence.Status()
     if not Config.persistence.enabled then return "Session only; persistence disabled." end
     if Persistence.error then return "Persistence unavailable; scores not confirmed saved." end
     if not Persistence.attached then return "Session only; persistence hook not connected." end
-    if Scoring.revision > Persistence.savedRevision then return "Persistence pending; not yet saved." end
+    if not Persistence.confirmed or Scoring.revision > Persistence.savedRevision then return "Persistence pending; not yet saved." end
     return "Persistent scores saved."
+end
+function Persistence.StartupStatus()
+    if Config.persistence.enabled and not Persistence.attached and not Persistence.error then
+        return "Persistence initialization pending."
+    end
+    return Persistence.Status()
 end
 function Persistence.Publish()
     if not Config.persistence.enabled then return end

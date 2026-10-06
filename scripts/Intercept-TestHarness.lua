@@ -73,6 +73,19 @@ local function scenario(options)
         self.players[#self.players + 1] = p.raw
         return p
     end
+    function s:addCAPZones()
+        self.zones = self.zones or {}
+        for index, name in ipairs({ "CAP_ZONE_CENTRAL_COAST", "CAP_ZONE_GOLAN", "CAP_ZONE_NORTH_COAST", "CAP_ZONE_HOMS_WEST" }) do
+            local zone = { center = { x = index * 100000, y = index * 10000 }, radius = 18288 }
+            function zone:GetVec2() return self.center end
+            function zone:GetRadius() return self.radius end
+            function zone:IsVec3InZone(point)
+                if self.failObservation then error("zone observation failed") end
+                return point and (point.x - self.center.x)^2 + (point.z - self.center.y)^2 <= self.radius^2 or false
+            end
+            self.zones[name] = zone
+        end
+    end
 
     local coordinate = { WaypointAltType = { BARO = "BARO" } }
     coordinate.__index = coordinate
@@ -83,8 +96,9 @@ local function scenario(options)
         return self:NewFromVec3({ x = self.x + distance * math.cos(radians),
             y = self.y, z = self.z + distance * math.sin(radians) })
     end
-    function coordinate:SetAltitude(altitude, asl) assert(asl == true); self.y = altitude end
+    function coordinate:SetAltitude(altitude, asl) assert(asl == true); self.y = altitude; return self end
     function coordinate:GetVec3() return { x = self.x, y = self.y, z = self.z } end
+    function coordinate:GetVec2() return { x = self.x, y = self.z } end
     function coordinate:NewFromVec2(v)
         return self:NewFromVec3({ x = v.x, y = s.terrainHeight and s.terrainHeight(v) or 0, z = v.y })
     end
@@ -134,7 +148,7 @@ local function scenario(options)
         return setmetatable({ template = template }, { __index = spawn })
     end
     function spawn:NewWithAlias(template, alias)
-        assert(string.match(alias, "^DT_INTERCEPT_%d+$") or string.match(alias, "^DT_SEAD_%d+$"),
+        assert(string.match(alias, "^DT_INTERCEPT_%d+$") or string.match(alias, "^DT_SEAD_%d+$") or string.match(alias, "^DT_CAP_%d+$"),
             "unique assignment alias required")
         local instance = self:New(template)
         instance.alias = alias
@@ -162,6 +176,10 @@ local function scenario(options)
             assert(distance == nil and priority == 0)
             assert(#types == 2 and types[1] == "Fighters" and types[2] == "Multirole fighters")
             return { id = "EngageTargets", types = types }
+        end
+        function g:TaskOrbit(center, altitude, speed)
+            assert(center and altitude > 0 and speed > 0)
+            return { id = "Orbit", params = { point = center:GetVec2(), altitude = altitude, speed = speed } }
         end
         function g:OptionROEOpenFire() self.openFire = true end
         function g:OptionAlarmStateRed()

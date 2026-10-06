@@ -29,7 +29,7 @@ if ($ConfigureHost) {
     $newline = if ($oldHostText.Contains("`r`n")) { "`r`n" } else { "`n" }
     $block = @'
 -- BEGIN DYNAMIC TRAINING PERSISTENCE HOST
--- Host hook -> mission only; no mission filesystem unsanitize.
+-- Host hook -> mission manager -> SSE; no mission filesystem unsanitize.
 do
     if not net then net = {} end
     local function allow(key, name)
@@ -40,6 +40,7 @@ do
     end
     allow("allow_unsafe_api", "userhooks")
     allow("allow_dostring_in", "server")
+    allow("allow_dostring_in", "mission") -- Keep the previous server permission when upgrading.
 end
 -- END DYNAMIC TRAINING PERSISTENCE HOST
 '@
@@ -80,7 +81,7 @@ if ($ConfigureHost) {
         }
         [System.IO.File]::WriteAllText($hostConfig, $newHostText, $hostEncoding)
         if ([System.IO.File]::ReadAllText($hostConfig) -cne $newHostText) { throw 'Host configuration verification failed.' }
-        Write-Host 'Configured host API permissions: userhooks -> server. Existing settings preserved.'
+        Write-Host 'Configured host API permissions: userhooks -> mission (previous server permission retained). Existing settings preserved.'
     } else { Write-Host 'Persistence host configuration already current.' }
 }
 Write-Host 'Restart DCS to load the hook. MissionScripting.lua is unchanged.'

@@ -60,7 +60,7 @@ for attempt = 1, 2 do
     assert(loadfile(path))()
     assert(DLSS_Preset == "K" and HUD_MFD_after_DLSS == true)
     assert(#net.allow_unsafe_api == 2 and net.allow_unsafe_api[1] == "gui" and net.allow_unsafe_api[2] == "userhooks")
-    assert(#net.allow_dostring_in == 2 and net.allow_dostring_in[1] == "export" and net.allow_dostring_in[2] == "server")
+    assert(#net.allow_dostring_in == 3 and net.allow_dostring_in[1] == "export" and net.allow_dostring_in[2] == "server" and net.allow_dostring_in[3] == "mission")
 end
 '@
     # luae/loadfile may treat a UTF-8 BOM as code; DCS's config loader accepts it.
@@ -77,6 +77,32 @@ end
     $hostHash = (Get-FileHash -LiteralPath $autoexec).Hash
     & (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -SavedGamesPath $fixtureRoot -ConfigureHost
     if ((Get-FileHash -LiteralPath $autoexec).Hash -ne $hostHash) { throw 'BOM-free config is not idempotent' }
+    # Upgrade the existing server-only managed block without losing that grant.
+    $legacyBlock = @'
+-- BEGIN DYNAMIC TRAINING PERSISTENCE HOST
+do
+    net.allow_unsafe_api[#net.allow_unsafe_api + 1] = "userhooks"
+    net.allow_dostring_in[#net.allow_dostring_in + 1] = "server"
+end
+-- END DYNAMIC TRAINING PERSISTENCE HOST
+'@
+    $legacyHost = $original + $legacyBlock
+    [System.IO.File]::WriteAllText($autoexec, $legacyHost, [System.Text.UTF8Encoding]::new($false))
+    $legacyHash = (Get-FileHash -LiteralPath $autoexec).Hash
+    & (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -SavedGamesPath $fixtureRoot -ConfigureHost
+    $upgraded = [System.IO.File]::ReadAllText($autoexec)
+    if (-not $upgraded.StartsWith($original) -or
+        [regex]::Matches($upgraded, '-- BEGIN DYNAMIC TRAINING PERSISTENCE HOST').Count -ne 1) {
+        throw 'Legacy block upgrade changed settings or duplicated its managed block'
+    }
+    $legacyBackup = @(Get-ChildItem -LiteralPath (Split-Path -Parent $autoexec) -Filter 'autoexec.cfg.*.bak' |
+        Where-Object { (Get-FileHash -LiteralPath $_.FullName).Hash -eq $legacyHash })
+    if ($legacyBackup.Count -ne 1) { throw 'Legacy configuration exact backup missing' }
+    $hostChecks | & $luaPath -
+    if ($LASTEXITCODE -ne 0) { throw 'Legacy permission upgrade semantics failed' }
+    $hostHash = (Get-FileHash -LiteralPath $autoexec).Hash
+    & (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -SavedGamesPath $fixtureRoot -ConfigureHost
+    if ((Get-FileHash -LiteralPath $autoexec).Hash -ne $hostHash) { throw 'Legacy upgrade not idempotent' }
     [System.IO.File]::WriteAllText($autoexec, '')
     & (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -SavedGamesPath $fixtureRoot -ConfigureHost
     if (-not ([System.IO.File]::ReadAllText($autoexec).StartsWith('-- BEGIN DYNAMIC TRAINING'))) {

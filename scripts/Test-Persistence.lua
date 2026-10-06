@@ -38,23 +38,55 @@ local function filesystem()
     return fs
 end
 local path = "saved/DynamicTraining/scores.dat"
-local function hook(s, fs)
-    local h = { time = 0, errors = {}, messages = {}, server = true, calls = 0 }
+local function hook(s, fs, startLoaded)
+    local h = { time = 0, errors = {}, messages = {}, diagnostics = {}, commits = {}, server = true, calls = 0 }
     local env = setmetatable({}, { __index = _G })
     env.Sim = { isServer = function() return h.server end, getRealTime = function() return h.time end,
         setUserCallbacks = function(callbacks) h.callbacks = callbacks end }
-    env.log = { ERROR = 1, WARNING = 2, INFO = 3, write = function(_, level, message)
-        local messages = level == 1 and h.errors or h.messages
+    env.log = { ERROR = 1, WARNING = 2, INFO = 3, write = function(source, level, message)
+        local messages = source == "DynamicTrainingPersistenceDiagnostic" and h.diagnostics or
+            (level == 1 and h.errors or (message:match("^[A-Z]+_COMMITTED:") and h.commits or h.messages))
         messages[#messages + 1] = message
     end }
-    -- Real hooks have no a_do_script. Only the server state sees mission globals.
+    -- Neither Hook nor mission manager sees the real SSE globals directly.
+    -- DCS 2.9.18 regression: one nil slot is prepended and the last value lost.
+    -- A single returned value therefore disappears; 2 values preserve it in #2.
+    local manager = setmetatable({ a_do_script = function(inner)
+        local run = assert(loadstring(inner)); setfenv(run, s.env)
+        local first, second = run()
+        if h.dispatchMode == "fixed" then return first, second end
+        if h.dispatchMode == "lost" then return nil end
+        return nil, first
+    end }, { __index = _G })
+    h.manager = manager
     env.net = { dostring_in = function(state, code)
-        assert(state == "server"); h.calls = h.calls + 1
-        local chunk = assert(loadstring(code)); setfenv(chunk, s.env); return chunk()
+        h.calls = h.calls + 1
+        assert(manager.DynamicTrainingPersistence == nil)
+        local chunk = assert(loadstring(code))
+        if state == "mission" then
+            setfenv(chunk, manager); local reply = chunk()
+            assert(reply == nil or type(reply) == "string", "Manager must return only a scalar string")
+            return reply or "", true
+        end
+        assert(state == "scripting"); return nil, nil -- Observed in DCS 2.9.30.
     end }
     env.lfs = { writedir = function() return "saved/" end,
         mkdir = function() fs.directory = true; return true end,
+        dir = function(parent)
+            if fs.failListing then error("listing denied") end
+            local entries = { ".", ".." }
+            for name in pairs(fs.files) do
+                if name:sub(1, #parent + 1) == parent .. "/" then entries[#entries + 1] = name:sub(#parent + 2) end
+            end
+            local index = 0
+            return function()
+                index = index + 1
+                if fs.failIteration and index == 2 then error("iteration failed") end
+                return entries[index]
+            end
+        end,
         attributes = function(name, field)
+            if fs.hiddenAttributes and name ~= "saved/DynamicTraining" then return nil end
             local mode = name == "saved/DynamicTraining" and fs.directory and "directory"
                 or fs.files[name] ~= nil and "file" or nil
             if field then return mode end
@@ -63,15 +95,38 @@ local function hook(s, fs)
     env.io = { open = function(name, mode)
         if mode == "rb" then
             local text, problem = fs.read(name)
-            if not text then return nil, problem, problem == "missing" and 2 or 13 end
-            return { read = function(_, n) return text:sub(1, n) end, close = function() return true end }
+            if not text then
+                if fs.noErrno then return nil, problem end
+                return nil, problem, problem == "missing" and 2 or 13
+            end
+            return { read = function(_, n) return text:sub(1, n) end,
+                close = function() if not fs.noMethodResult then return true end end }
         end
         if fs.failWrite then return nil, "denied", 13 end
-        return { write = function(_, text) return fs.write(name, text) end,
-            flush = function() return not fs.failFlush end, close = function() return not fs.failClose end }
+        return { write = function(_, text)
+                local written = fs.write(name, text)
+                if not written or not fs.noMethodResult then return written end
+            end,
+            flush = not fs.noFlushMethod and function()
+                if fs.failFlush then return false end
+                if not fs.noMethodResult then return true end
+            end or nil,
+            close = function()
+                if fs.failClose then return false end
+                if not fs.noMethodResult then return true end
+            end }
     end }
-    env.os = { rename = fs.rename, remove = fs.remove }
+    env.os = {
+        rename = function(from, to)
+            local moved = fs.rename(from, to)
+            if not moved or not fs.noMethodResult then return moved end
+        end,
+        remove = function(name)
+            local removed = fs.remove(name)
+            if not removed or not fs.noMethodResult then return removed end
+        end }
     local chunk = assert(loadfile("build/DynamicTrainingPersistenceHook.lua")); setfenv(chunk, env); chunk()
+    if startLoaded ~= false then h.callbacks.onMissionLoadEnd() end
     function h:frame(time) self.time = time; self.callbacks.onSimulationFrame() end
     h.env = env
     return h
@@ -289,9 +344,10 @@ test("an idle healthy poll clears a transient bridge error without another settl
     assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
 end)
 
-test("separate hook and server states connect through string-only replies without hook a_do_script", function()
+test("separate hook, manager and SSE states connect through scalar slots without hook a_do_script", function()
     local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
     assert(h.env.a_do_script == nil and h.env.DynamicTrainingPersistence == nil)
+    assert(h.manager.DynamicTrainingPersistence == nil and type(h.manager.a_do_script) == "function")
     local bridge = h.env.net.dostring_in
     h.env.net.dostring_in = function(state, code)
         local reply = bridge(state, code)
@@ -306,12 +362,13 @@ test("separate hook and server states connect through string-only replies withou
 end)
 
 test("API denial logs once, creates no storage and reconnects after permission recovery", function()
-    for _, mode in ipairs({ "denied", "exception" }) do
+    for _, mode in ipairs({ "denied", "exception", "falseStatus" }) do
         local fs = filesystem(); local s = scenario(); earn(s, false)
         local h = hook(s, fs); local bridge = h.env.net.dostring_in
         h.env.net.dostring_in = function()
             if mode == "exception" then error("not allowed") end
-            return nil, "server state not allowed"
+            if mode == "falseStatus" then return "DTBR1:D1", false end
+            return nil, "mission state not allowed"
         end
         h:frame(0); h:frame(1)
         assert(#h.errors == 1 and not fs.files[path]); statistics(s, "Session only")
@@ -327,6 +384,9 @@ test("empty, untagged and malformed typed replies never become a successful conn
         local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
         h.env.net.dostring_in = function() return reply end
         h:frame(0); assert(#h.errors == 1 and not fs.files[path])
+        if reply == "" then
+            assert(h.errors[1]:find("replyType=string; replyBytes=0; status=nil", 1, true))
+        end
         statistics(s, "Session only")
     end
 end)
@@ -360,6 +420,295 @@ test("false acknowledgements cannot confirm a saved revision and recover without
     s.env.DynamicTrainingPersistence.Acknowledge = acknowledge; h:frame(2)
     statistics(s, "Persistent scores saved.")
     assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+end)
+
+test("missing endpoint diagnostics are deduplicated, data-free and recover without creating early storage", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+    local endpoint = s.env.DynamicTrainingPersistence
+    s.env.DynamicTrainingPersistence = nil
+    assert(#h.diagnostics == 2 and h.diagnostics[1]:find("HOOK_REGISTERED", 1, true))
+    h:frame(0); h:frame(1)
+    assert(#h.diagnostics == 4 and #h.errors == 0 and not fs.files[path])
+    assert(h.diagnostics[3]:find("FIRST_SIMULATION_FRAME", 1, true))
+    assert(h.diagnostics[4]:find("WAITING_ENDPOINT: protocol=nil", 1, true))
+    assert(h.diagnostics[4]:find("endpoint=nil", 1, true) and h.diagnostics[4]:find("a_do_script=nil", 1, true))
+    for _, message in ipairs(h.diagnostics) do assert(not message:find("ucid-a", 1, true)) end
+    assert(h.env.a_do_script == nil)
+    s.env.DynamicTrainingPersistence = endpoint
+    h:frame(2); h:frame(3)
+    assert(#h.diagnostics == 5 and h.diagnostics[5]:find("CONNECTED", 1, true))
+    statistics(s, "Persistent scores saved."); assert(fs.files[path])
+end)
+
+test("diagnostics distinguish non-host and restart callback lifecycle without changing persistence", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+    h.server = false; h:frame(0); h:frame(1)
+    assert(#h.diagnostics == 4 and h.diagnostics[4]:find("NOT_SERVER", 1, true))
+    assert(h.calls == 0 and not fs.files[path] and #h.errors == 0)
+    h.callbacks.onMissionLoadBegin(); h:frame(2)
+    assert(#h.diagnostics == 5 and h.diagnostics[5]:find("MISSION_LOAD_BEGIN", 1, true))
+    h.callbacks.onMissionLoadEnd(); h:frame(2)
+    assert(#h.diagnostics == 8 and h.diagnostics[7]:find("FIRST_SIMULATION_FRAME", 1, true))
+    h.server = true; h:frame(3)
+    assert(#h.diagnostics == 9 and h.diagnostics[9]:find("CONNECTED", 1, true))
+    statistics(s, "Persistent scores saved."); assert(Data.Decode(fs.files[path]).counter == 1)
+end)
+
+test("missing mission dispatcher cannot initialize storage and reconnects after recovery", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+    local dispatch = h.manager.a_do_script; h.manager.a_do_script = nil
+    h:frame(0); h:frame(1)
+    assert(#h.errors == 1 and h.errors[1]:find("a_do_script", 1, true))
+    assert(not fs.files[path] and not module(s, "Scoring").sessionID)
+    statistics(s, "Session only")
+    h.manager.a_do_script = dispatch; h:frame(2)
+    statistics(s, "Persistent scores saved.")
+    assert(Data.Decode(fs.files[path]).counter == 1 and #h.messages == 1)
+end)
+
+test("shifted native slots discard a single result; trailing scalar preserves confirmation and snapshots", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+    local inner = 'bridgeProbe = true; return "DTBR1:D1"'
+    local reply, accepted = h.env.net.dostring_in("mission", "return a_do_script(" .. string.format("%q", inner) .. ")")
+    assert(accepted == true and reply == "" and s.env.bridgeProbe == true)
+    assert(h.manager.bridgeProbe == nil and not fs.files[path])
+    h:frame(0); earn(s, false); h:frame(1); h:frame(2)
+    statistics(s, "Persistent scores saved.")
+    assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+    assert(#h.errors == 0 and #h.messages == 1)
+end)
+
+test("fixed and shifted dispatchers preserve all typed values; fully lost replies cannot initialize storage", function()
+    for _, mode in ipairs({ "fixed", "shifted", "lost" }) do
+        local fs = filesystem(); local s = scenario(); local h = hook(s, fs)
+        h.dispatchMode = mode
+        h:frame(0)
+        if mode == "lost" then
+            assert(#h.errors == 1 and not fs.files[path] and not module(s, "Scoring").sessionID)
+            assert(h.errors[1]:find("DTBRIDGE_INVALID:first=nil;second=nil", 1, true))
+            statistics(s, "Persistence unavailable")
+            h.dispatchMode = "shifted"; h:frame(1)
+        end
+        local other = account(150)
+        module(s, "Scoring").players["ucid-other"] = other
+        earn(s, false); h:frame(2); h:frame(3)
+        statistics(s, "Persistent scores saved.")
+        local saved = Data.Decode(fs.files[path]); assert(saved.counter == 1)
+        assert(saved.players["ucid-a"].totalScore == 90)
+        assert(saved.players["ucid-other"].totalScore == 150 and
+            saved.players["ucid-other"].lastKnownName == other.lastKnownName)
+        assert(#h.messages == 1)
+    end
+end)
+
+test("missing files with no numeric errno bootstrap safely and later restore without resetting scores", function()
+    local fs = filesystem(); fs.noErrno = true
+    local s = scenario(); local h = hook(s, fs); h:frame(0)
+    assert(#h.errors == 0 and Data.Decode(fs.files[path]).counter == 1)
+    earn(s, false); h:frame(1)
+    s = scenario(); h = hook(s, fs); h:frame(0); s:score(90)
+    assert(Data.Decode(fs.files[path]).counter == 2 and #h.errors == 0)
+end)
+
+test("unreadable existing primary cannot fall back to a backup or be mistaken for a missing file", function()
+    for _, hidden in ipairs({ false, true }) do
+        local fs = filesystem(); fs.noErrno, fs.hiddenAttributes = true, hidden
+        local primary, backup = Data.Encode(data(240, 2)), Data.Encode(data(150))
+        fs.files[path], fs.files[path .. ".bak"], fs.failRead = primary, backup, path
+        local s = scenario(); local h = hook(s, fs); h:frame(0); h:frame(1)
+        assert(#h.errors == 1 and h.errors[1]:find("phase=LOAD", 1, true))
+        assert(not h.errors[1]:find("ucid-a", 1, true) and not h.errors[1]:find("DT_SCORE", 1, true))
+        assert(fs.files[path] == primary and fs.files[path .. ".bak"] == backup)
+        assert(not module(s, "Scoring").sessionID)
+        fs.failRead = nil; h:frame(2); s:score(240)
+    end
+end)
+
+test("failed or incomplete directory inspection blocks bootstrap and safely retries", function()
+    for _, fault in ipairs({ "failListing", "failIteration" }) do
+        local fs = filesystem(); fs.noErrno = true; fs[fault] = true
+        local s = scenario(); local h = hook(s, fs); h:frame(0); h:frame(1)
+        assert(#h.errors == 1 and h.errors[1]:find("directory inspection failed", 1, true))
+        assert(not fs.files[path] and not module(s, "Scoring").sessionID)
+        fs[fault] = false; h:frame(2)
+        assert(Data.Decode(fs.files[path]).counter == 1)
+    end
+end)
+
+test("native file operation exceptions close handles and never confirm partial writes", function()
+    local Adapter = dofile("server/persistence_fs.lua")
+    for _, fault in ipairs({ "read", "write", "flush", "lookup" }) do
+        local closed = 0
+        local file = { close = function() closed = closed + 1; return true end }
+        for _, operation in ipairs({ "read", "write", "flush" }) do
+            file[operation] = function()
+                if operation == fault then error("native operation failed") end
+                return operation == "read" and "contents" or true
+            end
+        end
+        if fault == "lookup" then
+            file.flush = nil
+            setmetatable(file, { __index = function() error("native method lookup failed") end })
+        end
+        local fs = Adapter.New({ open = function() return file end },
+            { attributes = function() return { mode = "file" } end }, {})
+        if fault == "read" then rejected(function() fs.read(path) end)
+        else assert(fs.write(path, "contents") == false) end
+        assert(closed == 1)
+    end
+end)
+
+test("unloaded and stopped frames do not access DCS or storage; teardown is a final-flush limitation", function()
+    local fs = filesystem(); local s = scenario(); local h = hook(s, fs, false)
+    h:frame(0); h:frame(1)
+    assert(h.calls == 0 and #h.errors == 0 and not fs.files[path])
+    h.callbacks.onMissionLoadBegin(); h:frame(2)
+    assert(h.calls == 0)
+    h.callbacks.onMissionLoadEnd(); h:frame(3)
+    earn(s, false); h:frame(4)
+    local saved = fs.files[path]
+    s.env.DynamicTrainingPersistence = nil
+    h.callbacks.onSimulationStop()
+    local calls = h.calls
+    h:frame(5); h:frame(6); h.callbacks.onSimulationStop()
+    assert(h.calls == calls and fs.files[path] == saved and #h.errors == 0)
+    assert(h.diagnostics[#h.diagnostics]:find("STOP_FLUSH_UNAVAILABLE", 1, true))
+end)
+
+test("restoration alone does not report saved and acknowledgement requires an attached matching run", function()
+    local s = scenario(); local endpoint = s.env.DynamicTrainingPersistence
+    assert(not endpoint.Acknowledge(nil, 0))
+    local baseline = data(150, 0)
+    baseline.counter = 2
+    rejected(function() endpoint.Initialize(Data.Encode(baseline)) end)
+    baseline.counter = 1
+    assert(endpoint.Initialize(Data.Encode(baseline)))
+    statistics(s, "Persistence pending")
+    assert(not endpoint.Acknowledge(2, 0))
+    assert(endpoint.Acknowledge(1, 0)); statistics(s, "Persistent scores saved.")
+end)
+
+test("lost initialize response retries the same committed run without remerging local settlements", function()
+    local fs = filesystem(); fs.files[path] = Data.Encode(data(150))
+    local s = scenario(); earn(s, false)
+    local h = hook(s, fs); local bridge = h.env.net.dostring_in
+    h.env.net.dostring_in = function(state, code)
+        local reply, status = bridge(state, code)
+        if code:find(".Initialize(", 1, true) then return "", true end
+        return reply, status
+    end
+    h:frame(0); s:score(240)
+    assert(#h.errors == 1 and h.errors[1]:find("phase=ATTACH", 1, true))
+    h.env.net.dostring_in = bridge; h:frame(1); h:frame(2)
+    s:score(240); statistics(s, "Persistent scores saved.")
+    local saved = Data.Decode(fs.files[path]); assert(saved.counter == 2 and saved.players["ucid-a"].totalScore == 240)
+end)
+
+test("persistence initializes with no selected slot or player statistics command", function()
+    local fs = filesystem(); fs.noErrno = true
+    local s = scenario(); s.connections = {}; s.player.name = nil
+    assert(table.concat(s.logs, "\n"):find("Persistence initialization pending.", 1, true))
+    local h = hook(s, fs); h:frame(0)
+    local saved = Data.Decode(fs.files[path]); assert(saved.counter == 1 and next(saved.players) == nil)
+    assert(#h.errors == 0 and h.diagnostics[#h.diagnostics]:find("CONNECTED", 1, true))
+end)
+
+test("host file methods with no return or optional flush still require verified save and restore", function()
+    for _, noFlush in ipairs({ false, true }) do
+        local fs = filesystem(); fs.noErrno, fs.noMethodResult, fs.noFlushMethod = true, true, noFlush
+        local s = scenario(); local h = hook(s, fs); h:frame(0)
+        earn(s, false); h:frame(1); statistics(s, "Persistent scores saved.")
+        assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+        local compat = 0
+        for _, message in ipairs(h.diagnostics) do if message:find("IO_COMPATIBILITY", 1, true) then compat = compat + 1 end end
+        assert(compat == 1)
+        s = scenario(); h = hook(s, fs); h:frame(0); s:score(90)
+        assert(#h.errors == 0 and Data.Decode(fs.files[path]).counter == 2)
+    end
+end)
+
+test("void-return writes that drop bytes or report explicit errors cannot become committed saves", function()
+    for _, fault in ipairs({ "tamper", "failFlush", "failClose" }) do
+        local fs = filesystem(); fs.noMethodResult, fs.noErrno = true, true
+        local s = scenario(); local h = hook(s, fs); h:frame(0)
+        local baseline = fs.files[path]; earn(s, false); fs[fault] = true; h:frame(1)
+        assert(#h.errors == 1 and fs.files[path] == baseline)
+        statistics(s, "Persistence unavailable")
+        fs[fault] = false; h:frame(2)
+        assert(Data.Decode(fs.files[path]).players["ucid-a"].totalScore == 90)
+    end
+end)
+
+test("rename and remove require observed postconditions even with nil or misleading success replies", function()
+    local Adapter = dofile("server/persistence_fs.lua")
+    for _, mode in ipairs({ "void", "noMutation", "exception" }) do
+        local contents = { [path .. ".tmp"] = "verified bytes" }
+        local rawFiles = { open = function(name)
+            if not contents[name] then return nil, "missing", 2 end
+            return { read = function() return contents[name] end, close = function() end }
+        end }
+        local system = {
+            rename = function(from, to)
+                if mode == "exception" then error("rename denied") end
+                if mode == "noMutation" then return true end
+                contents[to], contents[from] = contents[from], nil
+            end,
+            remove = function(name)
+                if mode == "exception" then error("remove denied") end
+                if mode == "noMutation" then return true end
+                contents[name] = nil
+            end }
+        local fs = Adapter.New(rawFiles, { attributes = function(name)
+            return contents[name] and { mode = "file" } or nil
+        end }, system)
+        assert(fs.rename(path .. ".tmp", path) == (mode == "void"))
+        local target = mode == "void" and path or path .. ".tmp"
+        assert(fs.remove(target) == (mode == "void"))
+        assert((contents[target] == nil) == (mode == "void"))
+    end
+end)
+
+local function legacyFile()
+    -- Independent version-1 fixture: the original 12 columns, no CAP field.
+    local body = "DT_SCORE\t1\t7\t7\t3\nP\t756369642d61\t50696c6f74\t300\t300\t150\t150\t0\t2\t2\t2\t0\t0\t0\t0\n"
+    local checksum = 0
+    for i = 1, #body do checksum = (checksum * 31 + body:byte(i)) % 2147483647 end
+    return body .. "END\t1\t" .. string.format("%.0f", checksum) .. "\n"
+end
+test("version one accounts migrate CAP to zero while preserving all original counters and canonical validation", function()
+    local original = legacyFile(); local saved = Data.Decode(original)
+    local p = saved.players["ucid-a"]
+    assert(saved.counter == 7 and saved.revision == 3 and p.capScore == 0)
+    assert(p.totalScore == 300 and p.interceptScore == 150 and p.seadScore == 150 and p.missionCount == 2)
+    local updated = Data.Encode(saved); assert(updated:find("DT_SCORE\t2\t", 1, true) == 1)
+    assert(Data.Decode(updated).players["ucid-a"].capScore == 0)
+    rejected(function() Data.Decode(original:sub(1, -2)) end)
+    rejected(function() Data.Decode(original:gsub("300", "301", 1)) end)
+end)
+test("CAP settlement persists separately after legacy restoration and survives a fresh hook session", function()
+    local fs = filesystem(); fs.files[path] = legacyFile()
+    local s = scenario(); s:addCAPZones(); local h = hook(s, fs); h:frame(0); s:score(300)
+    s:command("Generate CAP"); local record = s:mission()
+    s.player.airborne = true
+    s.player.position = { x = record.capPlan.center.x, y = 6000, z = record.capPlan.center.y }
+    for time = 1, 121 do s:tick(time) end
+    s:complete(record.spawn.group); s:event("Ejection", s.player); h:frame(122)
+    local data = Data.Decode(fs.files[path]); local p = data.players["ucid-a"]
+    assert(data.counter == 8 and p.totalScore == 390 and p.capScore == 90 and p.interceptScore == 150 and p.seadScore == 150)
+    s = scenario(); h = hook(s, fs); h:frame(0); s:score(390)
+    statistics(s, "CAP Score: 90"); statistics(s, "Persistent scores saved.")
+    assert(Data.Decode(fs.files[path]).counter == 9)
+end)
+
+test("unsupported future primary schemas cannot be overwritten or rolled back to an older backup", function()
+    local body = Data.Encode(data(450)):match("^(.*\n)END\t%d+\t%d+\n$"):gsub("^DT_SCORE\t2\t", "DT_SCORE\t3\t")
+    local checksum = 0
+    for i = 1, #body do checksum = (checksum * 31 + body:byte(i)) % 2147483647 end
+    local future = body .. "END\t1\t" .. string.format("%.0f", checksum) .. "\n"
+    local fs = filesystem(); fs.files[path], fs.files[path .. ".bak"] = future, legacyFile()
+    local store = Store.New(path, fs)
+    rejected(store.Load); rejected(function() store.Save(data(150)) end)
+    assert(fs.files[path] == future and fs.files[path .. ".bak"] == legacyFile())
 end)
 
 print(string.format("All %d persistence tests passed (simulated filesystem/DCS hooks).", count))

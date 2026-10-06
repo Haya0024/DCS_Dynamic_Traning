@@ -3,22 +3,26 @@ local ScoreStore = {}
 function ScoreStore.New(path, fs)
     local store = { path = path, fs = fs }
     local function readValid(name)
-        local text, problem = fs.read(name)
-        if not text then return nil, problem end
+        local text, problem, detail = fs.read(name)
+        if not text then return nil, problem, detail end
         local ok, data = pcall(ScoreData.Decode, text)
-        if ok then return data, nil, text end
+        if ok then return data end
+        if type(data) == "string" and data:find("Unsupported score schema", 1, true) then return nil, "unsupported" end
         return nil, "corrupt"
     end
     function store.Load()
-        local data, problem = readValid(path)
+        local data, problem, detail = readValid(path)
         if data then return data, "primary" end
-        local backup, backupProblem = readValid(path .. ".bak")
-        if backup then return backup, "backup" end
+        local backup, backupProblem, backupDetail = readValid(path .. ".bak")
+        if backup and (problem == "missing" or problem == "corrupt") then return backup, "backup" end
         if problem == "missing" and backupProblem == "missing" then return ScoreData.Empty(), "new" end
-        error("Score storage unreadable; primary/backup preserved")
+        error("Score storage unreadable; primary/backup preserved; primary=" .. tostring(problem) ..
+            "; backup=" .. tostring(backupProblem) .. "; primaryDetail=" .. tostring(detail) ..
+            "; backupDetail=" .. tostring(backupDetail))
     end
     local function checkedWrite(name, text)
-        assert(fs.write(name, text), "Score write/flush/close failed")
+        local written, problem = fs.write(name, text)
+        assert(written, "Score write/flush/close failed; " .. tostring(problem))
         local observed = assert(fs.read(name), "Score verification read failed")
         assert(observed == text, "Score write verification failed")
         ScoreData.Decode(observed)
@@ -28,7 +32,10 @@ function ScoreStore.New(path, fs)
         checkedWrite(path .. ".tmp", text)
         local current, readProblem = fs.read(path)
         assert(current or readProblem == "missing", "Cannot inspect existing score file")
-        local valid = current and pcall(ScoreData.Decode, current)
+        local valid, decodeProblem
+        if current then valid, decodeProblem = pcall(ScoreData.Decode, current) end
+        assert(not (type(decodeProblem) == "string" and decodeProblem:find("Unsupported score schema", 1, true)),
+            "Unsupported score schema; existing primary preserved")
         if valid then
             checkedWrite(path .. ".bak.tmp", current)
             local oldBackup, problem = fs.read(path .. ".bak")

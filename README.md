@@ -127,6 +127,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 
 | ドキュメント | 内容 |
 |---|---|
+| [Architecture](docs/ARCHITECTURE.md) | モジュールの責務、状態・識別子・用語、設計上の不変条件と改善候補 |
 | [Intercept](docs/Intercept.md) | 敵生成、開始条件、経路、目標判定 |
 | [CAP](docs/CAP.md) | 空域抽選、滞在時間、敵生成、時間＋全滅の達成条件 |
 | [SEAD](docs/SEAD.md) | TOO / PB、配置条件、レーダーの状態遷移 |
@@ -135,6 +136,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 | [Scoring](docs/SCORING.md) | UCID、帰還評価、採点と保存の制約 |
 | [Persistence](docs/PERSISTENCE.md) | サーバーHookの導入、成績保存・復元、バックアップ |
 | [Testing](docs/TESTING.md) | 自動テストの実行方法、DCS内の確認手順 |
+| [History](docs/HISTORY.md) | 過去の検証・DCS実測・保存障害の診断経過 |
 | [Messages](docs/MESSAGES.md) | 全任務の画面メッセージ・DCSログ、タイミング、表示時間 |
 | [Briefing](docs/BRIEFING.md) | Mission Editorへ貼り付ける日本語・英語のミッション説明 |
 | [AGENTS.md](AGENTS.md) | 設計方針と開発ルール |
@@ -143,6 +145,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 
 編集元は `src/*.lua` と `vendor/MOOSE/Moose.lua`、設定は [src/config.lua](src/config.lua) にまとめています。
 [Build-Mission.ps1](scripts/Build-Mission.ps1) が各モジュールを `build/DynamicTraining.lua` に結合します。生成物は直接編集しません。
+ソースの実行入口は [src/main.lua](src/main.lua) です（旧`src/DynamicTraining.lua`）。初期化、F10、任務進行の調整を担当します。ミッションに登録済みの埋め込みファイル名は`DynamicTraining.lua`を使い、ビルド時にmain.luaを最後へ結合します。
 
 Gitではソース、テスト、仕様書、共通のVS Codeタスクを管理します。`mission/*.miz` はMEで編集する基地・Zone・テンプレート・トリガーを含む実行用ミッション、`vendor/MOOSE/Moose.lua` は使用版を固定する依存ファイルとして管理します。
 生成済みbundleと検証出力の `build/`、ログ、バックアップ、一時ファイル、DCS/Tacview録画、実プレイヤーの `scores.dat`、環境変数ファイル、VS Codeの個人設定はGitへ追加しません。除外ルールは [.gitignore](.gitignore) にまとめています。
@@ -163,4 +166,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Mi
 同期は登録済みの埋め込みLuaを置き換え、その他のミッション内容の保持を検証します。直前の `.miz` は同じ場所に `.miz.bak` として保存します。
 同期後にMEから実行する場合は `.miz` を開き直してください。実行中のDCSミッションへの反映には、更新した `.miz` での再開始が必要です。
 
-テストの実行コマンドと確認項目は [docs/TESTING.md](docs/TESTING.md) を参照してください。
+全体の検証は次のコマンドで実行できます。両bundleを結合し、Lua全9スイートとBuild/Sync/Installテストを専用fixtureで確認します。実ミッションへの反映は上記Sync/Checkで行います。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1
+```
+
+LuaがPATHにも標準のSteam版DCSの場所にもない場合は `-LuaPath "<Lua 5.1またはDCS luae.exeのパス>"` を指定してください。
+詳細な実行方法と確認項目は [docs/TESTING.md](docs/TESTING.md)、コードを変更する際の責務・用語は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。

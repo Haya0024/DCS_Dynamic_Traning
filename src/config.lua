@@ -17,7 +17,6 @@ return {
         fontSize = 16,
         minimumDrawingID = 1000000 -- Shared MOOSE allocator continues above this floor.
     },
-    fullReward = 150,
     recoveryFailurePercent = 60,
     landingHoldSeconds = 10,
     landingSpeedKnots = 5,
@@ -67,6 +66,8 @@ return {
         maxTickCreditSeconds = 2, cleanupRetrySeconds = 5, fullReward = 150
     },
     intercept = {
+        fullReward = 150,
+        cleanupRetrySeconds = 5,
         templates = { "TPL_INT_MIG29A_2", "TPL_INT_SU27_1", "TPL_INT_MIG29A_1" },
         minDistanceNM = 60,
         maxDistanceNM = 80,

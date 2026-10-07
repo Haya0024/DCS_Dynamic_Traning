@@ -237,7 +237,7 @@ DEAD Scoreを独立して集計・保存する。Player Statisticsにはカテ�
 14. Release Site Reservation後、元SEAD全員終了を待って別Wingが同じGroupを取得できる。複数Siteは指定した1つだけを開放する。
 15. 開放して誰も予約しないまま30分でCleanupする。専用保持中・DEADの地上予約中は削除せず、共有候補は元保持者の切断では削除しない。
 
-自動検証は [scripts/Test-DEAD.lua](../scripts/Test-DEAD.lua) と既存5スイート、Build/Syncテストを使用する。
+自動検証は [scripts/Test-DEAD.lua](../scripts/Test-DEAD.lua) を含むLua全9スイートとBuild/Sync/Installテストを使用する。`scripts/Test-All.ps1`で一括実行できる。現在の対応表と件数は [TESTING.md](TESTING.md) を参照する。
 nil観測・不明からの回復・明示死亡優先・Group一覧欠落はDEAD-77〜80で検証する。DEAD-16/29/52はDDM精度3、実配置点のSITE LOCATION表示、座標API失敗時のrollbackと保存済みbriefingの再利用を検証する。DCS内の座標確認はMAN-28で行う。
 Immediate追加採点はDEAD-67〜76で、事故5種、配点固定、MP2個別精算、達成前喪失、イベント順序・時刻、UCID未照合、Abort、不正設定、精算再試行と統計維持を検証する。DCS内ではMAN-25/26/39を確認する。
 自動検証の対応と手動結果は [TESTING.md](TESTING.md) に記録する。

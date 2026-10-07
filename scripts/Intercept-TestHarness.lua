@@ -158,7 +158,8 @@ local function scenario(options)
     function spawn:SpawnFromVec3(position)
         if s.failSpawn then return nil end
         local g = { position = position, heading = self.heading, units = {}, name = self.alias .. "#001",
-            template = self.template }
+            template = self.template, cleanupFailures = s.spawnCleanupFailures }
+        g.raw = { isExist = function() return not g.destroyed end }
         local n = #s.spawns + 1
         for i, kind in ipairs(templates[self.template]) do
             local name = g.name .. "-" .. i
@@ -205,11 +206,20 @@ local function scenario(options)
         end
         function g:GetUnits() return self.units end
         function g:GetName() return self.name end
+        function g:GetDCSObject() return not self.destroyed and self.raw or nil end
         function g:Destroy()
             self.destroyCalls = (self.destroyCalls or 0) + 1
             if self.cleanupFailures and self.cleanupFailures > 0 then
                 self.cleanupFailures = self.cleanupFailures - 1
                 error("simulated cleanup failure")
+            end
+            if self.cleanupFalse and self.cleanupFalse > 0 then
+                self.cleanupFalse = self.cleanupFalse - 1
+                return false
+            end
+            if self.cleanupNoEffect and self.cleanupNoEffect > 0 then
+                self.cleanupNoEffect = self.cleanupNoEffect - 1
+                return nil
             end
             self.destroyed = true
             for _, u in ipairs(self.units) do

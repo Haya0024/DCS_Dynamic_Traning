@@ -23,6 +23,8 @@ test("airfield recovery awards 150 only after ten continuous stopped seconds", f
     s:lastMessageContains("Career Points: 150")
     s:lastMessageContains("RTB Success: 1")
     s:command("Mission Status"); s:lastMessageContains("Idle")
+    s:lastMessageContains("CAP: Idle.")
+    s:command("Abort Mission"); s:lastMessageContains("CAP: Idle.")
     s:assertClean()
 end)
 

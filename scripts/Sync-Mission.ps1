@@ -12,7 +12,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 Add-Type -AssemblyName System.IO.Compression
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (-not $MissionPath) {
-    $MissionPath = Join-Path $projectRoot 'mission/Syria.miz'
+    $MissionPath = Join-Path $projectRoot 'mission/Persistent_and_Dynamic_FA-18C_Training.miz'
 }
 $MissionPath = [System.IO.Path]::GetFullPath($MissionPath)
 if ($Check -and $Watch) {

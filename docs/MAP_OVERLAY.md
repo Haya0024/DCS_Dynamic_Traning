@@ -37,7 +37,7 @@ ME・ユーザーMarkerが通常使用する低いIDとの衝突を避ける下�
 
 ## Lifecycleとエラー
 
-`MapOverlay.RefreshFriendlyAirbases()` を `src/DynamicTraining.lua` の初期化時に1回だけ呼ぶ。周期更新・captureイベント購読・追加タイマーは設けない。
+`MapOverlay.RefreshFriendlyAirbases()` を `src/main.lua` の初期化時に1回だけ呼ぶ。周期更新・captureイベント購読・追加タイマーは設けない。
 再呼び出しは現在のcoalitionを再列挙し、旧Overlayを削除して再作成する。module再初期化でも所有IDを保持し、重複を防ぐ。
 将来coalitionが変化した際はこの関数を明示的に呼び出せる。今回の初期表示は、後からcaptureが起きても自動更新しない。
 
@@ -45,9 +45,9 @@ ME・ユーザーMarkerが通常使用する低いIDとの衝突を避ける下�
 生成失敗は該当基地のCircle/Textをrollbackする。削除失敗はIDを保持して次回Refreshで再試行し、削除できるまで新Drawingを生成しない。
 API欠落・例外はDCSログの `[DynamicTraining] MapOverlay: [ERROR]` へ記録し、既存ミッションの初期化・進行を止めない。成功時は描画数と基地名をログへ記録する。
 
-## 現在のSyria.miz設定と検証範囲
+## ミッション設定と検証範囲
 
-2026-10-06に作業ツリーの `mission/Syria.miz` の `warehouses.airports` を読み取り、BLUEのIDは6 / 16 / 30 / 44であることを確認した。
+2026-10-06に作業ツリーの `mission/Syria.miz`（現在は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`）の `warehouses.airports` を読み取り、BLUEのIDは6 / 16 / 30 / 44であることを確認した。
 DCS Syria `radio.lua` のairfield ID、MEの出撃route、同梱MOOSEのSyria名称を照合した結果は以下。
 
 | ID | BLUE陸上基地 |

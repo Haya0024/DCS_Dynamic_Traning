@@ -15,7 +15,7 @@ try {
     Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Filter '*.lua' -File |
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $testRoot 'src') }
     [System.IO.File]::WriteAllText((Join-Path $testRoot 'vendor/MOOSE/Moose.lua'), '-- mock MOOSE')
-    $missionPath = Join-Path $testRoot 'mission/Syria.miz'
+    $missionPath = Join-Path $testRoot 'mission/Persistent_and_Dynamic_FA-18C_Training.miz'
     $archive = [System.IO.Compression.ZipFile]::Open($missionPath, [System.IO.Compression.ZipArchiveMode]::Create)
     try {
         foreach ($name in @('mission', 'l10n/DEFAULT/DynamicTraining.lua', 'l10n/DEFAULT/Moose.lua')) {

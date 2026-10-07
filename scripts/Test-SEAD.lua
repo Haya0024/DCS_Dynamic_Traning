@@ -1045,6 +1045,9 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
             s:tick(3); s:tick(5); assert(briefings() == 1)
             s.player.airborne = true; s:tick(7)
             assert(string.find(s.logs[#s.logs], "Hostiles will spawn in 20 seconds.", 1, true))
+            status(s, "TAKEOFF_DELAY"); s:lastMessageContains(label .. location)
+            assert(not string.find(s.messages[#s.messages].text, "Spawn in", 1, true))
+            assert(s.messages[#s.messages].seconds == duration)
             s.player.airborne = false; s:tick(9)
             assert(string.find(s.logs[#s.logs], "SEAD countdown reset", 1, true))
             s.player.airborne = true; s:tick(11); s:tick(31)
@@ -1059,16 +1062,17 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
         assert(debugPilots)
         assert(not string.find(s.messages[#s.messages].text, location, 1, true))
         assert(not string.find(s.messages[#s.messages].text, "HARM PB CODE", 1, true))
-        assert(#s.spawns == 1 and briefings() == 1)
+        local manualBriefings = airborne and 0 or 1
+        assert(#s.spawns == 1 and briefings() == 1 + manualBriefings)
         for time = 32, 35 do s:tick(time) end
-        assert(briefings() == 1 and r.state == "ACTIVE")
+        assert(briefings() == 1 + manualBriefings and r.state == "ACTIVE")
         for n = 1, 2 do
             status(s, "ACTIVE"); s:lastMessageContains(label .. location)
             assert(not string.find(s.messages[#s.messages].text, "INSTRUCTIONS", 1, true))
             assert(s.messages[#s.messages].seconds == duration)
-            assert(briefings() == 1 + n)
+            assert(briefings() == 1 + manualBriefings + n)
         end
-        s:tick(36); assert(briefings() == 3)
+        s:tick(36); assert(briefings() == 3 + manualBriefings)
         for _, message in ipairs(s.messages) do
             assert(not string.find(message.text, "Hostiles will spawn", 1, true))
             assert(not string.find(message.text, "countdown reset", 1, true))

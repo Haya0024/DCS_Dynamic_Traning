@@ -298,4 +298,140 @@ test("solo and MP2 show one range altitude aspect start; hostiles countdown and 
   end
 end)
 
+test("unknown life or changed identity cannot complete Intercept by polling", function()
+    for _, observation in ipairs({ "nil", "invalid", "error", "newAliveID", "newDeadID" }) do
+        local s = scenario(); s.player.airborne = true; s.generate()
+        local record = s:mission()
+        for _, target in ipairs(record.spawn.units) do
+            local unit = target.unit
+            if observation == "nil" then unit.IsAlive = function() return nil end
+            elseif observation == "invalid" then unit.IsAlive = function() return "dead" end
+            elseif observation == "error" then unit.IsAlive = function() error("unavailable") end
+            else
+                unit.alive = observation == "newAliveID"
+                unit.GetID = function() return 999999 end
+            end
+        end
+        s:tick(1); s:tick(2)
+        assert(record.state == "ACTIVE" and not record.primaryCompletedAt)
+        -- The original targets become observable again, including destroyed
+        -- wrappers whose DCS IDs no longer exist.
+        for _, target in ipairs(record.spawn.units) do
+            target.unit.IsAlive = function() return false end
+            target.unit.GetID = function() return nil end
+        end
+        s:tick(3); assert(record.state == "RTB_PENDING")
+        s:score(0); s:assertClean()
+    end
+end)
+
+test("confirmed loss events complete Intercept even when life queries stay unavailable", function()
+    local s = scenario(); s.player.airborne = true; s.generate()
+    local record = s:mission()
+    for i, target in ipairs(record.spawn.units) do
+        target.unit.IsAlive = function() return nil end
+        target.unit.GetID = function() return nil end
+        s:event("Dead", target.unit)
+        assert(record.state == (i == #record.spawn.units and "RTB_PENDING" or "ACTIVE"))
+    end
+    s:tick(1); assert(record.state == "RTB_PENDING")
+    s:score(0); s:assertClean()
+end)
+
+local function pendingCleanup(s)
+    for i = 1, 100 do
+        local name, module = debug.getupvalue(s.timers[1].callback, i)
+        if name == "Intercept" then return module.pendingCleanup end
+    end
+    error("Missing Intercept cleanup module")
+end
+
+test("abort cleanup retries at five seconds while new and parallel wings continue independently", function()
+    local s = scenario(); s.player.airborne = true; s.generate()
+    local old = s.spawns[1]; old.cleanupFailures = 2
+    s:command("Abort Mission")
+    assert(not s:mission() and not old.destroyed and pendingCleanup(s)[old])
+    s:lastMessageContains("ERROR: Enemy cleanup. See DCS log.")
+    assert(s.messages[#s.messages].seconds == 15)
+    s.generate(); local current = s:mission()
+    local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(1)
+    s:command("Task: Intercept", other); local parallel = s:mission(other)
+    s.cleanupEvents = true
+    s:tick(4); assert(old.destroyCalls == 1)
+    s:tick(5); assert(old.destroyCalls == 2 and not old.destroyed)
+    s:tick(9); assert(old.destroyCalls == 2)
+    s:tick(10); assert(old.destroyed and old.destroyCalls == 3 and not pendingCleanup(s)[old])
+    s:tick(15); assert(old.destroyCalls == 3)
+    assert(current.state == "ACTIVE" and parallel.state == "ACTIVE")
+    assert(not current.spawn.group.destroyed and not parallel.spawn.group.destroyed)
+    s:score(0); s:score(0, other)
+    s:lastMessageContains("Primary Success: 0")
+    assert(#s.errors == 1 and s.errors[1]:find("Intercept enemy cleanup pending", 1, true))
+    local recovered = 0
+    for _, log in ipairs(s.logs) do if log:find("Intercept enemy cleaned: " .. old.name, 1, true) then recovered = recovered + 1 end end
+    assert(recovered == 1)
+end)
+
+test("formation and route setup failure keep untracked enemies queued for cleanup after lock release", function()
+    for _, fault in ipairs({ "failFormation", "failRoute" }) do
+        local s = scenario(); s.player.airborne = true
+        s[fault], s.spawnCleanupFailures = true, 1; s.generate()
+        local old = s.spawns[1]
+        assert(not s:mission() and not old.destroyed and pendingCleanup(s)[old])
+        s:lastMessageContains("Intercept enemy spawn failed")
+        s[fault], s.spawnCleanupFailures, s.cleanupEvents = false, nil, true
+        s.generate(); local current = s:mission()
+        assert(current and current.spawn.group ~= old)
+        s:tick(4); assert(old.destroyCalls == 1)
+        s:tick(5); assert(old.destroyed and not pendingCleanup(s)[old])
+        assert(current.state == "ACTIVE" and not current.spawn.group.destroyed)
+        s:score(0); s:lastMessageContains("Primary Success: 0")
+        assert(#s.errors == 2) -- Cleanup diagnostic plus the original setup failure.
+    end
+end)
+
+test("false no-effect and unobservable Destroy results never discard pending cleanup", function()
+    for _, fault in ipairs({ "false", "noEffect", "queryError", "queryFalse" }) do
+        local s = scenario(); s.player.airborne = true; s.generate()
+        local group = s.spawns[1]; local lookup = group.GetDCSObject
+        if fault == "false" then group.cleanupFalse = 1
+        elseif fault == "noEffect" then group.cleanupNoEffect = 1
+        elseif fault == "queryError" then group.GetDCSObject = function() error("lookup unavailable") end
+        else group.GetDCSObject = function() return false end end
+        s:command("Abort Mission")
+        assert(not s:mission() and pendingCleanup(s)[group] and group.destroyCalls == 1)
+        group.GetDCSObject = lookup
+        s:tick(4); assert(group.destroyCalls == 1)
+        s:tick(5); assert(group.destroyed and not pendingCleanup(s)[group] and group.destroyCalls == 2)
+        s:tick(10); assert(group.destroyCalls == 2)
+        s:score(0); assert(#s.errors == 1)
+    end
+end)
+
+test("cleanup retries after success or accident never resettle the closed sortie", function()
+    for _, result in ipairs({ "RTB_SUCCESS", "RTB_FAILURE", "FAILED" }) do
+        local s = scenario(); s.player.airborne = true; s.generate()
+        local record = s:mission(); local group = record.spawn.group
+        group.cleanupFailures, s.cleanupEvents = 1, true
+        local points, closedAt = 0, 0
+        if result ~= "FAILED" then s:complete() end
+        if result == "RTB_SUCCESS" then
+            s:land(s:base(), 10)
+            for time = 11, 21 do s:tick(time) end
+            points, closedAt = 150, 21
+        else
+            s:event("Ejection", s.player)
+            points = result == "RTB_FAILURE" and 90 or 0
+        end
+        local receipt = record.participants[1].receipt
+        assert(receipt.result == result and not s:mission() and pendingCleanup(s)[group])
+        s:score(points); s:lastMessageContains("Settled Missions: 1")
+        s:tick(closedAt + 4); assert(group.destroyCalls == 1)
+        s:tick(closedAt + 5); assert(group.destroyed and not pendingCleanup(s)[group])
+        s:tick(closedAt + 10); assert(group.destroyCalls == 2 and record.participants[1].receipt == receipt)
+        s:score(points); s:lastMessageContains("Settled Missions: 1")
+        assert(#s.errors == 1)
+    end
+end)
+
 print(string.format("All %d Intercept tests passed (simulated DCS/MOOSE).", count))

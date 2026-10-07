@@ -278,11 +278,11 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 
 ## 表示・操作
 
-座標付きブリーフィングの自動表示は計画確定時の1回だけ。地上・空中受注のどちらでも、受注直後は方式と計画中の通知、SAM生成時は開始・成功条件・参加者の短い通知を表示し、座標やPBコードを再掲しない。
+座標付きブリーフィングの自動表示は計画確定時の1回だけ。地上・空中受注のどちらでも、受注直後は受注と計画中の通知だけで方式はDEBUG限定、SAM生成時は開始・成功条件の短い通知を表示する。参加者一覧はDEBUG限定とし、座標やPBコードを再掲しない。
 座標付き表示は `src/config.lua` の `coordinateBriefingSeconds` で設定し、初期値は60秒。計画確定時と座標を含むMission Statusの両方へ適用する。
 離陸待ち・カウントダウンのリセット・ACTIVE中の監視でもブリーフィングを再掲しない。必要な場合は `Mission Status` から何度でも同じ計画ブリーフィングを確認でき、TOO / PBの情報制限を維持する。
 地域表示名は `sead.zoneLabels`、SAM表示名はテンプレートの `type` に置き、ME の参照名と分離する。
-`Mission Status` では方式別の情報に加え、計画中の地点選定回数・生成までの残り時間・各参加者の状態を表示する。
+`Mission Status` では方式別の情報に加え、計画中の地点選定回数・各参加者の状態を表示する。生成までの残り秒数は画面／Statusに出さずDEBUGだけに残す。
 生成後は `Emitter state: ACTIVE / SUPPRESSION PENDING / SUPPRESSED / DESTROYED` と、計測中の継続時間を表示する。
 SEAD ScoreはIntercept Scoreと別に集計・保存する。`Player Statistics` にはカテゴリ別Scoreを表示せず、累計と任務・帰還・喪失統計を表示する（[SCORING.md](SCORING.md)）。
 SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSite dispositionとFollow-on DEAD availableを加える。
@@ -295,12 +295,13 @@ SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSi
 - [src/sead_objective.lua](../src/sead_objective.lua): エミッター観測・遷移表・終端状態・デバッグ状態表示。
 - [src/sead_sites.lua](../src/sead_sites.lua): サイト参照の登録・全員終了後の削除・削除失敗時の再試行。
 - [src/dead.lua](../src/dead.lua): 保持Siteの選定・残存対象snapshot・DEAD判定。
-- [src/DynamicTraining.lua](../src/DynamicTraining.lua): F10・共有受注・段階的な地点選定・状態・終了。
+- [src/main.lua](../src/main.lua): F10・共有受注・段階的な地点選定・状態・終了。
+- [src/mission_report.lua](../src/mission_report.lua): Status/Statistics本文と表示時間。画面・ログ出力は`notifications.lua`へ分離。
 - [scripts/Test-SEAD.lua](../scripts/Test-SEAD.lua): 方式抽選・情報制限・計画固定・PB誤差・距離候補・離陸待ち・配置条件・失敗復旧・主要目標・個別採点・複数ウィングの模擬検証。
   状態遷移、60秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
 
-`Build-Mission.ps1` で結合後、Lua 5.1 で `scripts/Test-SEAD.lua`、`scripts/Test-DEAD.lua` と既存4種類のテストを実行する。
-SEAD62件と既存85件、DEAD103件を検証し、詳細は [TESTING.md](TESTING.md) にまとめる。
+`scripts/Test-All.ps1`で両bundleを結合後、Lua全9スイートとBuild/Sync/Installテストを実行する。
+SEAD62件・DEAD103件を含む対応表と現在の全件数は [TESTING.md](TESTING.md) を参照する。
 実際のDCSでのRadar状態・損傷Life・イベント順序・残存SAMのCleanupはゲーム内確認待ち。
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。

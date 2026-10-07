@@ -184,7 +184,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - AVAILABLEで使用中assignmentがない状態を `unreservedSince` から連続計測し、`dead.unreservedSiteCleanupSeconds = 1800`（ミッション時刻30分）でCleanupする。RETAIN専用予約中・IN_USE（地上ARMED含む）は計測しない。準備失敗のrollbackは元の開始時刻を復元し、期限を延長しない。候補選定・使用予約時にも期限を確認する。AVAILABLEは元保持者の切断Cleanup対象外。観測不能を全滅とは扱わないが未予約timeoutは適用し、削除失敗はSweepで再試行する。
 - 全員終了時にIN_USEならCLEANUPへ倒す。明示保持・開放済みSite以外はCleanupが標準。専用保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
 - 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
-- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。既存5 LuaスイートとBuild/Syncテストも通す。
+- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。Lua全9スイートとBuild/Sync/Installテストも通す。
 
 ---
 
@@ -444,33 +444,21 @@ Dynamic Training
 
 ## ファイル構成
 
-初期構成:
+現在の構成・責務・状態・識別子は `docs/ARCHITECTURE.md` にまとめる。
 
-DCS-Dynamic-Training/
-- AGENTS.md
-- README.md
-- docs/
-  - DESIGN.md
-- src/
-  - main.lua
-  - intercept.lua
-  - config.lua
-- mission/
-  - DynamicTraining_Syria.miz
-- vendor/
-  - MOOSE/
-    - Moose.lua
+- `src/main.lua`: 実行入口、初期化・F10・状態遷移・イベント・タイマーの調整。埋め込みとbundleの名前は`DynamicTraining.lua`。
+- `src/config.lua`: 設定。各任務の満額は `intercept/cap/sead/dead.fullReward`。
+- `src/player.lua` / `missions.lua`: 搭乗者識別と任務台帳・Wing/UCIDロック。
+- `src/intercept.lua` / `cap.lua` / `air_targets.lua`: 航空任務と共通の敵機観測。
+- `src/sead.lua` / `sead_objective.lua` / `sead_sites.lua` / `dead.lua`: 配置・レーダーFSM・Site寿命・継続攻撃。
+- `src/recovery.lua` / `scoring.lua` / `score_data.lua` / `persistence.lua`: 帰還・採点・schema・ミッション側保存bridge。
+- `src/mission_report.lua` / `notifications.lua` / `map_overlay.lua`: 手動レポート・画面／ログ出力・地図。
+- `server/`: 保存Hook、通信・保存手順・ファイルI/O・backup。
+- `scripts/`: 結合・同期・Hook導入・模擬テスト。`Test-All.ps1`が一括検証入口。
+- `mission/Persistent_and_Dynamic_FA-18C_Training.miz`: 現在の実ミッション。
+- `vendor/MOOSE/Moose.lua`: 使用版を固定したMOOSE。
 
-将来的に以下を追加する。
-
-- difficulty.lua
-- scoring.lua
-- persistence.lua
-- player.lua
-- sead.lua
-- strike.lua
-- cas.lua
-- antiship.lua
+将来はdifficulty、Strike、CAS、Anti-Ship等を独立したモジュールで追加する。
 
 ---
 
@@ -490,15 +478,16 @@ DCS-Dynamic-Training/
 ### テスト仕様書
 
 - テストの構成・条件・期待結果・実行方法・DCS内の確認手順は `docs/TESTING.md` にまとめる。
+- 過去の検証結果・DCS実測・診断経過は `docs/HISTORY.md` に記録し、現在の仕様と当時の暫定結果を分ける。全体の責務・状態・識別子は `docs/ARCHITECTURE.md` に合わせる。
 - 自動テストを追加・変更したら、対応表・件数・機能仕様書の検証範囲を同じ作業で更新する。
 - 模擬テストの通過とDCS内での確認済みを区別する。手動結果には対象版・設定・テストID・実測結果を記録する。
 
 ### Lua と .miz の同期
 
 - `src/*.lua` と `vendor/MOOSE/Moose.lua` を編集元とする。設定値は `src/config.lua` に集約する。
-- `scripts/Build-Mission.ps1` が設定・保存データcodec・プレイヤー・採点・永続化bridge・任務ロック・Intercept・CAP・SEAD目標判定・SEAD配置・サイト管理・DEAD・帰還評価・実行部分を `build/DynamicTraining.lua` に結合する。生成物を直接編集しない。
+- `scripts/Build-Mission.ps1` の順序付き対応表が設定・出力・保存・搭乗者・任務・目標観測・レポートの各モジュールを結合し、最後に `src/main.lua` を `build/DynamicTraining.lua` に加える。生成物を直接編集しない。
 - 保存codecまたはserver側Luaを変更したらHookも再結合し、導入用bundleと保存テストを確認する。導入済みHookの更新にはinstallerとDCS再起動を使う。
-- Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、`mission/Syria.miz` も更新する。
+- Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、既定先 `mission/Persistent_and_Dynamic_FA-18C_Training.miz` も更新する。別ファイルを指定する場合だけ `-MissionPath` を使う。
   1. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1`
   2. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Check`
 - 同期・確認に失敗した場合は、反映済みと報告せず理由を伝える。
@@ -549,7 +538,7 @@ DCS-Dynamic-Training/
 - 地上の参加者がいれば全員の離陸待ち
 - 全員の離陸検出から20秒後に Intercept Spawn（生成時点の長機位置・機首方向を使用）
 
-上記処理は `src/DynamicTraining.lua` に実装済み。今回修正した前方位置・経路の計算も含め、ゲーム内で段階的に確認する。
+上記処理は `src/main.lua` に実装済み。今回修正した前方位置・経路の計算も含め、ゲーム内で段階的に確認する。
 
 追加の DCS 内での確認対象（コード・模擬テストは実装済み）:
 

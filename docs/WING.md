@@ -131,7 +131,8 @@ F10 はグループ共有で、ボタンを押した本人の UCID は取得し�
 
 - [src/player.lua](../src/player.lua): 搭乗者一覧、機体番号、UCID、元の機体・操縦者の照合。
 - [src/missions.lua](../src/missions.lua): 共有状態、ウィング・UCID の受注ブロック。
-- [src/DynamicTraining.lua](../src/DynamicTraining.lua): 受注・開始・目標達成・参加者の状態・中止・表示。
+- [src/main.lua](../src/main.lua): 受注・開始・目標達成・参加者の状態・中止の調整。
+- [src/mission_report.lua](../src/mission_report.lua): 手動Status/Statistics。画面・ログ出力は`notifications.lua`。責務・用語は [ARCHITECTURE.md](ARCHITECTURE.md)。
 - [src/sead.lua](../src/sead.lua): 段階的な地点選定・地形／離隔判定・地上配置。
 - [src/sead_sites.lua](../src/sead_sites.lua): Siteの保持・予約・Cleanup。
 - [src/dead.lua](../src/dead.lua): 保持Site選定・残存対象固定・DEAD全滅判定。

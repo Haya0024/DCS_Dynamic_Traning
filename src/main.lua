@@ -1,8 +1,6 @@
--- Runtime entry. Build-Mission.ps1 prepends the local gameplay modules.
-local function GlobalMessage(text, seconds)
-    env.info("[DynamicTraining] MESSAGE [ALL]\n" .. text)
-    trigger.action.outText(text, seconds)
-end
+-- Mission entry point. Build-Mission.ps1 prepends the local gameplay modules.
+local Message, GlobalMessage = Notifications.Group, Notifications.Global
+local Log, DebugLog, Safe = Notifications.Log, Notifications.Debug, Notifications.Try
 if DynamicTrainingRuntime then
     GlobalMessage("Dynamic Training is already loaded.", 10)
     return
@@ -11,37 +9,12 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "CAP-trial-1" }
+DynamicTrainingRuntime = { version = "training-3" }
 Persistence.Publish()
 
 local menus = {}
 local nextPlayerScan = 0
 local ScanPlayers
-
-local function Message(group, text, seconds)
-    if group then pcall(function()
-        env.info("[DynamicTraining] MESSAGE [" .. group:GetName() .. "]\n" .. text)
-        MESSAGE:New(text, seconds or 10):ToGroup(group)
-    end) end
-end
-
-local function Log(text)
-    env.info("[DynamicTraining] " .. text)
-end
-
-local function DebugLog(record, text)
-    local id = record.id or (record.category .. " assignment " .. record.assignmentID)
-    Log("[DEBUG] " .. id .. "\n" .. text)
-end
-
-local function Safe(label, group, callback)
-    local ok, result = pcall(callback)
-    if not ok then
-        env.error("[DynamicTraining] " .. label .. ": " .. tostring(result))
-        Message(group, "ERROR: " .. label .. ". See DCS log.", 15)
-    end
-    return ok, result
-end
 
 local function HasPending(record)
     for _, p in ipairs(record.participants) do if not p.done then return true end end
@@ -61,7 +34,9 @@ local function Close(record)
     elseif record.site then
         SEADSites.CloseAssignment(record.site, record.assignmentID)
     elseif record.spawn then
-        Safe("Enemy cleanup", record.group, function() record.spawn.group:Destroy(false) end)
+        if not Intercept.Cleanup(record.spawn.group) then
+            Message(record.group, "ERROR: Enemy cleanup. See DCS log.", 15)
+        end
     end
     Log((record.id or ((record.category or "Intercept") .. " reservation")) .. " closed; wing assignment released")
 end
@@ -242,7 +217,7 @@ local function Start(record)
         return
     end
     record.spawn, record.state = spawn, "ACTIVE"
-    local pilots = BeginScoring(record, Config.fullReward)
+    local pilots = BeginScoring(record, Config.intercept.fullReward)
     local details = string.format(
         "Range: %d NM\nAltitude: %d ft\nAspect: HOT",
         spawn.distance, spawn.altitude)
@@ -361,71 +336,15 @@ local function Statistics(groupName)
     local group = GROUP:FindByName(groupName)
     local roster, problem = Player.ForGroup(groupName)
     if not roster then Message(group, problem); return end
-    local texts = {}
-    for _, owner in ipairs(roster) do
-        local p = Scoring.Get(owner.ucid, owner.name)
-        if p then
-            texts[#texts + 1] = string.format(
-                "PLAYER STATISTICS: %s [%s]\nTotal Score: %d\nCareer Points: %d\n" ..
-                "Settled Missions: %d\nPrimary Success: %d\nRTB Success: %d\nRecovery Failure: %d\nDeath Count: %d",
-                owner.name, owner.unitName, p.totalScore, p.careerPoints,
-                p.missionCount, p.primarySuccessCount, p.rtbSuccessCount, p.recoveryFailureCount, p.deathCount)
-        else texts[#texts + 1] = "PLAYER STATISTICS: " .. owner.name .. "\nUCID unavailable; unscored." end
-    end
-    Message(group, table.concat(texts, "\n\n") .. "\n" .. Persistence.Status(), 25)
+    local text, seconds = MissionReport.Statistics(roster)
+    Message(group, text, seconds)
 end
 
 local function Status(groupName)
     local group = GROUP:FindByName(groupName)
-    local roster = Player.ForGroup(groupName)
-    local records = Missions.ForGroup(groupName, roster)
-    if #records == 0 then Message(group, "Intercept: Idle.\nSEAD: Idle.\nDEAD: Idle.\nCAP: Idle."); return end
-    local texts, displaySeconds = {}, 20
-    for _, record in ipairs(records) do
-        if record.category == "CAP" or record.category == "DEAD" or (record.category == "SEAD" and record.plan.estimatedPoint) then
-            displaySeconds = Config.coordinateBriefingSeconds
-        end
-        local text = (record.category or "Intercept") .. ": " .. record.state .. "\nWing: " .. record.groupName ..
-            "\nLead reference: " .. record.owner.name
-        if record.state == "DEAD_ACTIVE" then
-            text = "SEAD: COMPLETE\nFollow-on: DEAD ACTIVE\nRemaining targets: " .. DEAD.Remaining(record) ..
-                "\nWing: " .. record.groupName
-        elseif record.category == "DEAD" then
-            text = "DEAD: " .. record.state:gsub("_", " ") .. "\nArea: " .. record.plan.areaLabel ..
-                "\nRemaining targets: " .. DEAD.Remaining(record) .. "\n" .. DEAD.Briefing(record.site)
-        end
-        if record.category == "SEAD" then
-            text = text .. "\n" .. SEAD.Briefing(record.plan)
-            if record.primaryResult then text = text .. "\nSEAD Primary result: " .. record.primaryResult end
-            if record.spawn then text = text .. "\n" .. SEADObjective.Status(record.spawn, timer.getTime()) end
-            if record.state == "PLANNING" then
-                text = text .. "\nSite checks: " .. record.selection.totalAttempts
-            end
-        end
-        if record.category == "CAP" then text = text .. "\n" .. CAP.Status(record.capPlan, record.spawn) end
-        if record.site then
-            SEADSites.Refresh(record.site)
-            text = text .. "\nSite state: " .. record.site.state
-            if record.site.seadCompleted then
-                text = text .. "\nSite remaining vehicles: " .. (record.site.remainingTargetCount or "UNKNOWN")
-            end
-            text = text .. "\nSite disposition: " .. record.site.disposition:gsub("_", " ") ..
-                "\nFollow-on DEAD available: " .. (record.site.followOnAvailable and "YES" or "NO")
-        end
-        if record.spawnAt then
-            text = text .. string.format("\nSpawn in %d seconds.", math.max(0, math.ceil(record.spawnAt - timer.getTime())))
-        end
-        for _, p in ipairs(record.participants) do
-            text = text .. "\n" .. p.owner.name .. " [" .. p.owner.unitName .. "]: " .. p.state
-            if p.receipt then text = text .. " (+" .. p.receipt.points .. ")" end
-            if p.deadScoring then
-                text = text .. "\nDEAD objective: " .. (p.deadScoring.primaryCompletedAt and "COMPLETE" or "INCOMPLETE")
-                if p.deadReceipt then text = text .. " (+" .. p.deadReceipt.points .. ")" end
-            end
-        end
-        texts[#texts + 1] = text
-    end
-    Message(group, table.concat(texts, "\n\n"), displaySeconds)
+    local records = Missions.ForGroup(groupName, Player.ForGroup(groupName))
+    local text, seconds = MissionReport.Status(records, timer.getTime())
+    Message(group, text, seconds)
 end
 
 local function CanManage(groupName, target)
@@ -496,7 +415,7 @@ local function Abort(groupName, target, assignment)
         if not Missions.IsActive(record) then Message(group, "This sortie is already closed."); return end
     else
         local records = Missions.ForGroup(groupName, Player.ForGroup(groupName))
-        if #records == 0 then Message(group, "Intercept: Idle.\nSEAD: Idle.\nDEAD: Idle."); return end
+        if #records == 0 then Message(group, MissionReport.Idle()); return end
         record = records[1]
         if not Missions.wings[groupName] and #records > 1 then
             Message(group, "Multiple earlier wing missions found. Use the named Abort Sortie command."); return
@@ -844,6 +763,7 @@ local function Tick(_, time)
         Safe("Mission monitor", record.group, function() TickMission(record, time) end)
     end
     Safe("SEAD site cleanup", nil, SEADSites.Sweep)
+    Safe("Intercept enemy cleanup", nil, function() Intercept.Sweep(time) end)
     Safe("CAP enemy cleanup", nil, function() CAP.Sweep(time) end)
     return time + Config.pollSeconds
 end

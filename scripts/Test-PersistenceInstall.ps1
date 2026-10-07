@@ -1,4 +1,7 @@
 # Isolated installer and real-file hook integration; never edits Saved Games.
+[CmdletBinding()]
+param([string]$LuaPath = 'C:/Program Files (x86)/Steam/steamapps/common/DCSWorld/bin/luae.exe')
+
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('dcs-persistence-install-' + [guid]::NewGuid().ToString('N'))
@@ -29,8 +32,7 @@ try {
     if (-not $refused) { throw 'Invalid DCS directory was accepted' }
     Write-Host 'PASS: invalid installation directory rejected'
     & (Join-Path $PSScriptRoot 'Build-Mission.ps1')
-    $luaPath = 'C:/Program Files (x86)/Steam/steamapps/common/DCSWorld/bin/luae.exe'
-    if (-not (Test-Path -LiteralPath $luaPath)) { throw 'Set luaPath to your Lua 5.1/DCS luae.exe installation' }
+    if (-not (Test-Path -LiteralPath $LuaPath -PathType Leaf)) { throw 'Pass -LuaPath with the installed Lua 5.1/DCS luae.exe path.' }
     $env:DCS_TRAINING_TEST_ROOT = $fixtureRoot
     foreach ($phase in @('write', 'restore', 'recover')) {
         $env:DCS_TRAINING_TEST_PHASE = $phase

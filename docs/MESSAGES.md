@@ -342,6 +342,7 @@ Hawk 2 [BLUE_HORNET_INCIRLIK_01-2]: ACTIVE
 
 Planning SEAD uses 20 seconds and `THREAT AREA: Planning in progress`, with `Site checks: 4` instead of emitter/site details.
 Planning PB uses `ESTIMATED LOCATION: Planning in progress`. Once coordinates exist, SEAD Status uses 60 seconds.
+SEAD Status never adds the `Spawn in ... seconds.` line during TAKEOFF_DELAY. Spawn countdowns and resets remain DEBUG-only; Intercept Status retains its countdown.
 
 ### Immediate DEAD ACTIVE — 60 seconds
 
@@ -433,7 +434,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 `Mission Status` lasts 60 seconds for CAP and appends the accepted briefing, `Patrol: 40% (48/120 seconds)`, `Clock: RUNNING` / `WAITING / PAUSED` / `TIME COMPLETE`, and `Hostiles remaining: 2` / `0` / `NOT SPAWNED`. It does not redraw or reroll the area.
 CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant messages, points, totals and persistence status. Setup failure shows `ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.` for 20 seconds. A monitor/spawn failure settles each registered participant with `CAP setup/spawn failed. No reward.` for 20 seconds.
 Acceptance selection and actual spawn details are DEBUG only: `CAP accepted; zone=<name> template=<name> enemy at on-station second <n>` and `CAP enemy spawned; template=<name> units=<n> altitude=<n> ft`. No separate hostile spawn message appears on screen. Normal CAP group messages are mirrored to the DCS MESSAGE log.
-Idle status now includes `CAP: Idle.` after the existing category lines.
+Idle Status and Abort Mission use the same Intercept / SEAD / DEAD / CAP list, including `CAP: Idle.`.
 
 ## Screen: Player Statistics — 25 seconds, requested manually
 
@@ -503,6 +504,7 @@ Each table row is one actual message body. Different mission categories produce 
 | Pre-start aircraft/occupant changed | `Intercept reservation cancelled. Player aircraft changed or unavailable.` | 10 |
 | Ground DEAD cancelled | `DEAD reservation cancelled. Player aircraft changed or unavailable.` | 10 |
 | Intercept spawn failed | `ERROR: Intercept enemy spawn failed. Select 'Task: Intercept' to retry.` | 15 |
+| Intercept enemy deletion pending at assignment close | `ERROR: Enemy cleanup. See DCS log.` | 15 |
 | SEAD setup failed | `ERROR: SEAD setup failed. See DCS log; select 'Task: SEAD' to retry.` | 15 |
 | SEAD spawn failed | `ERROR: SEAD spawn failed. Select 'Task: SEAD' to retry; see DCS log.` | 20 |
 | DEAD preparation failed | `ERROR: DEAD setup failed. Site reservation rolled back; see DCS log.` | 20 |
@@ -517,6 +519,7 @@ Each table row is one actual message body. Different mission categories produce 
 
 Ground DEAD cancellation also sends each participant a FAILED settlement with `DEAD reservation cancelled. No reward.`.
 Other protected exceptions use their operation name, such as `ERROR: Task: SEAD. See DCS log.`. Internal operations with no Group have no screen delivery.
+An Intercept deletion retry adds no screen message. At assignment close the initial deletion failure displays the cleanup error once; when setup fails after spawning, the existing spawn-error notification is used. Pending/recovered deletion is logged separately, and retries continue every 5 mission seconds by default.
 
 Placement failure — 25 seconds; this example assumes all 50 attempts failed the height-range check:
 
@@ -717,6 +720,8 @@ Each row is an example of a separate log entry. No screen duration applies.
 | Public site idle timeout | `[DynamicTraining] SAM site cleanup: unreserved timeout; site=run7:SEAD:2` | Once |
 | Site destroyed by cleanup | `[DynamicTraining] SEAD site cleaned: run7:SEAD:2` | Once |
 | Destroy returns false | `[DynamicTraining] SEAD site cleanup pending: run7:SEAD:2: false` | First failure only; retries continue |
+| Intercept enemy deletion fails or cannot be confirmed | `[DynamicTraining] Intercept enemy cleanup pending: DT_INTERCEPT_1#001: Destroy returned false.` | First failure per group only; Lua may prepend a source line. Retry after `intercept.cleanupRetrySeconds` (default 5 mission seconds) |
+| Pending Intercept deletion succeeds | `[DynamicTraining] Intercept enemy cleaned: DT_INTERCEPT_1#001` | Once after disappearance is confirmed; immediate successful deletion has no extra entry |
 | Intercept spawn fails | `[DynamicTraining] Spawn: Intercept enemy spawn failed.` | Per failure |
 | SEAD setup fails | `[DynamicTraining] SEAD setup: Invalid SEAD mode.` | Per failure; Lua may prepend a source line |
 | SEAD spawn fails | `[DynamicTraining] SEAD spawn: SEAD SpawnFromVec2 returned nil.` | Per failure |
@@ -782,7 +787,7 @@ Diagnostics inspect SSE types only, do not log account/score data, and do not cr
 
 ## Sources and verification
 
-- [Runtime](../src/DynamicTraining.lua): delivery, acceptance, start, settlement, menu, monitoring.
+- [Main entry](../src/main.lua): acceptance, start, settlement, menu, monitoring. The bundle and embedded entry remain named DynamicTraining.lua.
 - [SEAD](../src/sead.lua): visible briefing and debug instructions.
 - [SEAD objective](../src/sead_objective.lua): emitter transitions.
 - [DEAD](../src/dead.lua) and [Sites](../src/sead_sites.lua): targets, briefing, cleanup.

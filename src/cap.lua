@@ -97,37 +97,13 @@ function CAP.Spawn(plan, assignmentID)
         position:WaypointAirTurningPoint(COORDINATE.WaypointAltType.BARO, plan.speedMps * 3.6, { engage }),
         center:WaypointAirTurningPoint(COORDINATE.WaypointAltType.BARO, plan.speedMps * 3.6, { engage, orbit })
     })
-    local spawn = { group = enemy, units = {}, template = plan.template, altitude = altitude }
-    for _, unit in ipairs(enemy:GetUnits() or {}) do
-        local object, id = unit:GetDCSObject(), unit:GetID()
-        assert(object and id, "CAP enemy identity unavailable.")
-        spawn.units[#spawn.units + 1] = { unit = unit, dcsUnit = object, objectID = id, lost = false }
-    end
-    assert(#spawn.units > 0, "CAP enemy units unavailable.")
-    return spawn
+    return { group = enemy, units = AirTargets.Snapshot(enemy), template = plan.template, altitude = altitude }
 end
 function CAP.RecordLoss(spawn, event)
-    if not spawn then return end
-    for _, target in ipairs(spawn.units) do if Player.EventMatches(target, event) then target.lost = true end end
+    return AirTargets.RecordLoss(spawn, event)
 end
 function CAP.Remaining(spawn)
-    if not spawn then return nil end
-    local count = 0
-    for _, target in ipairs(spawn.units) do
-        if not target.lost then
-            local ok, alive = pcall(function()
-                local alive = target.unit:IsAlive()
-                assert(type(alive) == "boolean", "CAP enemy life observation unavailable.")
-                local id = target.unit:GetID()
-                -- A destroyed MOOSE wrapper can no longer expose a DCS ID.
-                -- A different ID is never evidence about the original target.
-                assert(id == target.objectID or (alive == false and id == nil), "CAP enemy identity changed.")
-                return alive
-            end)
-            if not ok or alive ~= false then count = count + 1 end
-        end
-    end
-    return count
+    return AirTargets.Remaining(spawn)
 end
 function CAP.Complete(plan, spawn) return plan.elapsed >= plan.holdSeconds and CAP.Remaining(spawn) == 0 end
 function CAP.Status(plan, spawn)

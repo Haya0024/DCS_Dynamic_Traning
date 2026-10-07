@@ -15,7 +15,7 @@
 
 | 区分 | 実行ファイル | 現在の件数 | 主な対象 |
 |---|---|---:|---|
-| INT | [Test-Intercept.lua](../scripts/Test-Intercept.lua) | 16 | 離陸待ち、生成位置、編隊、機種、全滅判定、通知重複防止 |
+| INT | [Test-Intercept.lua](../scripts/Test-Intercept.lua) | 22 | 離陸待ち、生成位置、編隊、機種、全滅判定、観測不能・ID変更、通知重複防止、削除確認と再試行 |
 | CAP | [Test-CAP.lua](../scripts/Test-CAP.lua) | 30 | 空域抽選・DDM、滞在時間・停止再開・通知、敵生成、120秒＋全滅、MP2・並行任務、精算・失敗Cleanup |
 | SCORE | [Test-Scoring.lua](../scripts/Test-Scoring.lua) | 26 | UCID、帰還、事故、重複防止、累計 |
 | WING | [Test-Wing.lua](../scripts/Test-Wing.lua) | 27 | MP2、参加者固定、共有目標、個別精算、排他 |
@@ -28,11 +28,12 @@
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 
-Luaは合計342ケース（INT16＋CAP30＋SCORE26＋WING27＋PAR16＋SEAD62＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。
+Luaは合計348ケース（INT22＋CAP30＋SCORE26＋WING27＋PAR16＋SEAD62＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
-2026-10-07、この表示変更でLua全342ケース、BUILD2、SYNC3が通過。現在の実ミッション `mission/Persistent_and_Dynamic_FA-18C_Training.miz` を `-MissionPath` で指定してSync/Check成功。既定の `mission/Syria.miz` は存在しないため既定パスでのSync/Checkは失敗した。新表示のDCS内確認（MAN-01）は未実施。
+現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
+最新の自動検証: 2026-10-07、`training-3`。Test-AllでLua全348ケース、BUILD2、SYNC3、INSTALL5が通過し、main.luaを入口に結合して既定先の実ミッションSync/Checkも成功。DCS内の改名・削除再試行確認は未実施。
 
 ### 自動テストの前提と限界
 
@@ -53,6 +54,16 @@ MOOSE本体や実際のSyria地形・SAM AI・DCSのイベント配信・サー�
 
 すべてリポジトリのルートから実行する。Lua 5.1互換の実行環境とWindows PowerShellを使用する。
 最初に結合を行い、古い `build/DynamicTraining.lua` をテストしない。
+
+一括実行は次を使う。両bundleの結合、Lua全9スイート、BUILD2、SYNC3、INSTALL5の順に実行し、失敗した段階で停止する。実ミッションへの同期は別途行う。`-LuaPath`はINSTALL内の別プロセス検証にも引き継ぐ。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1
+# Luaの場所を指定する場合:
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1 -LuaPath "C:/Program Files (x86)/Steam/steamapps/common/DCSWorld/bin/luae.exe"
+```
+
+未指定ならPATHのlua、次に上記Steam版DCSのluae.exeを使う。以下は段階別に実行する場合のコマンド。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Mission.ps1
@@ -95,7 +106,7 @@ foreach ($suite in $suites) {
 ```
 
 ビルド・同期ツールは次の2本を順に実行する。どちらも一時ディレクトリの使い捨てミッションを使用する。
-SYNCは編集元から実プロジェクトのbundleを再生成することがあるが、実際の `mission/Syria.miz` は変更しない。
+SYNCは編集元から実プロジェクトのbundleを再生成することがあるが、実際の `mission/Persistent_and_Dynamic_FA-18C_Training.miz` は変更しない。
 BUILDはソースも一時プロジェクトへコピーして検証する。Watcherはテスト内で起動・停止し、一時ファイルを終了時に削除する。
 
 ```powershell
@@ -146,6 +157,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | INT-14 | 選ばれたテンプレートが見つからない | 予約解除後に別の受注を開始可能 |
 | INT-15 | 再受注と複数ウィングの受注 | 任務ごとにテンプレートを選び、他任務の抽選・敵に影響しない |
 | INT-16 | 単独・MP2の地上／空中受注、両者の連打、離陸イベント、カウントダウンリセット、定期監視 | 画面の開始はRange・Altitude・HOTの1回。Hostiles・Pilots・20秒待ち・リセットはDEBUGのみ。通常通知もMESSAGEへ記録。敵は1回生成、開始15秒・Status20秒を維持 |
+| INT-17 | IsAlive=nil/不正値/例外、生存・死亡wrapperの別ID、復旧後false＋IDなし | 不明観測中はACTIVE・未達成を維持、復旧後の明示死亡でRTB_PENDING。観測例外で他の処理を止めない |
+| INT-18 | IsAlive=nil・IDなしでも元のDCS実体の死亡イベントを順に受信 | 既知対象のlossを優先し、全対象の明示loss後だけ達成。pollingで達成を取り消さない |
+| INT-19 | Abort後のDestroyが2回例外、新任務と別Wingを開始、旧Destroyが死亡イベントを発生 | 参照・削除待ちを保持し5秒・10秒に再試行。任務ロックは即解放、新任務・他WingはACTIVE/0点のまま。成功後に待ち参照を解放し再削除なし、失敗・回復ログ各1回 |
+| INT-20 | 生成後の編隊／経路設定失敗と初回削除失敗、そのまま再受注 | 旧任務を解放し、未追跡の旧敵だけ削除待ちへ保持。5秒後に旧敵を削除、新敵の達成・採点へ干渉しない |
+| INT-21 | Destroy=false、nilで実体が残る、消失検索が例外／false | 不正・未確認を削除成功にしない。参照を保持し、5秒後に正常消失を確認して解放、以後再削除なし |
+| INT-22 | 帰還150／達成後事故90／未達成事故0で精算、初回削除失敗 | 精算・ロック解放を先に確定し、5秒後に削除。遅れた死亡イベントでもreceipt・点数・任務数1件を維持 |
 
 ### CAP（CAP）
 
@@ -186,7 +203,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 
 | ID | 条件・操作 | 期待結果 |
 |---|---|---|
-| SCORE-01 | 達成後BLUE飛行場へ着陸、停止10秒の前後 | 10秒未満は0、条件を連続10秒満たすと150 |
+| SCORE-01 | 達成後BLUE飛行場へ着陸、停止10秒の前後、精算後Status/Abort | 10秒未満は0、条件を連続10秒満たすと150。任務なしStatus/Abortは同じIdle一覧でCAPも含む |
 | SCORE-02 | 達成後のCrash/Dead/PilotDead/Ejection/UnitLost、同じ事故の重複通知 | 各事故で90を一度だけ加算 |
 | SCORE-03 | 達成前の事故、Cleanupによる敵死亡イベント | 0のまま終了し、削除イベントで後から成功しない |
 | SCORE-04 | 着陸確認中の事故、帰還確定後の事故 | 確認中は90、確定後は150を維持 |
@@ -346,7 +363,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | SEAD-59 | ACTIVEまたはPENDINGからDESTROYED、残存車両破壊、精算 | 完了表示・終端状態が固定、追加報酬なし。精算まで保持し、Cleanup後も保持したsite参照の結果は不変 |
 | SEAD-60 | MP2片方だけ精算、全員終了後の削除が2回失敗、新任務受注 | 全員終了まで削除なし。ロックは解放し、site参照を保持して再試行、新任務へ干渉せず3回目で削除 |
 | SEAD-61 | 別ウィングと並行中に自任務を中止 | 自サイトだけ削除し、未達成を成功へ変えず、他サイトを維持 |
-| SEAD-62 | TOO/PBを地上・空中で受注、複数tickの計画、離陸待ち・カウントダウンリセット、生成、Status再確認、表示時間60／90秒を設定 | 受注時MODE・計画時Ground acceptance説明・開始Pilots・20秒待ち・リセット・HARM攻撃指示はDEBUGのみ。方式と座標は計画確定で自動1回。DEBUGの計画に通常本文も含む。座標・コード秘匿、Status再確認と表示時間を維持 |
+| SEAD-62 | TOO/PBを地上・空中で受注、複数tickの計画、離陸待ち・カウントダウンリセット、生成前後のStatus、表示時間60／90秒を設定 | 受注時MODE・計画時Ground acceptance説明・開始Pilots・20秒待ち・リセット・HARM攻撃指示はDEBUGのみ。生成待ちStatusにもSpawn inを出さない。方式と座標は計画確定で自動1回。DEBUGの計画に通常本文も含む。座標・コード秘匿、手動Statusと表示時間を維持 |
 
 ### DEAD follow-on（DEAD）
 
@@ -509,7 +526,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 
 | ID | 条件・操作 | 期待結果 |
 |---|---|---|
-| BUILD-01 | 一時プロジェクトで2回結合、初回同期、Check | bundleのハッシュが一致し、埋め込みLuaが結合結果と一致 |
+| BUILD-01 | 一時プロジェクトでmain.luaと各モジュールを2回結合、初回同期、Check | bundleのハッシュが一致し、main.luaを最後に結合、登録済みDynamicTraining.luaの埋め込み内容が結合結果と一致 |
 | BUILD-02 | Watch起動後、コピーしたconfigのfullRewardを150→175へ変更 | 自動再結合し、埋め込みLuaに175が現れCheck成功 |
 | SYNC-01 | 古いLua入りZIPへCheck→同期→Check→同じ内容で再同期 | 初回Checkは不一致検出のみ。同期後一致、元ZIPのバックアップあり。エントリ数・名前・時刻・非Lua内容を保持し、再同期はZIP・backupを書き換えない |
 | SYNC-02 | 埋め込みLua欠落、ZIPエントリ重複、破損ZIP | 各理由で拒否し、元ファイルのハッシュを変更せずbackupも作らない |
@@ -549,7 +566,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 
 ### 実施前提
 
-同期済みの `mission/Syria.miz` を開き直し、ミッションを再開始する。
+同期済みの `mission/Persistent_and_Dynamic_FA-18C_Training.miz` を開き直し、ミッションを再開始する。
 採点・UCID確認はマルチプレイのサーバー側で行い、静的BLUE Hornet Clientスロットを使う。
 MP2は2人を受注前に搭乗させ、並行テストは別DCSグループを用意する。
 機体の初期兵装が空なのは仕様なので、必要な兵装を地上で再武装する。
@@ -607,9 +624,9 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-45 | 元WingがRelease Site Reservation、別WingでTask: DEAD。別試行ではMP2精算前に開放 | 同じ残存Groupを別Wingが取得、二重受注なし。元SEAD全員終了までは別Wingを拒否、採点・任務ロック維持 |
 | MAN-46 | 開放したSiteを未予約で30分放置。専用保持・地上DEAD受注も別試行 | 共有未予約30分でCleanup。専用保持中・ARMED使用予約中は削除なし。元保持者切断は共有Siteに影響しない |
 | MAN-47 | Intercept／SEAD／Follow-on DEADを地上・空中受注し、待機中着地・再離陸、StatusとDCSログを確認 | 指定した詳細はDEBUGのみ、Intercept画面はRange／Altitude／HOT。SEAD受注にMODEなし、計画に生成待ち説明なし、開始にPilotsなし。DEADも受注→座標1回→短い開始で自動再掲なし。Statusで座標を再確認可能 |
-| MAN-48 | 同期済みSyria.mizを開き直して開始。BLUE/REDでF10確認、ズーム・地図回転・通常Marker入力・任務メニューを操作 | 現在BLUEのAkrotiri/Beirut-Rafic Hariri/Incirlik/Ramat Davidに薄青Circleと青文字1枚の基地名。RED/Neutral/Ship/FARPは追加Drawingなし、BLUE側だけ表示。readOnly、南オフセットで文字可読、黒い複製文字なし。Marker入力・任務・帰還・採点が従来どおり。Allies Only/Fog of War維持。ログの描画数4を確認 |
+| MAN-48 | 同期済み実ミッションを開き直して開始。BLUE/REDでF10確認、ズーム・地図回転・通常Marker入力・任務メニューを操作 | 現在BLUEのAkrotiri/Beirut-Rafic Hariri/Incirlik/Ramat Davidに薄青Circleと青文字1枚の基地名。RED/Neutral/Ship/FARPは追加Drawingなし、BLUE側だけ表示。readOnly、南オフセットで文字可読、黒い複製文字なし。Marker入力・任務・帰還・採点が従来どおり。Allies Only/Fog of War維持。ログの描画数4を確認 |
 | MAN-49 | テスト用コピーをMEでTiyas BLUEへ変更して再開始。Luaの空港名リストは編集しない | Tiyasが自動追加され、Circle/Textが他基地と独立。元4基地も引き続き表示。結果を標準設定と区別して記録 |
-| MAN-50 | 更新したHookでDCSを再起動し同期済みSyria.mizをホスト。slot未選択・Statistics未操作で10秒待つ | Startupはinitialization pending。ログでMissionLoadEnd→BOOTSTRAP_COMMITTED→CONNECTED（storage/ack確認）を確認しscores.datを検証。初期表示だけで失敗とせず、失敗時はphaseとprimary/backup I/O詳細を記録 |
+| MAN-50 | 更新したHookでDCSを再起動し同期済み実ミッションをホスト。slot未選択・Statistics未操作で10秒待つ | Startupはinitialization pending。ログでMissionLoadEnd→BOOTSTRAP_COMMITTED→CONNECTED（storage/ack確認）を確認しscores.datを検証。初期表示だけで失敗とせず、失敗時はphaseとprimary/backup I/O詳細を記録 |
 | MAN-51 | 保存確認済みの精算後にミッションを閉じ、メニューに戻って10秒待つ。別ミッションも開始 | Stop後frameで通信・新run採番なし。SSEが先に消える場合はSTOP_FLUSH_UNAVAILABLEだけを記録し既存保存を保持。次ミッションは別run、保存済み累計を復元 |
 | MAN-52 | CAPを受注し座標へ移動、退出再進入、Status確認 | MEの4候補から1つ。CAP AREAへ中心DDMと条件を受注時60秒表示、半径・PATROL CENTER行なし。進入通知はCAP on station.のみ、20%ごと通知、全員退出で停止。zone内累計30〜120秒で1編隊出現し空域へ進入・哨戒 |
 | MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成事故・任意中止0 |
@@ -634,10 +651,13 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | サイト管理・Cleanup | SEAD-57〜61 / DEAD-53〜62 | MAN-18/20/23/35〜37 |
 | DEAD対象・phase・保持・予約 | DEAD | MAN-24〜34、SEAD-45〜61の回帰 |
 | player/missions/runtime | WING/PAR | INT/SCORE/SEAD、UCID・F10のマルチ確認 |
+| air_targets・空中目標観測 | INT-17/18、CAP-10/27 | INT/CAP全体、元実体のイベント・観測不能・死亡後IDなし |
+| Intercept敵削除・再試行 | INT-19〜22 | Lua全9スイート。Abort・精算・生成後設定失敗、5秒間隔・消失確認、旧イベントの非干渉 |
+| mission_report/notifications | INT-16、SEAD-62、SCORE-01、各Statistics確認 | Lua全9スイート、MESSAGESの本文・表示時間・MESSAGE/DEBUG境界、MAN-01/02/05/07/08/27/52 |
 | scoring/recovery・採点設定 | SCORE | WING/SEAD、MAN-15〜18/21/22 |
 | 成績永続化・サーバーHook | PERSIST / INSTALL | Lua全9スイート、MAN-22/34/40/41/50/51/55、通信・I/O・callback寿命を別々に確認 |
 | 結合・同期・Watch | BUILD/SYNC | 実 `.miz` に対する `-Check` |
-| BLUE陸上Airbase Drawing | MAP全18件 | MAN-48/49、青文字・倍率/回転別の見え方、現在の `.miz` のBLUE airport IDと設定保持、既存7 Luaスイート回帰 |
+| BLUE陸上Airbase Drawing | MAP全18件 | MAN-48/49、青文字・倍率/回転別の見え方、現在の `.miz` のBLUE airport IDと設定保持、Lua全9スイート回帰 |
 | MEのスロット・テンプレート・Zone変更 | 対応するLuaスイート | 実 `.miz` 確認と該当する手動ケース。fixtureだけではME変更を検出できない |
 
 共通モジュールの変更や機能追加の完了時は、両bundleの結合後にLua全9スイートを実行し、既存カテゴリへの回帰を確認する。
@@ -646,60 +666,7 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 
 ## 結果の記録と仕様の維持
 
-2026-10-04のDEAD追加前はLua145ケース、BUILDの2確認グループ、SYNCの3確認グループの通過を確認済み。
-同日のPrimary Result/Site残存判定分離後はLua全211ケース（INT15、SCORE26、WING27、PAR16、SEAD61、DEAD66）、BUILDの2確認グループ、SYNCの3確認グループがすべて通過した。
-同日のImmediate DEAD追加採点後はLua全221ケース（INT15、SCORE26、WING27、PAR16、SEAD61、DEAD76）、BUILDの2確認グループ、SYNCの3確認グループがすべて通過した。DCS内の追加採点確認は未実施。
-同日のTOO/PB DDM表示変更後もLua全221ケースが通過し、実ミッションのLua同期・Checkが成功した。DDM表示のDCS内確認（MAN-07/08）は未実施。
-同日のSite/DEAD nil観測修正・SEAD FSMのnil観測経路修正・Follow-on DEAD DDM統一後はLua全225ケース（INT15、SCORE26、WING27、PAR16、SEAD61、DEAD80）が通過した。BUILDの2確認グループ、SYNCの3確認グループも通過。DCS内のFollow-on座標確認（MAN-28）は未実施。
-2026-10-05のSEADブリーフィング重複修正後はLua全226ケース（INT15、SCORE26、WING27、PAR16、SEAD62、DEAD80）が通過した。BUILDの2確認グループ、SYNCの3確認グループ、実ミッションのLua同期・Checkも成功。DCS内の自動表示回数とStatus再確認（MAN-07/08）は未実施。
-同日の座標表示時間延長・Intercept受注通知整理後はLua全227ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD80）が通過した。表示時間の初期60秒と設定変更後90秒、Intercept開始表示1回を模擬検証。BUILDの2確認グループ、SYNCの3確認グループ、実ミッションのLua同期・Checkも成功。DCS内の表示時間・回数確認は未実施。
-同日の成績永続化実装後はLua全247ケース（既存227＋PERSIST20）、BUILD2確認グループ、SYNC3確認グループ、INSTALL3確認グループが通過した。INSTALLでは実ファイル保存・別Luaプロセスでの復元・破損primaryのbackup復旧も確認。実ミッションのLua同期・Checkも成功。DCS内のHook接続・再起動復元・停止callback順は未確認。
-同日のImmediate DEAD未達成からのSEAD帰還修正後はLua全253ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD86、PERSIST20）、BUILD2、SYNC3、INSTALL3確認グループが通過した。未達成RTBのSEAD150／DEAD0、MP2個別精算と僚機継続、復行、確認中事故、確認中DEAD達成を模擬検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-42/43は未確認。
-同日、ユーザー承認後に `Saved Games/<ユーザーフォルダー>/Scripts/Hooks/DynamicTrainingPersistenceHook.lua` へ導入し、生成bundleとのハッシュ一致を確認した。DCS再起動後の実機確認は未実施。
-同日の保存Hook通信修正後はLua全258ケース（既存233＋PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。Hookとミッションの別Lua環境・文字列通信・API拒否・不正返信・再接続、ホスト設定の保持・backup・idempotence・不正設定拒否を検証。実ミッションのLua同期・Checkも成功。ユーザー承認後に実Saved GamesのHookとautoexec.cfgをbackup付きで更新し、Hookハッシュ一致・既存DLSS設定維持・userhooks→server許可ブロック1件を確認した。DCS再起動後の接続・精算保存・再起動復元は未確認。
-同日のPreserve元Wing専用予約への変更後はLua全262ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD90、PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。元SEAD精算・再武装後の保持予約、別Wing拒否、同Wing内最寄り選択、所有者不明時の拒否、rollback後の保持予約維持、同UCIDの別Wing移動を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-30/44は未確認。
-
-2026-10-06の明示予約解除・共有Site未予約30分Cleanup追加後はLua全275ケース（INT16、SCORE26、WING27、PAR16、SEAD62、DEAD103、PERSIST25）、BUILD2、SYNC3、INSTALL5確認グループが通過した。30分境界、元SEAD精算待ち、専用保持・地上使用予約中の保護、別Wing共有取得・二重取得拒否、期限前rollback、観測不能時timeout、削除再試行、複数Site個別解除、古いcallbackの拒否を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-45/46は未確認。
-
-同日の画面通知整理後もLua全275ケース、BUILD2、SYNC3、INSTALL5確認グループが通過した。INT-16／SEAD-62／WING-02を変更し、生成待ち・リセット・Intercept開始詳細・TOO/PB攻撃指示のDEBUG専用出力、短い開始通知、通常メッセージのログ複写、座標秘匿・表示時間・一度だけの生成を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-47は未確認。
-
-その後、ユーザー指定でInterceptのHostiles／Range／Altitude／HOTを画面開始通知へ戻した。Lua全275ケース、BUILD2、SYNC3が通過。INT-11/16で実編成との一致、開始15秒で1回、Pilotsとカウント通知はDEBUGのみ、通常本文のMESSAGE記録を検証。実ミッションのLua同期・Checkも成功。DCS内確認は未実施。
-
-同日の追加整理後もLua全275ケース、BUILD2、SYNC3が通過。InterceptのHostiles、SEAD受注のMODE・計画のGround acceptance説明・開始PilotsをDEBUG専用にした。Follow-on DEADは受注10秒→座標ブリーフィング1回→座標なし開始25秒へ統一し、INT-11/16、SEAD-62、DEAD-16/17で画面／DEBUG分離、地上・空中の表示回数、Status再確認、配点・状態不変を検証。実ミッションのLua同期・Checkも成功。DCS内のMAN-47は未確認。
-2026-10-06のBLUE陸上Airbase Drawing追加後はLua全293ケース（既存275＋MAP18）、BUILD2、SYNC3確認グループが通過した。既存7 Luaスイート・harnessは変更していない。作業開始時のmainはorigin/mainと一致するe3b98ad。実ミッションのBLUE airport ID6/16/30/44を静的確認し、4基地から8個のBLUE限定Drawingを作る追加模擬検証も通過した。Build・実 `.miz` のSync・Checkが成功し、同期前backupとの比較でDynamicTraining.lua以外の7 ZIP entryが不変、作業開始時のmission/warehouses/optionsも不変であることを確認した。ログはローカルの `build/map-overlay-inspection/` に置く。MAN-48/49のDCS内表示・可視性は未確認。
-
-同日のMapOverlay文字位置修正後もLua全293ケース、BUILD2、SYNC3が通過。MAP-01でCircleの基地中心を維持し、Textのみ南1,000 mへ移動することを検証した。Build・実ミッションSync・Checkも成功。ユーザー提供のIncirlik画像では中心配置文字と通常基地名の重なりを確認したが、オフセット修正後の実DCS表示は未確認。MAN-48で文字の離隔を再確認する。
-
-同日の黒縁追加後はLua全296ケース（既存275＋MAP21）、BUILD2、SYNC3が通過。青文字を維持したまま黒Textを8方向に描き、最後に青Textを描画すること、全10 IDのRefresh/rollback、縁幅変更/無効化を模擬検証した。Build・実ミッションSync・Checkも成功。ただしユーザー提供のBeirutの実DCS画像で黒文字が分離して見づらくなることが判明し、この方式は撤回した。模擬テストでは実描画の可読性を検証できていなかった。
-
-同日の撤回後は黒文字の生成処理・設定・追加3テストを取り除き、南1,000 mに青文字1枚を置く前の状態へ戻した。Lua全293ケース（既存275＋MAP18）、BUILD2、SYNC3が通過し、Build・実ミッションSync・Checkも成功。オフセット版の可読改善はユーザー報告あり（版・倍率未記録）。全手動ケースの合格とは扱わない。
-
-本書のLuaケース数・番号と実行ファイルの対応、READMEと本書のリンク先も確認済み。
-2026-10-06のmission manager接続修正後はLua全296ケース（PERSIST28）、BUILD2、SYNC3、INSTALL5が通過。Hook/manager/実SSEの3環境を分離し、manager側a_do_scriptから型付き文字列だけを返す通信、dispatcher欠落時の非保存と復旧、旧server管理ブロックへのmission許可追加・server維持・backup・idempotenceを検証した。ユーザー承認後に実Hookとautoexec.cfgを更新し、Hookハッシュ一致と管理ブロック外の設定不変を確認。Sync/Check成功、CAP Zone4件保持。修正後の実DCS接続・保存・再起動復元は確認待ち。
-
-同日18:11 JSTの実DCS再現でmission経路のAPI status=true・不正返信と保存未接続を確認した。戻り値が伝搬する旧manager fixtureは実環境を再現できていなかった。scripting直接接続への変更後はLua全297ケース（PERSIST29）、BUILD2、SYNC3、INSTALL5が通過。副作用は実行されてもmanager返信が失われる条件、dispatcher不在、status=falseの拒否を検証。実Saved Gamesへ最終Hookをbackup付きで配置しbundleとのハッシュ一致、autoexec.cfg全体の不変、実ミッションSync/Check成功とCAP Zone4件保持を確認。scores.datは未作成。新経路の実DCS接続・精算保存・再起動復元は確認待ち。
-
-同日18:21 JSTの実DCSログでscripting経路のnil/nil返信と未接続を確認し、この経路は撤回した。ユーザーはPlayer Statisticsを押さず、起動時表示で判断したと報告。起動直後のSession only表示だけは失敗の根拠とせず、Hookエラー・後続の接続ログ・保存ファイルで判定する。mission/a_do_scriptへ戻し、報告された先頭nil・末尾値欠落に対応する末尾scalar回避策を追加。Lua全298ケース（PERSIST30）、BUILD2、SYNC3、INSTALL5が通過し、実ファイルの別プロセス保存・復元・backup復旧も位置ずれfixtureで確認した。実Hookをbackup付きで更新、bundleハッシュ一致、autoexec.cfg全体不変、Sync/Check成功、CAP Zone4件保持を確認。回避策導入後の実DCS接続・精算保存・再起動復元は未確認。
-
-同日18:30 JSTの実DCS再現はprotocol取得後のScore storage unreadableで停止した。開始前/終了後のbridgeエラーを分離すると、実行中の失敗はLoad段階であり、スロット未選択は初期化失敗の原因ではない。通信・native I/O・transaction service・Hook寿命を分離し、errno欠落時の不存在確認、unreadable primary保護、Initialize返信喪失時の再統合防止、確認前のSaved抑止、Stop後frame抑止、slot未選択接続を追加検証。Lua全306ケース（PERSIST38）、BUILD2、SYNC3、INSTALL5が通過。実Hookをbackup付きで更新、bundleハッシュ一致とautoexec.cfg全体不変を確認。実ミッションSync/Check成功、対象DynamicTraining.lua以外の全ZIP entryとCAP Zone4件が不変。起動表示をinitialization pendingへ変更。scores.datは導入時点で未作成。I/O失敗の具体的原因とMAN-50/51、実プレイヤーの精算保存・再起動復元は引き続き実DCSで確認する。
-
-同日18:52 JSTの再現でLoad通過後のBOOTSTRAP write判定失敗を確認。一時fileはDCS終了後も34 bytes残り、codec検証に通るrun1/revision0/空accountsだった。書込み結果とnative I/Oの返り値を分離し、void-return・flush欠落でもclose後再読とschema一致を必須とするadapterへ修正。rename/removeも実結果を検証する。Lua全309ケース（PERSIST41）、BUILD2、SYNC3、INSTALL5が通過。最終Hookを実Saved Gamesへbackup付きで導入、bundleハッシュ一致とautoexec.cfg不変、Sync/Check成功を確認。実DCSでの書込み/保存確認・復元は未確認。対象版のmethodごとの返り値形状はIO_COMPATIBILITYログで確認する。
-
-同日19:10 JST、DCS 2.9.30.28718（Windows MT）、ユーザーのマルチプレイホスト実行で初回接続・空成績の保存・確認通知・正常終了が通過した。write/flush/closeは成功時返り値nilであることを実ログで確認。MissionLoadEnd→BOOTSTRAP_COMMITTED run1→CONNECTED、Ramat slot StatisticsのPersistent scores saved.、StopのFinal snapshot and acknowledgement confirmed.を確認。終了後scores.datのcodec検証成功、34 bytes、run1/revision0/accounts0、Hookとbundleのハッシュ一致。MAN-50の初期保存・MAN-51の正常終了部分を確認したが、slot未選択の条件、実ポイント精算保存、既存累計の再起動復元は未確認なので手動ケース全体を完了とはしない。実成績を検証用に変更していない。
-2026-10-06の保存未接続診断追加後はLua全295ケース、BUILD2、SYNC3、INSTALL5確認グループが通過。通常の保存・採点・復元処理を変えず、登録/frame/非ホスト/endpoint待ちを区別するログを追加した。実ミッションのSync/Checkも成功し、ユーザー追加のCAP Zone4件を保持した。17:45 JSTの実DCSログではHook読込済み・Player Statistics未接続を確認したが、診断Hookでの再現と根本原因の確定は未実施。
-DCS内のSEAD状態遷移・DEAD継続・サイト管理・採点の各手動ケースは個別結果の記録待ち。
-過去の「ゲーム内で動いている」という報告は、未記録の手動ケースすべての合格とは扱わない。
-
-CAP-trial-1追加後はLua全342ケース（INT16、CAP30、SCORE26、WING27、PAR16、SEAD62、DEAD103、PERSIST44、MAP18）、BUILD2、SYNC3、INSTALL5確認グループが通過した。Intercept/SEAD/DEAD等の既存ゲームプレイテスト本体は変更せず、共通harnessへCAPのZone/Orbit/alias模擬を追加した。実Syria.mizの4円形CAP Zone（各18,288m）と既存Intercept template3種のLate Activation・実機数を静的確認。Build・実ミッションSync・Check成功、同期直前との比較で埋め込みDynamicTraining.lua以外の全ZIP entry不変。schema2の最終Hookを実Saved Gamesへbackup付きで更新しbundleハッシュ一致を確認、autoexec.cfgと既存scores.datのハッシュは不変。旧schema→新schemaの移行・CAP90保存・次run復元・未知schema保護は専用fixtureで確認した。DCS再起動後のCAP AI・F10・実ポイント保存復元（MAN-52〜55）は未確認。
-
-2026-10-06 20:17〜20:56 JST、CAP-trial-1、DCS 2.9.30.28718（Windows MT）、ユーザーのマルチプレイホスト、標準設定で2回のCAP実行をログ検証した。run2:CAP:1（Beirut）はGolan/Su-27×1、進入20:30:19→24/48/72/96/120秒の通知、65秒で生成、時間達成後の敵全滅20:33:12、UnitLost20:33:25で90点。run2:CAP:2（空母）はGolan/MiG-29A×2、進入20:53:29→同じ通知、74秒で生成、120秒後も敵残存、1機撃破後のUnitLost20:56:23で0点。両任務の敵交戦・任務ロック終了と、revision1/2保存・Stop最終確認を記録。終了後schema2/run2/revision2の保存fileをcodecで読取検証し、Total/Career/CAP各90、任務2、Primary成功1、帰還失敗1、未達成失敗1、Death2が一致した。証跡はbuild/cap-live-20261006.log（元dcs.logのUTC表記をJSTへ換算）。任務関連Luaエラーなし。MAN-52/53/55の一部条件のみ確認済みであり、退出停止/再開・敵全滅先行・帰還150・MP2/並行・次セッションの90点復元は未実施。全ケースPASSとは扱わない。
-
-同日のCAP表示整理後は、CAP-01/03/25で受注/Statusの `CAP AREA: <DDM>`、Radius/PATROL CENTER行の非表示、進入時 `CAP on station.` のみを検証した。Lua全342ケース、BUILD2、SYNC3が通過し、実Syria.mizのSync/Checkも成功。時計・敵生成・達成・採点条件は変更していない。整理後の実DCS表示はMAN-52で確認待ち。
-
-2026-10-06 21:15〜21:16 JST、DCS更新後の2.9.30.28738（Windows MT）、同PCでのホスト実行を確認した。21:15:44のrun3/source=primary接続・保存確認と21:16:47のStop最終確認が成功。終了後primary schema2/run3/revision0とbackup run2/revision2を読取codec検証し、Total/Career/CAP各90、既存統計を保持していた。Hookと生成bundleのhash一致、autoexec.cfgの既知hash一致。更新後の接続失敗ログはない。MAN-51/55の次セッションへの累計引継ぎ部分を確認したが、Statistics画面・更新後の新規精算・帰還150・得点付き旧schema移行は未実施。証跡はbuild/persistence-update-20261006.log。実成績への直接書込みや実装修正は行っていない。
-
-F10の受注メニューは2026-10-07から `Task: Intercept / CAP / SEAD / DEAD` とする。模擬操作のコマンド名と対応表も同じ表記を使い、ケース数・達成条件・採点の期待値は維持する。DCS内ではMAN-02/05/27/52でメニュー名と受注、エラー時の再受注案内を確認する。
-名称変更後はLua全342ケース（9スイート）、BUILD2、SYNC3、INSTALL5確認グループが通過した。実ミッション `mission/Persistent_and_Dynamic_FA-18C_Training.miz` へのBuild/Sync/Checkも成功。直前backupとの比較でDynamicTraining.lua以外の全ZIP entryが不変、埋め込みLua内の4メニューがTask表記であることを確認した。MEの既存ブリーフィングに旧メニュー名の記載はなかった。受注・敵生成・帰還・採点条件は維持している。変更後の実DCSメニュー表示は確認待ち。
+過去の自動テスト結果・DCS実測・診断経過は [HISTORY.md](HISTORY.md) に保存する。現在の仕様と当時の暫定結果を区別する。
 
 手動・回帰確認の記録には、次の形式を使う。結果は `PASS / FAIL / 未実施 / 条件未成立` のいずれかとする。
 

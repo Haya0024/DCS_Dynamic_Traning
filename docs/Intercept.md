@@ -232,10 +232,13 @@ MiG-29A ×2 では形状によって外見上の違いが小さくなる場合�
 
 敵は生成時に各機の DCS オブジェクトを記録し、死亡・墜落・機体喪失イベントで全滅を判定する。
 補助的に1秒監視で生存状態を確認するが、未精算の元の参加者機が全機失われた後にクリアを推測しない。
+空中目標の観測はCAPと共通の`air_targets.lua`を使う。IsAliveのnil・例外・不正値、元の機体と異なるIDは生存側に数える。明示lossイベントを優先し、IsAlive=falseでIDが消えた死亡wrapperは死亡と確認できる。
 敵全滅で `Intercept PRIMARY OBJECTIVE COMPLETE` と帰還指示を表示する。この時点ではポイントを加算しない。
 各参加者が BLUE 飛行場・空母に帰還して条件を満たすと各自150ポイント、クリア後の墜落・死亡・脱出は該当者だけ90ポイントを付与する。
 未クリアの事故・任意 Abort は該当者だけ0ポイント。長機の喪失・個人中止後も僚機は継続できる。
 全員の精算・中止後に受注ロックを解除し、敵を削除して待機状態へ戻す。
+敵削除は`Intercept.Cleanup`に委譲する。削除の例外・false・実体残存・実体確認の失敗ではグループ参照を`Intercept.pendingCleanup`に保持し、共通の1秒監視から`intercept.cleanupRetrySeconds`（初期5秒）ごとに再試行する。任務ロック解放や精算を削除待ちで遅らせない。生成後の編隊・経路・機体追跡設定の失敗でも、取得済みの敵グループを同じ削除待ちへ渡す。
+同梱MOOSEの`Destroy(false)`は成功時もnilを返すため、戻り値のfalseを拒否し、MOOSEの`GetDCSObject`による新しい検索と残存DCS Groupの`isExist`で消失を確認してから参照を解放する。確認できない場合は再試行を継続する。削除待ちはミッション実行中だけで、永続保存しない。
 1人だけ精算してもウィング名と登録 UCID のロックを維持する。別スロットへ移動しても新たな受注はできない。
 登録者は別スロットから UCID を照合し、名前・機体を指定する個人 Abort で自分の出撃を中止できる。
 僚機の撃墜も任務クリア条件に含む。個別の撃墜者・撃墜数はまだ採点しない。
@@ -253,6 +256,7 @@ MiG-29A ×2 では形状によって外見上の違いが小さくなる場合�
 | 開始前にプレイヤーが無効・死亡・別機体へ移動 | 予約を解除し、生成しない |
 | スポーンの戻り値が nil、または経路設定に失敗 | エラーを表示・記録し、生成した敵があれば削除して再要求を可能にする |
 | 20秒後にスポーン失敗 | 予約は解除済み。再度 `Task: Intercept` を選択する |
+| 任務終了・生成後設定失敗時の敵削除失敗 | 参照を保持して5秒ごとに再試行。最初の失敗だけログへ記録し、回復後に完了ログ。終了時は従来のエラー通知15秒を1回出す。再試行による死亡イベントは旧任務を精算・達成させず、新任務・別Wingへ干渉しない |
 | 予約中のプレイヤー死亡・離脱・機体変更・操縦者変更 | 予約を解除し、取消メッセージを表示する |
 | 生成待ち中の着地 | カウントをリセットし、離陸待ちへ戻る |
 | 予約中の途中参加・AI 僚機の離陸 | 受注時に登録した参加者だけを引き続き監視する |
@@ -264,18 +268,18 @@ MiG-29A ×2 では形状によって外見上の違いが小さくなる場合�
 
 ## 将来仕様（未実装）
 
-採点・帰還評価はメモリ内の試用実装済み。永続保存、ノーダメージ等の追加評価、Difficulty による満額の算出式は未実装。
+採点・帰還評価とUCID累計の永続保存は実装済み（[SCORING.md](SCORING.md)、[PERSISTENCE.md](PERSISTENCE.md)）。ノーダメージ等の追加評価、Difficultyによる満額の算出式、カテゴリRating・個別撃墜統計は未実装。
 
 | 機能 | 方針 |
 |---|---|
 | 難易度 | 1 Training ～ 5 Expert。Threat Budget で編成する |
 | Threat Cost の例 | MiG-21: 1、MiG-29: 2、Su-27: 3、Su-30: 4 |
 | 難易度の要素 | 敵数・機種・Skill・距離・高度差・編隊数・Aspect・ECM・AWACS・情報量 |
-| 永続化 | Career Points、Total Score、Intercept Rating、成功・失敗・撃墜・帰還等の統計 |
+| 成績の拡張 | カテゴリRating、個別の撃墜者・撃墜数、推奨難易度 |
 | 生成バリエーション | 方位範囲を側方・後方へ拡張、高度差、機種・機数の候補拡張、複数編隊、FLANK / BEAM / COLD、複数方向 |
 | プレイヤー / 状態管理 | 動的 Client スロット |
 
-難易度ごとの予算、満額の配点、永続化形式は未決定。現行コードの固定値と混同しない。
+難易度ごとの予算と配点、追加成績の保存方法は未決定。現在の保存schemaと固定報酬`intercept.fullReward = 150`を将来案と混同しない。
 
 ## 動作確認項目
 
@@ -287,6 +291,7 @@ Intercept への名称変更後のゲーム内表示は再確認する。
 `scripts/Test-Intercept.lua`、`scripts/Test-Scoring.lua`、`scripts/Test-Wing.lua`、`scripts/Test-ParallelWings.lua` は結合済みの実際のミッションスクリプトを Lua 5.1 で読み込み、DCS / MOOSE の呼び出し先を模擬する。
 生成のタイミング・予約の解除とリセット・重複抑止・生成時点の位置・距離と方位の境界・経路の構成を自動検証する。
 敵テンプレートの3抽選結果、機種・機数の表示、1機・2機編成の完了と採点、選択テンプレート不在時の再試行、別ウィングとの独立性も模擬検証する。
+Test-Interceptは22ケース。INT-19〜22で、終了時・生成後設定失敗時の削除例外、false、無処理nil、消失確認不能、5秒の再試行境界、参照解放、精算済みreceiptの不変性、新任務・別Wingへの非干渉を検証する。実DCSでの削除再試行は確認待ち。
 この検証はゲーム内の離陸判定や AI 交戦の確認を代替しない。
 
 | ケース | 期待結果 |
@@ -323,11 +328,13 @@ Intercept への名称変更後のゲーム内表示は再確認する。
 
 ## 実装ファイルと反映手順
 
-- 実装: [src/DynamicTraining.lua](../src/DynamicTraining.lua)
+- 実装: [src/main.lua](../src/main.lua)
 - 設定: [src/config.lua](../src/config.lua)
 - 敵生成: [src/intercept.lua](../src/intercept.lua)
+- 敵観測: [src/air_targets.lua](../src/air_targets.lua)
+- Status/Statistics: [src/mission_report.lua](../src/mission_report.lua)
 - 採点・帰還: [SCORING.md](SCORING.md)
-- ミッション: [mission/Syria.miz](../mission/Syria.miz)
+- ミッション: [Persistent_and_Dynamic_FA-18C_Training.miz](../mission/Persistent_and_Dynamic_FA-18C_Training.miz)
 - API 実装: [vendor/MOOSE/Moose.lua](../vendor/MOOSE/Moose.lua)
 - Lua 同期: [scripts/Sync-Mission.ps1](../scripts/Sync-Mission.ps1)
 

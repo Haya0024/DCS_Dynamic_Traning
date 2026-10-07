@@ -13,11 +13,11 @@ UCID の照合、グループ別 F10 メニュー、クリア後の帰還評価�
 重複防止、成績表示とサーバーHookによる永続保存はコードに実装済み。
 ユーザーから任務がゲーム内で動作しているとの報告あり。
 UCID 取得・着陸・事故イベントの個別ケースの確認範囲は未記録。
-サーバー用Hook導入時は保存済み累計をミッション再開始・サーバー再起動後も復元する。未接続時はセッション内のみ。導入・保存状態・復旧は [PERSISTENCE.md](PERSISTENCE.md) を参照する。DCS内の保存・復元は確認待ち。
+サーバー用Hook導入時は保存済み累計をミッション再開始・サーバー再起動後も復元する。未接続時はセッション内のみ。導入・保存状態・復旧は [PERSISTENCE.md](PERSISTENCE.md) を参照する。2026-10-06に初期接続・CAP90点の保存と次セッションへの引継ぎを確認済み。帰還150点の保存、復元成績のStatistics画面などは確認待ち。
 
 設定は [src/config.lua](../src/config.lua) に集約する。
 初期の試用値は満額150ポイント、失敗率60%、着陸確認10秒、停止判定5 knots。
-Intercept の満額は `fullReward`、SEAD の満額は `sead.fullReward`、両DEADの満額は `dead.fullReward` で個別に設定する。
+Intercept の満額は `intercept.fullReward`、SEAD の満額は `sead.fullReward`、両DEADの満額は `dead.fullReward` で個別に設定する。Interceptは旧トップレベルの`fullReward`から移動し、初期値150は維持する。
 CAPの満額は `cap.fullReward`（150）。CAP Scoreへ独立加算し、他カテゴリのScoreへ加算しない。Total/Careerと既存の任務・帰還・喪失統計は共通精算を使う。保存schema2でCAPを追加し、schema1の既存成績はCAP=0として読み込み、従来の累計を維持する。
 Difficulty / Threat Budget による配点、追加ボーナス、カテゴリ Rating は未実装。
 
@@ -84,7 +84,7 @@ UCID の全文をゲーム内表示や通常のログに出力しない。
 ## 状態と精算（実装済み）
 
 状態は [src/missions.lua](../src/missions.lua) の `Missions.wings[groupName]` とその参加者一覧に集約する。
-状態の更新は [src/DynamicTraining.lua](../src/DynamicTraining.lua) が行う。
+状態の更新は [src/main.lua](../src/main.lua) が行う。
 ウィングごとに同時に1任務で、帰還待ちもその1件に含める。別ウィングは並行して受注できる。
 ウィング名と登録 UCID に受注ロックを設定し、1人の精算・スロット変更では解除しない。
 
@@ -193,7 +193,7 @@ UCIDを照合できない搭乗者はプレイヤー名と `UCID unavailable; un
 この表示変更は実装済み、DCS内の画面確認は未実施。
 
 各件数は任務精算時に更新する。主要目標達成から帰還待ちの間は件数も未精算。
-`Mission Status` は自分のウィング、または搭乗中 UCID に紐づく元の任務の状態・長機の基準・生成までの残り秒数・参加者の個別状態を表示する。
+`Mission Status` は自分のウィング、または搭乗中 UCID に紐づく元の任務の状態・長機の基準・参加者の個別状態を表示する。生成までの残り秒数はInterceptだけで表示し、SEADはDEBUG限定とする。
 
 ## ファイルと結合方式
 
@@ -204,9 +204,12 @@ UCIDを照合できない搭乗者はプレイヤー名と `UCID unavailable; un
 | [src/scoring.lua](../src/scoring.lua) | 報酬計算、累計、精算記録 |
 | [src/missions.lua](../src/missions.lua) | 共有任務、ウィング・UCID の受注ロック |
 | [src/intercept.lua](../src/intercept.lua) | 敵生成・経路・敵の喪失記録 |
+| [src/air_targets.lua](../src/air_targets.lua) | Intercept/CAPの敵機識別・喪失・生存観測 |
 | [src/sead.lua](../src/sead.lua) | 地点選定・地上生成・主要レーダーの喪失記録 |
 | [src/recovery.lua](../src/recovery.lua) | 接地先・速度・着陸確認 |
-| [src/DynamicTraining.lua](../src/DynamicTraining.lua) | 状態、イベント、タイマー、F10、表示 |
+| [src/mission_report.lua](../src/mission_report.lua) | Status/Statistics本文と表示時間 |
+| [src/notifications.lua](../src/notifications.lua) | 画面・MESSAGEログ・DEBUG・例外通知 |
+| [src/main.lua](../src/main.lua) | 状態遷移の調整、イベント、タイマー、F10 |
 | [scripts/Build-Mission.ps1](../scripts/Build-Mission.ps1) | 上記を既存の埋め込み Lua 用に結合 |
 
 結合結果は `build/DynamicTraining.lua` に生成し、同期ツールが登録済みの同名埋め込み Lua を置き換える。
@@ -222,10 +225,10 @@ DCS のミッション環境で `require` や外部ファイル読み込みを�
 
 ## 検証とゲーム内確認
 
-`Build-Mission.ps1` と `Build-PersistenceHook.ps1` の実行後、Lua 5.1で既存6スイートと `scripts/Test-Persistence.lua` を実行する。導入・実ファイルの検証は `scripts/Test-PersistenceInstall.ps1`、全コマンドは [TESTING.md](TESTING.md) を参照する。
+`scripts/Test-All.ps1`で両bundleを結合し、Lua全9スイートとBuild/Sync/Installテストを実行する。個別コマンドと検証範囲は [TESTING.md](TESTING.md)、全体の責務と用語は [ARCHITECTURE.md](ARCHITECTURE.md) を参照する。
 結合済みの本番コードを読み込み、DCS / MOOSE の呼び出し先だけを模擬する。
 計算、UCID・スロットの照合、名前変更、再スポーン、着陸確認、動く空母、重複事故、Abort、複数任務の累積を自動検証する。
-Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カテゴリ別集計・復元の維持も既存テストで検証する。2026-10-07にLua全9スイート342ケースとBuild/Syncテストが通過。新表示のDCS内確認は未実施。
+Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カテゴリ別集計・復元の維持も既存テストで検証する。現在の自動テスト結果は [TESTING.md](TESTING.md)、過去の実測記録は [HISTORY.md](HISTORY.md) を参照する。新表示のDCS内確認は未実施。
 
 実際のマルチプレイでは次を確認する。
 

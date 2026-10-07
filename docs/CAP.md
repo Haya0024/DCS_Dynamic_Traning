@@ -30,7 +30,9 @@ CAP Scoreを独立し、Total/Careerと統計へ加算する。保存schemaはCA
 
 ## 検証結果と制約
 
-抽選・DDM/半径・カウント停止/再開・通知境界・30/120秒生成・二重生成拒否・達成順序・MP2・別Wing・早期事故・帰還/事故報酬・敵の観測不能・Cleanup再試行をscripts/Test-CAP.luaの30ケースで模擬検証済み。旧schema移行とCAP精算保存・次セッション復元、未知schemaの保護はscripts/Test-Persistence.luaのPERSIST-42〜44で検証済み。現ミッション（旧Syria.miz）の候補4 Zoneが存在し、各半径18,288m（約9.9NM）、円形type0であることを静的確認済み。手動確認は [TESTING.md](TESTING.md) のMAN-52〜55を使う。
+2026-10-07、DCS 2.9.30.28738の専用サーバー、Ramat SOLOのCAPで脱出・墜落後もACTIVEと任務ロックが残り、個人Abortまで精算されない不具合をログで確認した。MOOSEが弱参照で保存する受信者を保持していないコード不具合をGCの模擬テストで再現し、training-4では`DynamicTrainingRuntime.eventHandler`でミッション終了まで保持する。CAP-31でIntercept→同スロット再搭乗→CAP→GC→脱出の未達成0点・ロック解放・重複精算防止を検証する。修正版の実DCS再確認（MAN-53）は未実施。詳細は [HISTORY.md](HISTORY.md#2026-10-07-受信者の寿命修正training-4) を参照する。
+
+抽選・DDM/半径・カウント停止/再開・通知境界・30/120秒生成・二重生成拒否・達成順序・MP2・別Wing・早期事故・帰還/事故報酬・敵の観測不能・Cleanup再試行をscripts/Test-CAP.luaの31ケースで模擬検証済み。旧schema移行とCAP精算保存・次セッション復元、未知schemaの保護はscripts/Test-Persistence.luaのPERSIST-42〜44で検証済み。現ミッション（旧Syria.miz）の候補4 Zoneが存在し、各半径18,288m（約9.9NM）、円形type0であることを静的確認済み。手動確認は [TESTING.md](TESTING.md) のMAN-52〜55を使う。
 敵機の識別・生存観測はInterceptと共通の`air_targets.lua`、Status本文は`mission_report.lua`に置く。生成・滞在時間・目標条件はCAPが所有する。全体の責務は [ARCHITECTURE.md](ARCHITECTURE.md) を参照する。
 2026-10-06 20:17〜20:56 JST、DCS 2.9.30.28718（Windows MT）のユーザーホストで2任務を実行。両方Golan、半径9.9NM、同じDDM中心を通知。Beirut出発のrun2:CAP:1は20:30:19から24秒ごとに20%通知、65秒でSu-27×1（25,789ft）生成、120秒で時間達成、20:33:12に敵全滅達成、20:33:25のUnitLostで90点。空母出発のrun2:CAP:2は20:53:29から同じ進捗、74秒でMiG-29A×2（20,367ft）生成、120秒で時間達成、敵1機撃破後20:56:23のUnitLostで未達成0点。生成敵とプレイヤー間のミサイル発射/命中をログで確認。任務関連Luaエラーなし。
 終了後のschema2 scores.datを読取検証し、run2/revision2、Total/Career/CAP各90、任務2・Primary成功1・帰還失敗1・未達成失敗1・Death2を確認。今回のログでMAN-52の進入/進捗/出現とMAN-53の時間先行/達成後事故/未達成事故を部分確認した。退出停止/再開、全空域、敵の哨戒形状、敵全滅先行、帰還150、MP2/並行、次セッションの90点復元は未確認。

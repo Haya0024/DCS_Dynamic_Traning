@@ -79,6 +79,26 @@ Interceptの終了時と生成後設定失敗時の敵をpendingCleanupで保持
 
 INT-19〜22で例外2回・5秒境界・設定失敗・nil無処理・false・検索例外／不正値・帰還150／事故90／未達成0・新任務／別Wing・遅れた死亡イベントを検証。Lua全348ケース（INT22）、BUILD2、SYNC3、INSTALL5が通過し、実ミッションSync/Check成功。DCS内の削除再試行確認は未実施。
 
+### 2026-10-07 専用サーバーCAP死亡未精算の調査（未解決）
+
+ユーザー提供の`C:/Users/hayat/Desktop/dcs.log`を確認。DCS_server.exe、DCS 2.9.30.28738（Windows MT）、Saved GamesのDCS.dcs_serverreleaseプロファイルで実行したサーバーログ。実行ミッションは`Missions/Persistent_and_Dynamic_FA-18C_Training.miz`。訓練bundleの版・ローカル編集元との一致はこのログだけでは確認できない。時刻はログのUTCからJSTへ換算。
+
+Ramat SOLOの登録1人。run2:Intercept:1は21:14:42に主要目標達成、21:15:10にUnitLostをRTB_FAILUREとして90点精算し、revision1を保存した。run2:CAP:2は21:16:51受注、North Coast/MiG-29A×2/出現累計97秒。21:45:46進入、21:47:23敵生成、21:47:46に累計120秒を達成したが敵は残存。
+
+21:50:29のejectと21:50:40のcrashは同じ機体object ID 16783362でDCSログへ記録された。21:50:53 Statisticsは精算済み任務数1・Death Count1のまま、21:51:23 StatusはCAP ACTIVE、敵残数2、登録者ACTIVE。21:52:54の個人Abortで初めてCAP0点を精算し任務を閉じ、revision2を保存した。MAN-53の未達成事故での自動精算はFAIL。MAN-52の進入・進捗・敵生成は部分確認。
+
+任務の死亡イベント受信前に止まったのか、受注時機体との照合で一致しなかったのかは既存ログから区別できない。DCS内部のScripting event記録を、MOOSEの任務callbackへ配信済みという証拠にはしない。任務関連のLua例外は当該時間帯に見当たらず、Abort後の保存は成功している。サーバー実行版の埋め込みLuaを照合し、必要なら受信イベント・受注時機体IDの診断を追加して再現する。原因は未確定、現段階では動作ロジックを変更しない。
+
+### 2026-10-07 受信者の寿命修正（training-4）
+
+ユーザーからサーバーで実行した.mizはローカル／レポジトリと同じとの確認を受け、配布版の違いを調査の前提から除いた。同梱MOOSEの`EVENT:Init`は受信者を弱キーにし、`EVENT:OnEventGeneric`はcallbackだけを保存する。main.luaのBASE受信オブジェクトはローカル変数にしか保持されず、エントリ処理終了後にGCされるコード不具合を特定した。これはタイマーによるCAP時計・Statusが動き続ける一方、途中から死亡精算を受け取らなくなる実ログの挙動を説明する。
+
+CAP-31に同じ弱キー登録で配送する模擬境界と実際の`collectgarbage`を追加。修正前はIntercept→再搭乗→CAPのGC後に受信者が消えてテスト失敗。`DynamicTrainingRuntime.eventHandler`でミッション終了まで強参照を保持する修正後は、受信者1つ・重複読み込み・未達成脱出0点／ロック解放・重複Crash・次CAPのGC後の敵全滅／帰還150が通過した。既存の直接callback配送だけではこの寿命の違いを検出できていなかった。
+
+初期化時に`Runtime initialized; version=training-4; MOOSE event subscriber retained.`をログへ1回出し、配布版を判別できるようにした。DCS標準の追加受信経路や、機体名を使う緩い照合は導入せず、MOOSE配送・既存ID照合・一度だけの精算を維持する。
+
+Lua全349ケース（CAP31）、BUILD2、SYNC3、INSTALL5が通過。実ミッションのSync/Check成功。サーバー側は更新した.mizを差し替えてミッション再開始が必要。Hook更新は不要。修正版の専用サーバーでのMAN-53確認は未実施、過去にAbortで保存された成績を直接修正していない。
+
 ## 成績保存の診断履歴
 
 2026-10-06 17:45 JSTの実DCSログで、BLUE_HORNET_SC_AI2_01のPlayer Statisticsが `Session only; persistence hook not connected.` であることを確認した。Hookの読み込み、同梱bundleとの一致、ホストAPI許可は確認済みだが、scores.datは未作成で接続ログもない。実行中endpointの所在／callbackの呼び出しを区別できるログが旧Hookになかったため、診断ログを追加する。診断Hook導入後のDCS確認と根本原因の確定は未実施。

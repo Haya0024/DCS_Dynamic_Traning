@@ -6,7 +6,7 @@
 
 Intercept / CAP / SEAD / DEADの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。将来案は実装済みの機能と分ける。
 
-この構成は`training-3`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。リファクタリング後のDCS確認は未実施。
+この構成は`training-4`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
 ## 責務と依存
 
@@ -64,6 +64,7 @@ MissionReportは本文と表示時間を返し、main.luaが対象グループ�
 5. Siteの専用予約とassignment使用予約は別。Preserve/Releaseで元の採点・帰還・Wing/UCIDロックを変えない。
 6. 目標達成時には累計へ加算しない。参加者ごとの精算時にだけ更新し、Hookの有効なACK前には保存済みと表示しない。
 7. 1つのタイマーと安定した任務snapshotから各任務を監視する。例外は該当処理でログに残し、他Wingの監視を継続する。
+8. MOOSEのイベント受信者は`DynamicTrainingRuntime.eventHandler`でミッション終了まで強参照を保持する。同梱MOOSEのEVENT:Initは受信者を弱キーで保存するため、ローカル変数での登録だけではGC後に受信しなくなる。重複読み込みでは元の受信者を保持し、再登録しない。
 
 ## 整理した箇所と残る課題
 

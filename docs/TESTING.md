@@ -16,7 +16,7 @@
 | 区分 | 実行ファイル | 現在の件数 | 主な対象 |
 |---|---|---:|---|
 | INT | [Test-Intercept.lua](../scripts/Test-Intercept.lua) | 22 | 離陸待ち、生成位置、編隊、機種、全滅判定、観測不能・ID変更、通知重複防止、削除確認と再試行 |
-| CAP | [Test-CAP.lua](../scripts/Test-CAP.lua) | 30 | 空域抽選・DDM、滞在時間・停止再開・通知、敵生成、120秒＋全滅、MP2・並行任務、精算・失敗Cleanup |
+| CAP | [Test-CAP.lua](../scripts/Test-CAP.lua) | 31 | 空域抽選・DDM、滞在時間・停止再開・通知、敵生成、120秒＋全滅、MP2・並行任務、精算・失敗Cleanup、GC後の受信者寿命 |
 | SCORE | [Test-Scoring.lua](../scripts/Test-Scoring.lua) | 26 | UCID、帰還、事故、重複防止、累計 |
 | WING | [Test-Wing.lua](../scripts/Test-Wing.lua) | 27 | MP2、参加者固定、共有目標、個別精算、排他 |
 | PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 16 | 複数ウィングの並行処理と独立性 |
@@ -28,18 +28,19 @@
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 
-Luaは合計348ケース（INT22＋CAP30＋SCORE26＋WING27＋PAR16＋SEAD62＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。
+Luaは合計349ケース（INT22＋CAP31＋SCORE26＋WING27＋PAR16＋SEAD62＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-07、`training-3`。Test-AllでLua全348ケース、BUILD2、SYNC3、INSTALL5が通過し、main.luaを入口に結合して既定先の実ミッションSync/Checkも成功。DCS内の改名・削除再試行確認は未実施。
+最新の自動検証: 2026-10-07、`training-4`。Test-AllでLua全349ケース、BUILD2、SYNC3、INSTALL5が通過し、既定先の実ミッションSync/Checkも成功。CAP-31は修正前にGCで受信者が消える失敗を再現し、保持修正後に通過。修正版の実DCS確認は未実施。
 
 ### 自動テストの前提と限界
 
 任務のLuaテストは `build/DynamicTraining.lua` を読み込み、本番の結合済みコードに対して操作・時刻・イベントを入力する。
 MAPは `src/config.lua` と `src/map_overlay.lua` を独立した模擬環境で読み込み、最終ケースではbundle初期化も検証する。ID allocatorは同梱MOOSEの実際の関数を抜き出して実行する。実DCSのDrawing描画・可視性・MOOSEの地形判定は手動確認が必要。
 DCS/MOOSEのユニット、グループ、座標、地形、障害物、F10、接続情報、Life、Radar、ログを模擬する。
+CAP-31は同梱MOOSEのEVENT:InitとOnEventGenericを確認したうえで、受信者を弱キーにする模擬配送を使い、Luaの実際の`collectgarbage`で寿命を検証する。既存の直接callback配送だけでは受信オブジェクトの回収を検出できなかった。
 採点台帳の単体確認では `src/config.lua` と `src/scoring.lua` も直接読み込む。
 
 時刻は `s:tick(time)`、イベントは `s:event(...)`、抽選結果は `s.randomValues` で指定する。
@@ -198,6 +199,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | CAP-28 | CAP中の重複CAP/SEAD受注、同UCID別Wing | 既存ブロッカーで拒否、再抽選なし |
 | CAP-29 | 半径境界、境界より1m外 | 境界は内側、1m外は停止 |
 | CAP-30 | 空域内の1人を個人中止、僚機は継続 | 中止者は時計対象外、任務はACTIVEを維持 |
+| CAP-31 | MOOSEと同じ弱キー受信者でIntercept→同Slot再搭乗→CAP、100%＋敵残存でGC・再読込後に脱出。次CAPではGC後に敵全滅・帰還 | 受信者は1つを保持。未達成死亡0でロック解放、重複Crashで再精算なし。次任務の敵Dead・着陸イベントも届き150点、累計240・任務3・Death2。修正前はGCで受信者が消えることを再現 |
 
 ### 採点・帰還（SCORE）
 
@@ -629,7 +631,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-50 | 更新したHookでDCSを再起動し同期済み実ミッションをホスト。slot未選択・Statistics未操作で10秒待つ | Startupはinitialization pending。ログでMissionLoadEnd→BOOTSTRAP_COMMITTED→CONNECTED（storage/ack確認）を確認しscores.datを検証。初期表示だけで失敗とせず、失敗時はphaseとprimary/backup I/O詳細を記録 |
 | MAN-51 | 保存確認済みの精算後にミッションを閉じ、メニューに戻って10秒待つ。別ミッションも開始 | Stop後frameで通信・新run採番なし。SSEが先に消える場合はSTOP_FLUSH_UNAVAILABLEだけを記録し既存保存を保持。次ミッションは別run、保存済み累計を復元 |
 | MAN-52 | CAPを受注し座標へ移動、退出再進入、Status確認 | MEの4候補から1つ。CAP AREAへ中心DDMと条件を受注時60秒表示、半径・PATROL CENTER行なし。進入通知はCAP on station.のみ、20%ごと通知、全員退出で停止。zone内累計30〜120秒で1編隊出現し空域へ進入・哨戒 |
-| MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成事故・任意中止0 |
+| MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認。Intercept後に同Slot再搭乗し、長時間飛行したCAPの途中脱出も確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成死亡FAILED/0、任意中止ABORT/0。SOLO死亡後はACTIVE・Wing/UCIDロックを残さない。起動ログversion=training-4を確認 |
 | MAN-54 | MP2で片方だけ進入、両者退出、1人個人中止。別Wingでも並行受注 | 元の未精算参加者の誰か1人が内側なら進み、全員外なら停止。中止者0、僚機継続。別Wingの時計・敵・ロックは独立 |
 | MAN-55 | 新Hook導入後DCS再起動、旧schemaの成績でホスト。CAP精算保存後に閉じ再ホスト | schema1をCAP=0で移行し既存得点保持。CAP ScoreとTotal/Careerを保存確認後、次セッションで復元。実成績をfixtureで書き換えない |
 
@@ -651,6 +653,7 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | サイト管理・Cleanup | SEAD-57〜61 / DEAD-53〜62 | MAN-18/20/23/35〜37 |
 | DEAD対象・phase・保持・予約 | DEAD | MAN-24〜34、SEAD-45〜61の回帰 |
 | player/missions/runtime | WING/PAR | INT/SCORE/SEAD、UCID・F10のマルチ確認 |
+| MOOSE受信者寿命 | CAP-31 | 強参照・GC後の脱出/敵Dead/着陸・重複読み込み。実DCSで長時間飛行後のMAN-53も確認 |
 | air_targets・空中目標観測 | INT-17/18、CAP-10/27 | INT/CAP全体、元実体のイベント・観測不能・死亡後IDなし |
 | Intercept敵削除・再試行 | INT-19〜22 | Lua全9スイート。Abort・精算・生成後設定失敗、5秒間隔・消失確認、旧イベントの非干渉 |
 | mission_report/notifications | INT-16、SEAD-62、SCORE-01、各Statistics確認 | Lua全9スイート、MESSAGESの本文・表示時間・MESSAGE/DEBUG境界、MAN-01/02/05/07/08/27/52 |

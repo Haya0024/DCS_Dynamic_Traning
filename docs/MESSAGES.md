@@ -695,6 +695,8 @@ Engage the emitter using HARM PB mode, then RTB.
 
 ## DCS log: lifecycle and diagnostics
 
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-4; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+
 Each row is an example of a separate log entry. No screen duration applies.
 
 | Timing | Actual output example | Frequency |

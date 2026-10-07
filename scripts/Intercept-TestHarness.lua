@@ -3,7 +3,8 @@
 local function scenario(options)
     options = options or {}
     local s = { time = 0, timers = {}, messages = {}, spawns = {}, randomValues = {},
-        errors = {}, logs = {}, units = {}, groups = {}, commands = {}, connections = {}, handlers = {}, randomCalls = {} }
+        errors = {}, logs = {}, units = {}, groups = {}, commands = {}, connections = {}, handlers = {},
+        eventSubscribers = {}, randomCalls = {} }
     local function newUnit(name, id, pilot, group, side, kind)
         local u = { alive = true, airborne = false, id = id, slotID = id, name = pilot,
             unitName = name, position = { x = 100, y = 200, z = 300 }, heading = 0,
@@ -287,7 +288,12 @@ local function scenario(options)
     env.EVENTS = { Crash = 1, Dead = 2, PilotDead = 3, Ejection = 4, UnitLost = 5,
         RunwayTouch = 6, Land = 7, Takeoff = 8, RunwayTakeoff = 9 }
     env.BASE = { New = function()
-        return { HandleEvent = function(_, id, callback) s.handlers[id] = callback end }
+        return { HandleEvent = function(subscriber, id, callback)
+            s.handlers[id] = callback
+            -- Bundled MOOSE EVENT:Init stores subscriber objects as weak keys.
+            s.eventSubscribers[id] = s.eventSubscribers[id] or setmetatable({}, { __mode = "k" })
+            s.eventSubscribers[id][subscriber] = callback
+        end }
     end }
     local function runBundle()
         local chunk = assert(loadfile("build/DynamicTraining.lua")); setfenv(chunk, env)()
@@ -326,9 +332,14 @@ local function scenario(options)
     end
     function s:event(name, unit, place, time, raw)
         local id = assert(env.EVENTS[name])
+        local event = { id = id, Time = time or self.time,
+            IniDCSUnit = raw or unit.raw, IniUnit = unit, Place = place }
+        if options.weakEventHandlers then
+            for subscriber, callback in pairs(self.eventSubscribers[id] or {}) do callback(subscriber, event) end
+            return
+        end
         local callback = assert(self.handlers[id])
-        callback(nil, { id = id, Time = time or self.time,
-            IniDCSUnit = raw or unit.raw, IniUnit = unit, Place = place })
+        callback(nil, event)
     end
     function s:complete(spawn)
         local g = spawn or self.spawns[#self.spawns]

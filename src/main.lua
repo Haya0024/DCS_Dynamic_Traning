@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-3" }
+DynamicTrainingRuntime = { version = "training-4" }
 Persistence.Publish()
 
 local menus = {}
@@ -686,6 +686,9 @@ local function TickMission(record, time)
 end
 
 local eventHandler = BASE:New()
+-- MOOSE EVENT:Init stores subscribers as weak keys. Retain the BASE object
+-- for the whole mission; local registration alone is lost after Lua GC.
+DynamicTrainingRuntime.eventHandler = eventHandler
 local failureEvents = {}
 for _, name in ipairs({ "Crash", "Dead", "PilotDead", "Ejection", "UnitLost" }) do
     if EVENTS[name] and EVENTS[name] >= 0 then failureEvents[EVENTS[name]] = name end
@@ -771,4 +774,5 @@ end
 MapOverlay.RefreshFriendlyAirbases()
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
+Log("Runtime initialized; version=" .. DynamicTrainingRuntime.version .. "; MOOSE event subscriber retained.")
 GlobalMessage("Dynamic Training ready. Wing UCID scoring.\n" .. Persistence.StartupStatus(), 10)

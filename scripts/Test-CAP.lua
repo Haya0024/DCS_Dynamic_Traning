@@ -1,8 +1,8 @@
 local scenario = dofile("scripts/Intercept-TestHarness.lua")
 local count = 0
 local function test(name, run) run(); count = count + 1; print("PASS: " .. name) end
-local function new()
-    local s = scenario(); s:addCAPZones(); return s
+local function new(options)
+    local s = scenario(options); s:addCAPZones(); return s
 end
 local function accept(s, player, choices)
     s.randomValues = choices or { 1, 1, 30 }
@@ -254,4 +254,33 @@ test("personally aborted pilots inside cannot keep counting while their survivin
     enter(s, r, s.wingman); advance(s, 111); s:complete()
     assert(r.state == "RTB_PENDING" and r.participants[1].receipt.points == 0)
 end)
+test("MOOSE weak subscribers survive garbage collection after Intercept and respawn for CAP", function()
+    local s = new({ weakEventHandlers = true })
+    s.player.airborne = true; s.generate(); s:complete(); s:event("Ejection", s.player)
+    s:score(90); assert(not s:mission())
+    s.player.id = 50000; s.player:newDCSObject(); s.players = { s.player.raw }; advance(s, 2)
+    local r = accept(s, nil, { 3, 1, 97 }); enter(s, r); advance(s, 121)
+    assert(r.state == "ACTIVE" and r.capPlan.elapsed == 120 and #r.spawn.units == 2)
+    collectgarbage("collect")
+    s.reload(); collectgarbage("collect") -- The existing subscriber must remain retained.
+    local subscribers = 0
+    for _ in pairs(s.eventSubscribers[s.env.EVENTS.Ejection]) do subscribers = subscribers + 1 end
+    assert(subscribers == 1, "MOOSE weak subscriber was collected or duplicated")
+    s.player.alive = false; s:event("Ejection", s.player); s:event("Crash", s.player)
+    assert(not s:mission() and r.spawn.group.destroyed)
+    local p = r.participants[1]
+    assert(p.done and p.receipt.result == "FAILED" and p.receipt.points == 0)
+    s.player.alive = true; s.player.id = 50001; s.player:newDCSObject()
+    s.players = { s.player.raw }; advance(s, 2)
+    s:score(90); s:lastMessageContains("Settled Missions: 2"); s:lastMessageContains("Death Count: 2")
+    s:categoryScores({ interceptScore = 90, capScore = 0 })
+    local next = accept(s); enter(s, next); advance(s, 121)
+    collectgarbage("collect"); s:complete(next.spawn.group)
+    assert(next.state == "RTB_PENDING")
+    collectgarbage("collect"); s:land(s:base(), s.time); advance(s, 11)
+    assert(not s:mission()); s:score(240)
+    s:lastMessageContains("Settled Missions: 3"); s:lastMessageContains("Death Count: 2")
+    s:categoryScores({ interceptScore = 90, capScore = 150 }); s:assertClean()
+end)
+
 print(string.format("All %d CAP tests passed (simulated DCS/MOOSE).", count))

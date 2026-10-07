@@ -366,9 +366,9 @@ local function Statistics(groupName)
         local p = Scoring.Get(owner.ucid, owner.name)
         if p then
             texts[#texts + 1] = string.format(
-                "PLAYER STATISTICS: %s [%s]\nTotal Score: %d\nCareer Points: %d\nIntercept Score: %d\nSEAD Score: %d\nDEAD Score: %d\nCAP Score: %d\n" ..
+                "PLAYER STATISTICS: %s [%s]\nTotal Score: %d\nCareer Points: %d\n" ..
                 "Settled Missions: %d\nPrimary Success: %d\nRTB Success: %d\nRecovery Failure: %d\nDeath Count: %d",
-                owner.name, owner.unitName, p.totalScore, p.careerPoints, p.interceptScore, p.seadScore, p.deadScore, p.capScore,
+                owner.name, owner.unitName, p.totalScore, p.careerPoints,
                 p.missionCount, p.primarySuccessCount, p.rtbSuccessCount, p.recoveryFailureCount, p.deathCount)
         else texts[#texts + 1] = "PLAYER STATISTICS: " .. owner.name .. "\nUCID unavailable; unscored." end
     end

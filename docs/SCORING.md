@@ -34,7 +34,7 @@ Difficulty / Threat Budget による配点、追加ボーナス、カテゴリ R
 60%の規則は着陸進入中に限定せず、クリア後の帰還途中の事故・被撃墜も対象とする。
 60%の付与額は整数に切り捨てる。例えば満額101なら60ポイント。
 Intercept/SEADの満額は敵生成成功時、Follow-on DEADは受注時、Immediate DEADはContinue時に固定する。主要目標達成時点では累計へ加算しない。
-帰還成功・失敗で確定した額を Total Score、Career Points と、その任務の Intercept Score / SEAD Score / DEAD Score に同額加算する。
+帰還成功・失敗で確定した額を Total Score、Career Points と、その任務の Intercept Score / CAP Score / SEAD Score / DEAD Score に同額加算する。
 各Scoreはカテゴリ別累計であり、Ratingではない。両DEADの満額は `dead.fullReward = 150`。
 
 Immediate DEADは同じRecovery結果でSEADと追加DEAD報酬を別々に精算する。両目標達成＋帰還なら各150で合計300、両目標達成後事故なら各90で180、DEAD未達成事故ならSEAD90＋DEAD0。任意Abortは両方0。
@@ -175,11 +175,22 @@ AI 僚機・未参加者・別グループのプレイヤーの事故は参加�
 ## F10 の成績表示（実装済み）
 
 `Dynamic Training → Player Statistics` で以下を表示する。
-そのグループに現在搭乗する人間全員を機体名つきで表示する。
+そのグループに現在搭乗する人間全員について、次の項目を25秒間表示する。
 
-- Total Score、Career Points、Intercept Score、SEAD Score、DEAD Score。
-- 精算済み任務数、Primary Success、RTB Success、Recovery Failure。
-- メモリ内のみの記録であること。
+- `PLAYER STATISTICS`: プレイヤー名・機体名。
+- `Total Score`: 累計スコア。
+- `Career Points`: 累計ポイント。現在はTotal Scoreと同額を加算する。
+- `Settled Missions`: 精算済み任務数。
+- `Primary Success`: 主要目標達成数。
+- `RTB Success`: 帰還成功数。
+- `Recovery Failure`: 主要目標達成後の帰還失敗数。
+- `Death Count`: 墜落・死亡・脱出などによる出撃喪失数。
+- 全員分の末尾に保存状態を1回表示する。保存済み／保存待ち／Hook未接続／保存無効／保存エラーを区別する。
+
+Intercept / CAP / SEAD / DEADのカテゴリ別Scoreは画面に表示しない。カテゴリ別の加算・永続保存・復元は継続する。
+UCIDを照合できない搭乗者はプレイヤー名と `UCID unavailable; unscored.` を表示し、成績値は表示しない。
+通常の画面メッセージと同じ本文をDCSログのMESSAGEへ記録する。表示例は [MESSAGES.md](MESSAGES.md#screen-player-statistics--25-seconds-requested-manually) を参照する。
+この表示変更は実装済み、DCS内の画面確認は未実施。
 
 各件数は任務精算時に更新する。主要目標達成から帰還待ちの間は件数も未精算。
 `Mission Status` は自分のウィング、または搭乗中 UCID に紐づく元の任務の状態・長機の基準・生成までの残り秒数・参加者の個別状態を表示する。
@@ -214,6 +225,7 @@ DCS のミッション環境で `require` や外部ファイル読み込みを�
 `Build-Mission.ps1` と `Build-PersistenceHook.ps1` の実行後、Lua 5.1で既存6スイートと `scripts/Test-Persistence.lua` を実行する。導入・実ファイルの検証は `scripts/Test-PersistenceInstall.ps1`、全コマンドは [TESTING.md](TESTING.md) を参照する。
 結合済みの本番コードを読み込み、DCS / MOOSE の呼び出し先だけを模擬する。
 計算、UCID・スロットの照合、名前変更、再スポーン、着陸確認、動く空母、重複事故、Abort、複数任務の累積を自動検証する。
+Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カテゴリ別集計・復元の維持も既存テストで検証する。2026-10-07にLua全9スイート342ケースとBuild/Syncテストが通過。新表示のDCS内確認は未実施。
 
 実際のマルチプレイでは次を確認する。
 

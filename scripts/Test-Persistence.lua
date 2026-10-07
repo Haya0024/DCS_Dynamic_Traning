@@ -696,7 +696,8 @@ test("CAP settlement persists separately after legacy restoration and survives a
     local data = Data.Decode(fs.files[path]); local p = data.players["ucid-a"]
     assert(data.counter == 8 and p.totalScore == 390 and p.capScore == 90 and p.interceptScore == 150 and p.seadScore == 150)
     s = scenario(); h = hook(s, fs); h:frame(0); s:score(390)
-    statistics(s, "CAP Score: 90"); statistics(s, "Persistent scores saved.")
+    s:categoryScores({ capScore = 90, interceptScore = 150, seadScore = 150 })
+    statistics(s, "Persistent scores saved.")
     assert(Data.Decode(fs.files[path]).counter == 9)
 end)
 

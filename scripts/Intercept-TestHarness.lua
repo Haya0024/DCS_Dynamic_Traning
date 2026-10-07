@@ -354,10 +354,27 @@ local function scenario(options)
         player = player or self.player
         self:command("Player Statistics", player)
         local text = self.messages[#self.messages].text
+        assert(self.messages[#self.messages].seconds == 25)
+        for _, category in ipairs({ "Intercept", "CAP", "SEAD", "DEAD" }) do
+            assert(not string.find(text, category .. " Score:", 1, true), text)
+        end
         local first = assert(string.find(text, "PLAYER STATISTICS: " .. player.name .. " [" .. player.unitName .. "]", 1, true))
         local last = string.find(text, "PLAYER STATISTICS:", first + 1, true)
         local section = string.sub(text, first, last and last - 1 or #text)
         assert(string.find(section, "Total Score: " .. expected .. "\n", 1, true), section)
+    end
+    function s:categoryScores(expected, player)
+        player = player or self.player
+        -- Inspect the existing persistence closure without exposing gameplay internals.
+        for i = 1, 100 do
+            local name, value = debug.getupvalue(self.env.DynamicTrainingPersistence.Initialize, i)
+            if name == "Scoring" then
+                local p = assert(value.Get(self.connections[player.slotID].ucid))
+                for field, points in pairs(expected) do assert(p[field] == points, field) end
+                return
+            end
+        end
+        error("Missing Scoring module")
     end
     function s:abortSortie(target, actor)
         self:command("Abort Sortie: " .. target.name .. " [" .. target.unitName .. "]", actor)

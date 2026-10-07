@@ -441,10 +441,6 @@ Idle status now includes `CAP: Idle.` after the existing category lines.
 PLAYER STATISTICS: Hawk 1 [BLUE_HORNET_INCIRLIK_01-1]
 Total Score: 450
 Career Points: 450
-Intercept Score: 150
-SEAD Score: 150
-DEAD Score: 150
-CAP Score: 0
 Settled Missions: 2
 Primary Success: 2
 RTB Success: 2
@@ -461,7 +457,7 @@ UCID unavailable; unscored.
 Session only; persistence hook not connected.
 ```
 
-All current human pilots are included. Persistence status is appended once after the statistics.
+All current human pilots are included with player and aircraft names when UCID is verified. Persistence status is appended once after the statistics. Category scores (Intercept, CAP, SEAD, DEAD) are omitted from the screen and its MESSAGE log copy; category accounting, persistence, and restoration continue. This display change is implemented; in-DCS screen verification is pending.
 
 ## Screen: Initialization and persistence status
 

@@ -157,7 +157,7 @@ test("safe recovery awards CAP 150 independently of other categories", function(
     local s = new(); local r = accept(s); completed(s, r)
     local t = s.time; s:land(s:base(), t); advance(s, 11)
     assert(not s:mission() and r.spawn.group.destroyed); s:score(150)
-    s:lastMessageContains("CAP Score: 150"); s:lastMessageContains("Intercept Score: 0")
+    s:categoryScores({ capScore = 150, interceptScore = 0 })
 end)
 test("completed CAP accident awards 90 once and abort awards zero", function()
     for _, abort in ipairs({ false, true }) do

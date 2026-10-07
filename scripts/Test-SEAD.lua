@@ -260,7 +260,7 @@ test("SA6 launcher losses cannot clear while the primary radar is alive", functi
     g.units[1].alive = false; s:event("Dead", g.units[1])
     s:lastMessageContains("Enemy radar destroyed."); status(s, "RTB_PENDING"); s:score(0)
     s:event("Crash", s.player); s:score(90)
-    s:lastMessageContains("SEAD Score: 90"); s:lastMessageContains("Intercept Score: 0")
+    s:categoryScores({ seadScore = 90, interceptScore = 0 })
     s:assertClean()
 end)
 
@@ -306,7 +306,7 @@ test("SA6 radar alone clears with launchers alive; the site and blocker persist 
     s:score(0); status(s, "RTB_PENDING")
     s:command("Task: Intercept"); s:lastMessageContains("SEAD mission is already active")
     recover(s); s:score(150)
-    s:lastMessageContains("SEAD Score: 150"); s:lastMessageContains("Intercept Score: 0")
+    s:categoryScores({ seadScore = 150, interceptScore = 0 })
     assert(g.destroyed); status(s, "Idle"); s:assertClean()
 end)
 
@@ -337,7 +337,7 @@ test("SEAD post-clear failures award exactly 90 once; pre-clear failures and abo
             local s, g = started(index)
             destroyRadar(s, g); s.cleanupEvents = true
             s:event(event, s.player); s:event("Dead", s.player); s:score(90)
-            s:lastMessageContains("SEAD Score: 90"); s:lastMessageContains("Intercept Score: 0")
+            s:categoryScores({ seadScore = 90, interceptScore = 0 })
             s:lastMessageContains("Settled Missions: 1"); s:assertClean()
             s, g = started(index); s.cleanupEvents = true
             s:event(event, s.player); s:complete(g); s:score(0)
@@ -394,7 +394,7 @@ test("SEAD and Intercept scores accumulate separately for the same UCID", functi
     s:score(150); s.player.airborne = true; s.generate()
     s:complete(); s:event("Crash", s.player); s:score(240)
     s:lastMessageContains("Career Points: 240")
-    s:lastMessageContains("SEAD Score: 150"); s:lastMessageContains("Intercept Score: 90")
+    s:categoryScores({ seadScore = 150, interceptScore = 90 })
     s:lastMessageContains("Settled Missions: 2"); s:assertClean()
 end)
 
@@ -723,7 +723,7 @@ test("damaged live emitters need sixty full OFF seconds in both modes and both S
             s:score(0); s:command("Task: SEAD"); s:lastMessageContains("already active")
             radar.radarEmitting = true; s:tick(63); assert(r.primaryResult == "SUPPRESSED")
             recover(s, nil, 70); s:score(150)
-            s:lastMessageContains("SEAD Score: 150"); s:lastMessageContains("Primary Success: 1")
+            s:categoryScores({ seadScore = 150 }); s:lastMessageContains("Primary Success: 1")
             assert(g.destroyed and not s:mission()); s:assertClean()
         end
     end

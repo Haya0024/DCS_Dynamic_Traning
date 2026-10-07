@@ -88,7 +88,7 @@ end)
 test("SA8 alive and suppressed remains a valid one-vehicle DEAD site", function()
     local s, r, site = ready(2, true)
     s:command("Continue as DEAD"); assert(#r.deadTargets == 1 and site.disposition == "IN_USE")
-    finish(s, r); recover(s); s:score(300); s:lastMessageContains("DEAD Score: 150"); s:assertClean()
+    finish(s, r); recover(s); s:score(300); s:categoryScores({ deadScore = 150 }); s:assertClean()
 end)
 
 test("ordinary SEAD RTB without follow-on still cleans the site after 150 points", function()
@@ -152,7 +152,7 @@ test("immediate target snapshot excludes vehicles already destroyed during SEAD"
     assert(site.disposition == "IN_USE" and not site.followOnAvailable)
     destroy(s, g.units[3]); assert(r.state == "DEAD_ACTIVE")
     finish(s, r); assert(r.deadCompletedAt and r.primaryResult == "DESTROYED")
-    recover(s); s:score(300); s:lastMessageContains("DEAD Score: 150"); s:assertClean()
+    recover(s); s:score(300); s:categoryScores({ deadScore = 150 }); s:assertClean()
 end)
 
 test("immediate DEAD missing loss events are detected by polling and SEAD result stays fixed", function()
@@ -168,7 +168,7 @@ test("immediate DEAD accidents keep SEAD success and pay ninety once before clea
     for _, event in ipairs({ "Crash", "Dead", "PilotDead", "Ejection", "UnitLost" }) do
         local s, r, site, g = ready(1, false); s:command("Continue as DEAD")
         s.cleanupEvents = true; s:event(event, s.player); s:event("Dead", s.player)
-        s:score(90); s:lastMessageContains("SEAD Score: 90"); s:lastMessageContains("DEAD Score: 0")
+        s:score(90); s:categoryScores({ seadScore = 90 }); s:categoryScores({ deadScore = 0 })
         assert(r.primaryResult == "DESTROYED" and not r.deadCompletedAt and site.cleaned and g.destroyed)
         assert(site.disposition == "CLEANUP" and site.reservedByAssignmentID == nil); s:assertClean()
     end
@@ -178,7 +178,7 @@ test("immediate DEAD Abort settles both objectives at zero and cleans", function
     local s, r, site = ready(1, false); s:command("Continue as DEAD"); s:command("Abort Mission")
     assert(site.cleaned and not s:mission()); s:score(0)
     assert(r.participants[1].deadReceipt.result == "ABORT" and r.participants[1].deadReceipt.points == 0)
-    s:lastMessageContains("Primary Success: 1"); s:lastMessageContains("DEAD Score: 0"); s:assertClean()
+    s:lastMessageContains("Primary Success: 1"); s:categoryScores({ deadScore = 0 }); s:assertClean()
 end)
 
 test("Preserve then Continue changes RETAIN to IN_USE and cleanup follows completion", function()
@@ -261,7 +261,7 @@ test("all targets lost while ARMED complete only after Follow-on DEAD activates"
     assert(r.state == "ARMED" and not r.primaryCompletedAt)
     s.player.airborne = true; s:tick(s.time + 1); assert(r.state == "ACTIVE")
     s:tick(s.time + 1); assert(r.state == "RTB_PENDING"); recover(s)
-    s:score(300); s:lastMessageContains("DEAD Score: 150"); s:assertClean()
+    s:score(300); s:categoryScores({ deadScore = 150 }); s:assertClean()
 end)
 
 test("Follow-on DEAD whole target loss completes and RTB awards DEAD150 alongside SEAD150", function()
@@ -269,7 +269,7 @@ test("Follow-on DEAD whole target loss completes and RTB awards DEAD150 alongsid
     destroy(s, r.deadTargets[1].unit); assert(r.state == "ACTIVE")
     finish(s, r); assert(site.state == "DESTROYED" and site.disposition == "CLEANUP" and not site.cleaned)
     s:command("Mission Status"); s:lastMessageContains("DEAD: RTB PENDING")
-    recover(s); s:score(300); s:lastMessageContains("DEAD Score: 150"); s:lastMessageContains("SEAD Score: 150")
+    recover(s); s:score(300); s:categoryScores({ deadScore = 150 }); s:categoryScores({ seadScore = 150 })
     s:lastMessageContains("Career Points: 300"); s:lastMessageContains("Settled Missions: 2")
     assert(site.cleaned and not s:sites()[site.id]); s:assertClean()
 end)
@@ -278,7 +278,7 @@ test("Follow-on DEAD post-primary failure awards DEAD90 once for every supported
     for _, event in ipairs({ "Crash", "Dead", "PilotDead", "Ejection", "UnitLost" }) do
         local s, site = preserved(1, false); local r = followOnDead(s); finish(s, r)
         s:event(event, s.player); s:event("Dead", s.player)
-        s:score(240); s:lastMessageContains("DEAD Score: 90"); assert(site.cleaned); s:assertClean()
+        s:score(240); s:categoryScores({ deadScore = 90 }); assert(site.cleaned); s:assertClean()
     end
 end)
 
@@ -286,7 +286,7 @@ test("Follow-on DEAD pre-primary accidents and Abort award zero DEAD points and 
     for _, event in ipairs({ "Crash", "Dead", "PilotDead", "Ejection", "UnitLost", "Abort" }) do
         local s, site = preserved(1, false); followOnDead(s)
         if event == "Abort" then s:command("Abort Mission") else s:event(event, s.player) end
-        assert(site.cleaned and not s:mission()); s:score(150); s:lastMessageContains("DEAD Score: 0"); s:assertClean()
+        assert(site.cleaned and not s:mission()); s:score(150); s:categoryScores({ deadScore = 0 }); s:assertClean()
     end
 end)
 
@@ -296,7 +296,7 @@ test("ground Follow-on DEAD abort or aircraft replacement closes its reservation
         if change == "Abort" then s:command("Abort Mission")
         else s.player.id = 999; s:tick(s.time + 1) end
         assert(not s:mission() and site.cleaned and site.reservedByAssignmentID == nil)
-        s:score(150); s:lastMessageContains("DEAD Score: 0"); s:assertClean()
+        s:score(150); s:categoryScores({ deadScore = 0 }); s:assertClean()
     end
 end)
 
@@ -488,7 +488,7 @@ test("Follow-on DEAD MP2 shares DEAD objective and independently settles 150 and
     local s, site = preserved(1, false); s:occupyWing(); local r = followOnDead(s)
     finish(s, r); recover(s); assert(not site.cleaned and site.reservedByAssignmentID == r.assignmentID)
     s:score(300); s:event("Ejection", s.wingman); s:score(90, s.wingman)
-    s:lastMessageContains("DEAD Score: 90"); assert(site.cleaned); s:assertClean()
+    s:categoryScores({ deadScore = 90 }, s.wingman); assert(site.cleaned); s:assertClean()
 end)
 
 test("cleanup failures after DEAD retry without retaining locks or awarding another result", function()
@@ -498,7 +498,7 @@ test("cleanup failures after DEAD retry without retaining locks or awarding anot
     assert(site.disposition == "CLEANUP" and not site.reservedByAssignmentID)
     s:tick(s.time + 1); assert(not site.cleaned)
     s:tick(s.time + 1); assert(site.cleaned and not s:sites()[site.id] and g.destroyCalls == 3)
-    s:score(240); s:lastMessageContains("DEAD Score: 90"); assert(#s.errors == 1)
+    s:score(240); s:categoryScores({ deadScore = 90 }); assert(#s.errors == 1)
 end)
 
 test("Follow-on DEAD last-target and pilot-loss event order gives ninety versus zero without retrospective polling", function()
@@ -517,7 +517,7 @@ test("DEAD recovery reuses moving-carrier relative speed and ten-second confirma
     local s = setup(); local r = begin(s); primary(s, r, false)
     s:command("Preserve Site for DEAD"); recover(s); r = followOnDead(s); finish(s, r)
     local base, carrier = s:carrier(); s.player.velocity = carrier.velocity
-    recover(s, nil, base); s:score(300); s:lastMessageContains("DEAD Score: 150"); s:assertClean()
+    recover(s, nil, base); s:score(300); s:categoryScores({ deadScore = 150 }); s:assertClean()
 end)
 
 test("Follow-on DEAD unverified UCID stays unscored and still cleans after recovery", function()
@@ -541,7 +541,7 @@ test("Immediate continuation clears the old landing hold but permits a fresh SEA
     s:tick(landed); s:tick(landed + 9)
     assert(r.state == "DEAD_ACTIVE" and not r.participants[1].done)
     s:tick(landed + 10); assert(not s:mission() and r.site.cleaned)
-    s:score(150); s:lastMessageContains("DEAD Score: 0"); s:assertClean()
+    s:score(150); s:categoryScores({ deadScore = 0 }); s:assertClean()
 end)
 
 test("parallel Follow-on DEAD assignments isolate losses, abort cleanup, scoring and source groups", function()
@@ -580,14 +580,14 @@ test("Follow-on DEAD reward is fixed at acceptance and cannot change while waiti
     local s, site = preserved(1, false); local config = module(s, "Config")
     config.dead.fullReward = 175; local r = followOnDead(s, false); assert(r.fullReward == 175)
     config.dead.fullReward = 150; s.player.airborne = true; s:tick(s.time + 1)
-    finish(s, r); recover(s); s:score(325); s:lastMessageContains("DEAD Score: 175"); s:assertClean()
+    finish(s, r); recover(s); s:score(325); s:categoryScores({ deadScore = 175 }); s:assertClean()
 end)
 
 test("explicit Preserve survives a later voluntary SEAD abort without converting zero into a reward", function()
     local s, r, site = ready(1, false); s:command("Preserve Site for DEAD"); s:command("Abort Mission")
     assert(not s:mission() and site.disposition == "RETAIN" and not site.cleaned and not site.reservedByAssignmentID)
     s:score(0); local dead = followOnDead(s); finish(s, dead); recover(s)
-    s:score(150); s:lastMessageContains("SEAD Score: 0"); s:lastMessageContains("DEAD Score: 150"); s:assertClean()
+    s:score(150); s:categoryScores({ seadScore = 0 }); s:categoryScores({ deadScore = 150 }); s:assertClean()
 end)
 
 test("participant readiness failure during acceptance rolls back both Site and assignment reservations", function()
@@ -763,7 +763,7 @@ test("SA6 destroyed radar with one or three live launchers supports both DEAD pa
             for _, target in ipairs(dead.deadTargets) do assert(target.unit.kind == "Kub 2P25 ln") end
             finish(s, dead)
             assert(source.primaryResult == "DESTROYED" and site.state == "DESTROYED" and site.remainingTargetCount == 0)
-            recover(s); s:score(300); s:lastMessageContains("DEAD Score: 150"); s:assertClean()
+            recover(s); s:score(300); s:categoryScores({ deadScore = 150 }); s:assertClean()
         end
     end
 end)
@@ -783,7 +783,7 @@ test("SA6 suppression snapshots its surviving radar and launchers in Immediate a
         assert(dead.state == (immediate and "DEAD_ACTIVE" or "ACTIVE") and site.remainingTargetCount == 1)
         destroy(s, g.units[1]); assert(dead.state == "RTB_PENDING" and site.remainingTargetCount == 0)
         assert(source.primaryResult == "SUPPRESSED" and site.primaryResult == "SUPPRESSED")
-        recover(s); s:score(300); s:lastMessageContains("DEAD Score: 150"); s:assertClean()
+        recover(s); s:score(300); s:categoryScores({ deadScore = 150 }); s:assertClean()
     end
 end)
 
@@ -817,7 +817,7 @@ test("Immediate DEAD completed accidents award SEAD90 and DEAD90 once without du
     for _, event in ipairs({ "Crash", "Dead", "PilotDead", "Ejection", "UnitLost" }) do
         local s, r, site = ready(1, true); s:command("Continue as DEAD"); finish(s, r)
         s:event(event, s.player); s:event("Dead", s.player); s:tick(s.time + 1)
-        s:score(180); s:lastMessageContains("SEAD Score: 90"); s:lastMessageContains("DEAD Score: 90")
+        s:score(180); s:categoryScores({ seadScore = 90 }); s:categoryScores({ deadScore = 90 })
         s:lastMessageContains("Settled Missions: 1"); s:lastMessageContains("Primary Success: 1")
         s:lastMessageContains("Recovery Failure: 1")
         assert(r.participants[1].deadReceipt.result == "RTB_FAILURE" and site.cleaned); s:assertClean()
@@ -834,7 +834,7 @@ test("Immediate DEAD fixes a separate reward and ledger at Continue while retain
         assert(r.deadScoringID == scoreID and scoreID ~= r.id and r.deadFullReward == reward)
         assert(s:mission() == r and r.category == "SEAD" and r.participants[1].deadScoring.scoreOnly)
         finish(s, r); recover(s); s:score(150 + reward)
-        s:lastMessageContains("DEAD Score: " .. reward); s:lastMessageContains("Settled Missions: 1")
+        s:categoryScores({ deadScore = reward }); s:lastMessageContains("Settled Missions: 1")
         assert(r.primaryCompletedAt == primaryAt and r.participants[1].deadReceipt.missionID == scoreID)
         s:assertClean()
     end
@@ -845,7 +845,7 @@ test("Immediate DEAD MP2 separately awards combined 300 and 180 and retains the 
     s:command("Continue as DEAD"); finish(s, r); recover(s)
     assert(not r.site.cleaned and s:mission() == r); s:score(300)
     s:event("Ejection", s.wingman); s:event("Dead", s.wingman)
-    s:score(180, s.wingman); s:lastMessageContains("DEAD Score: 90")
+    s:score(180, s.wingman); s:categoryScores({ deadScore = 90 }, s.wingman)
     s:lastMessageContains("Settled Missions: 1"); assert(r.site.cleaned); s:assertClean()
 end)
 
@@ -876,7 +876,7 @@ test("Immediate DEAD delayed pre-completion accident pays only the earlier SEAD 
     assert(r.deadCompletedAt > crashAt and r.primaryCompletedAt < crashAt)
     s:event("Crash", s.player, nil, crashAt); s:score(90)
     assert(r.participants[1].deadReceipt.result == "FAILED" and not r.participants[1].deadScoring.primaryCompletedAt)
-    s:lastMessageContains("DEAD Score: 0"); s:assertClean()
+    s:categoryScores({ deadScore = 0 }); s:assertClean()
 end)
 
 test("Immediate DEAD unverified UCID settles both objectives unscored and still cleans", function()
@@ -901,7 +901,7 @@ test("invalid Immediate DEAD reward leaves SEAD recovery and site disposition in
         config.dead.fullReward = reward; s:command("Continue as DEAD")
         assert(r.state == "RTB_PENDING" and not r.deadScoringID and not r.deadStartedAt)
         assert(not r.participants[1].deadScoring and site.disposition == "CLEANUP" and #s.errors == 1)
-        recover(s); s:score(150); s:lastMessageContains("DEAD Score: 0"); assert(site.cleaned)
+        recover(s); s:score(150); s:categoryScores({ deadScore = 0 }); assert(site.cleaned)
     end
 end)
 
@@ -1014,7 +1014,7 @@ test("unfinished Immediate DEAD recovers SEAD once at a BLUE field or moving car
         assert(p.receipt.points == 150 and p.deadReceipt.points == 0 and p.deadReceipt.result == "FAILED")
         assert(not r.deadCompletedAt and site.cleaned and g.destroyed and not s:mission())
         s:event("Land", s.player, base); s:event("Crash", s.player); s:tick(time + 20)
-        s:score(150); s:lastMessageContains("SEAD Score: 150"); s:lastMessageContains("DEAD Score: 0")
+        s:score(150); s:categoryScores({ seadScore = 150 }); s:categoryScores({ deadScore = 0 })
         s:lastMessageContains("Settled Missions: 1"); s:lastMessageContains("RTB Success: 1"); s:assertClean()
     end
 end)
@@ -1029,7 +1029,7 @@ test("MP2 early SEAD-only RTB leaves Immediate DEAD and locks for the remaining 
     s:command("Task: Intercept"); assert(s:mission() == r and #s.spawns == 1)
     finish(s, r); recover(s, s.wingman)
     assert(not p.deadScoring.primaryCompletedAt and p.deadReceipt.points == 0 and r.site.cleaned)
-    s:score(150); s:lastMessageContains("DEAD Score: 0")
+    s:score(150); s:categoryScores({ deadScore = 0 })
     s:score(300, s.wingman); s:lastMessageContains("Settled Missions: 1"); s:assertClean()
 end)
 
@@ -1054,7 +1054,7 @@ test("unfinished Immediate DEAD crash during an early recovery hold pays SEAD90 
     local time = s.time + 1; s:land(s:base(), time); s:tick(time); s:tick(time + 9)
     s:event("Crash", s.player); s:event("Dead", s.player); s:tick(time + 10)
     assert(r.site.cleaned and not r.deadCompletedAt)
-    s:score(90); s:lastMessageContains("DEAD Score: 0")
+    s:score(90); s:categoryScores({ deadScore = 0 })
     s:lastMessageContains("Recovery Failure: 1"); s:assertClean()
 end)
 
@@ -1082,7 +1082,7 @@ test("incomplete Follow-on DEAD still rejects early landing and requires its own
     assert(r.state == "ACTIVE" and not r.participants[1].done and not r.participants[1].landing)
     assert(not r.primaryCompletedAt and not r.site.cleaned); s:score(150)
     finish(s, r); recover(s)
-    s:score(300); s:lastMessageContains("DEAD Score: 150"); assert(r.site.cleaned); s:assertClean()
+    s:score(300); s:categoryScores({ deadScore = 150 }); assert(r.site.cleaned); s:assertClean()
 end)
 
 test("Preserve reserves its wing across SEAD settlement and ground rearm while rejecting another wing", function()
@@ -1167,7 +1167,7 @@ test("public unreserved sites clean at 1800 seconds without changing settled sco
     s:tick(since + 1799); assert(not site.cleaned and not g.destroyed)
     s:tick(since + 1800)
     assert(site.cleaned and g.destroyed and not s:sites()[site.id] and site.cleanupReason == "UNRESERVED_TIMEOUT")
-    s:score(150); s:lastMessageContains("DEAD Score: 0"); s:assertClean()
+    s:score(150); s:categoryScores({ deadScore = 0 }); s:assertClean()
 end)
 
 test("release during source SEAD recovery waits for all participants before starting its clock", function()
@@ -1246,7 +1246,7 @@ test("shared timeout applies to unknown observations and retries failed cleanup 
     assert(site.observationUnavailable and site.state ~= "DESTROYED" and not site.cleaned)
     s:tick(since + 1800); assert(site.cleanupRequested and not site.cleaned and s:sites()[site.id] == site)
     s:tick(since + 1801); assert(site.cleaned and #s.errors == 1)
-    s:score(150); s:lastMessageContains("DEAD Score: 0")
+    s:score(150); s:categoryScores({ deadScore = 0 })
 end)
 
 test("unreserved timeout is configurable and invalid configuration preserves private ownership", function()

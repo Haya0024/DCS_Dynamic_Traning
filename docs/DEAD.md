@@ -217,7 +217,7 @@ SEAD Statusには `Site disposition: CLEANUP / RETAIN / AVAILABLE / IN USE` と 
 `SEAD Primary result` と `Site state` を別々に表示し、SEAD完了後は `Site remaining vehicles` で実残存数を表示する。観測失敗時の残数はUNKNOWN。
 Immediateには `SEAD: COMPLETE` / `Follow-on: DEAD ACTIVE` / `Remaining targets: X`。
 Follow-on DEADには `DEAD: ARMED / ACTIVE / RTB PENDING`、地域と残数を表示する。
-Player StatisticsへDEAD Scoreを追加。
+DEAD Scoreを独立して集計・保存する。Player Statisticsにはカテゴリ別Scoreを表示せず、累計と任務・帰還・喪失統計を表示する（[SCORING.md](SCORING.md)）。
 
 ## ゲーム内確認チェックリスト
 

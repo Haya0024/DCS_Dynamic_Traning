@@ -31,6 +31,8 @@
 Luaは合計342ケース（INT16＋CAP30＋SCORE26＋WING27＋PAR16＋SEAD62＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
+共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
+2026-10-07、この表示変更でLua全342ケース、BUILD2、SYNC3が通過。現在の実ミッション `mission/Persistent_and_Dynamic_FA-18C_Training.miz` を `-MissionPath` で指定してSync/Check成功。既定の `mission/Syria.miz` は存在しないため既定パスでのSync/Checkは失敗した。新表示のDCS内確認（MAN-01）は未実施。
 
 ### 自動テストの前提と限界
 
@@ -165,7 +167,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | CAP-14 | 大きなtick間隔、同時刻tick | 加算上限2秒、同時刻の二重加算なし |
 | CAP-15 | 敵出現前に参加者事故 | 0点で終了し受注ロック解放 |
 | CAP-16 | 長機事故、生存僚機が継続 | 長機0、僚機で時計・敵・達成を継続 |
-| CAP-17 | 達成後BLUE基地へ停止帰還 | 150、CAP Score独立、既存カテゴリ得点を変更しない |
+| CAP-17 | 達成後BLUE基地へ停止帰還 | Total150、内部CAP150/Intercept0、Statistics25秒・カテゴリ別Score非表示 |
 | CAP-18 | 達成後事故と任意中止、イベント重複 | 事故90を1回、任意中止0 |
 | CAP-19 | MP2の個別帰還・僚機事故 | 150/90個別精算、全員終了までロック維持 |
 | CAP-20 | CAPとInterceptを別Wingで並行 | alias・目標達成・帰還状態を分離 |
@@ -298,7 +300,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | SEAD-23 | レーダー破壊と参加者喪失の順序を反転 | 破壊が先なら90、喪失が先なら0、pollingで遡らない |
 | SEAD-24 | MP2で共有達成、1人帰還・1人事故 | 各自150/90を独立精算 |
 | SEAD-25 | 達成前に1人事故、残る参加者が達成・帰還 | 先の事故0、残る人150 |
-| SEAD-26 | 同一UCIDがSEADとInterceptを順に完了 | Total/Careerは累積、カテゴリ別Scoreを分離 |
+| SEAD-26 | 同一UCIDがSEADとInterceptを順に完了 | Total/Career240、内部SEAD150/Intercept90、Statisticsにカテゴリ別Scoreを表示しない |
 | SEAD-27 | 他ウィングや前回任務のレーダーイベント | 今回の対象以外で達成しない |
 | SEAD-28 | 車両順序変更、主要レーダーを複数含む | TypeNameで識別し、全主要対象の達成を要求 |
 | SEAD-29 | 主要レーダーなし・追跡不能なテンプレート | 生成失敗解除、修正後に再受注可能 |
@@ -500,7 +502,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | PERSIST-40 | void-returnでbytes欠落、flush false、close false | 既存primary保持・保存未確認。正常化後に90を一度だけ保存 |
 | PERSIST-41 | rename/removeがnil成功、trueを返すが未実行、例外 | source/destinationの実状態で確認。未実行・例外を成功にせずfileを保持 |
 | PERSIST-42 | 正規schema1、checksum不正、途中欠落 | 正常な旧得点をCAP=0で読み込みschema2へ変換。不正旧fileは拒否 |
-| PERSIST-43 | 旧schemaの得点を復元、CAP達成・事故90、次セッション | 既存INT/SEAD得点保持、Total390/CAP90を保存・復元、run8→9 |
+| PERSIST-43 | 旧schemaの得点を復元、CAP達成・事故90、次セッション | 内部INT150/SEAD150/CAP90とTotal390を保存・復元、run8→9。Statisticsはカテゴリ非表示・保存済み |
 | PERSIST-44 | 有効checksumの未知schema3 primaryと旧backup | 旧backupへ巻き戻さず、Load/Save拒否でprimary/backup保持 |
 
 ### ビルド・同期・導入（PowerShell）
@@ -558,7 +560,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 
 | ID | 手順・入力 | 合格条件 |
 |---|---|---|
-| MAN-01 | 各基地・SCのHornetへ搭乗し、F10とStatisticsを開く | 自グループにメニューが現れ、マルチプレイでUCIDが照合される。初期は0、採点なしならその理由を調査 |
+| MAN-01 | 各基地・SCのHornetへ搭乗し、F10とStatisticsを開く | 自グループにメニューが現れ、マルチプレイでUCIDが照合される。全搭乗者の名前・機体名・Total/Career・精算/目標/帰還/喪失件数と末尾1回の保存状態を25秒表示、カテゴリ別Scoreは非表示。初期は0、採点なしならその理由を調査 |
 | MAN-02 | Interceptを地上受注、離陸、別試行で待機中に着地、空中受注 | 地上は離陸検出後約20〜22秒、着地でリセット、空中は即生成 |
 | MAN-03 | Interceptを繰り返し、3テンプレート・5編隊を確認 | 距離60〜80 NM、左右60°内、HOT、高度15,000〜30,000 ft。DEBUG開始ログの機種・機数が実体と一致、画面はRange／Altitude／HOTのみ、AIが指定編隊へ移行 |
 | MAN-04 | Interceptの2機編成を1機だけ破壊し、その後全滅 | 1機生存中は未達成、全滅で帰還指示 |

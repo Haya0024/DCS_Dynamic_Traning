@@ -284,7 +284,7 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 地域表示名は `sead.zoneLabels`、SAM表示名はテンプレートの `type` に置き、ME の参照名と分離する。
 `Mission Status` では方式別の情報に加え、計画中の地点選定回数・生成までの残り時間・各参加者の状態を表示する。
 生成後は `Emitter state: ACTIVE / SUPPRESSION PENDING / SUPPRESSED / DESTROYED` と、計測中の継続時間を表示する。
-`Player Statistics` では SEAD Score を Intercept Score と別に表示する。
+SEAD ScoreはIntercept Scoreと別に集計・保存する。`Player Statistics` にはカテゴリ別Scoreを表示せず、累計と任務・帰還・喪失統計を表示する（[SCORING.md](SCORING.md)）。
 SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSite dispositionとFollow-on DEAD availableを加える。
 `Abort Mission` でウィング全体、`Abort Sortie: <名前> [<機体>]` でその参加者だけを中止する。
 今回、F10 地図マーカー・コックピットのウェイポイント設定は追加しない。

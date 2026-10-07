@@ -33,7 +33,7 @@ PowerShellは複数のassertをまとめたPASSグループで、Luaのケース
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-07、`training-4`。Test-AllでLua全349ケース、BUILD2、SYNC3、INSTALL5が通過し、既定先の実ミッションSync/Checkも成功。CAP-31は修正前にGCで受信者が消える失敗を再現し、保持修正後に通過。修正版の実DCS確認は未実施。
+最新の自動検証: 2026-10-07、`training-5`。Test-AllでLua全349ケース、BUILD2、SYNC3、INSTALL5が通過し、既定先の実ミッションSync/Checkも成功。CAP-31はGC後の受信者保持に加え、受注時ID・受信・一致のDEBUG、破壊後ID取得例外、同名別IDの拒否、UCID非出力も検証。修正版の実DCS確認は未実施。
 
 ### 自動テストの前提と限界
 
@@ -200,6 +200,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | CAP-29 | 半径境界、境界より1m外 | 境界は内側、1m外は停止 |
 | CAP-30 | 空域内の1人を個人中止、僚機は継続 | 中止者は時計対象外、任務はACTIVEを維持 |
 | CAP-31 | MOOSEと同じ弱キー受信者でIntercept→同Slot再搭乗→CAP、100%＋敵残存でGC・再読込後に脱出。次CAPではGC後に敵全滅・帰還 | 受信者は1つを保持。未達成死亡0でロック解放、重複Crashで再精算なし。次任務の敵Dead・着陸イベントも届き150点、累計240・任務3・Death2。修正前はGCで受信者が消えることを再現 |
+
+CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し、受信DEBUGだけで一致・精算しないことを確認する。元実体のgetID例外ではUNAVAILABLEを記録しつつ元参照で0点精算し、登録／受信／一致ログにUCIDを含めない。初期化の版ログは重複読み込み後も1回。
 
 ### 採点・帰還（SCORE）
 
@@ -631,7 +633,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-50 | 更新したHookでDCSを再起動し同期済み実ミッションをホスト。slot未選択・Statistics未操作で10秒待つ | Startupはinitialization pending。ログでMissionLoadEnd→BOOTSTRAP_COMMITTED→CONNECTED（storage/ack確認）を確認しscores.datを検証。初期表示だけで失敗とせず、失敗時はphaseとprimary/backup I/O詳細を記録 |
 | MAN-51 | 保存確認済みの精算後にミッションを閉じ、メニューに戻って10秒待つ。別ミッションも開始 | Stop後frameで通信・新run採番なし。SSEが先に消える場合はSTOP_FLUSH_UNAVAILABLEだけを記録し既存保存を保持。次ミッションは別run、保存済み累計を復元 |
 | MAN-52 | CAPを受注し座標へ移動、退出再進入、Status確認 | MEの4候補から1つ。CAP AREAへ中心DDMと条件を受注時60秒表示、半径・PATROL CENTER行なし。進入通知はCAP on station.のみ、20%ごと通知、全員退出で停止。zone内累計30〜120秒で1編隊出現し空域へ進入・哨戒 |
-| MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認。Intercept後に同Slot再搭乗し、長時間飛行したCAPの途中脱出も確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成死亡FAILED/0、任意中止ABORT/0。SOLO死亡後はACTIVE・Wing/UCIDロックを残さない。起動ログversion=training-4を確認 |
+| MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認。Intercept後に同Slot再搭乗し、長時間飛行したCAPの途中脱出も確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成死亡FAILED/0、任意中止ABORT/0。SOLO死亡後はACTIVE・Wing/UCIDロックを残さない。起動ログversion=training-5、Registered aircraft → Failure event received → Failure event matched → FAILED/0 → closedの記録を確認 |
 | MAN-54 | MP2で片方だけ進入、両者退出、1人個人中止。別Wingでも並行受注 | 元の未精算参加者の誰か1人が内側なら進み、全員外なら停止。中止者0、僚機継続。別Wingの時計・敵・ロックは独立 |
 | MAN-55 | 新Hook導入後DCS再起動、旧schemaの成績でホスト。CAP精算保存後に閉じ再ホスト | schema1をCAP=0で移行し既存得点保持。CAP ScoreとTotal/Careerを保存確認後、次セッションで復元。実成績をfixtureで書き換えない |
 

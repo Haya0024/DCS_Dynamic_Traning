@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-4" }
+DynamicTrainingRuntime = { version = "training-5" }
 Persistence.Publish()
 
 local menus = {}
@@ -244,6 +244,7 @@ local function Generate(groupName, category)
     end
     local acquired, blocked = Missions.Acquire(record)
     if not acquired then Message(group, blocked); return end
+    Notifications.RegisteredAircraft(record)
     if problem then Message(group, problem, 15) end
     if category == "CAP" then
         record.owner = roster[1]
@@ -701,6 +702,8 @@ local function HandleEvent(record, event)
     if reason then
         for _, p in ipairs(record.participants) do
             if Player.EventMatches(p.owner, event) then
+                DebugLog(record, "Failure event matched: event=" .. reason .. "; unit=" .. tostring(p.owner.unitName) ..
+                    "; objectID=" .. tostring(p.owner.objectID) .. "; state=" .. tostring(p.state) .. "; done=" .. tostring(p.done == true))
                 if p.done then return end
                 p.failureEvent = reason
                 if p.primaryCompletedAt and time >= p.primaryCompletedAt then
@@ -747,6 +750,9 @@ for _, name in ipairs({ "RunwayTouch", "Land", "Takeoff", "RunwayTakeoff" }) do
 end
 for id in pairs(subscriptions) do
     eventHandler:HandleEvent(id, function(_, event)
+        if failureEvents[event.id] then
+            Safe("Failure event trace", nil, function() Notifications.FailureEvent(event, failureEvents[event.id]) end)
+        end
         if event.id == EVENTS.Crash or event.id == EVENTS.Dead or event.id == EVENTS.UnitLost then
             Safe("SAM site loss", nil, function() SEADSites.RecordLoss(event) end)
         end

@@ -693,9 +693,31 @@ INSTRUCTIONS:
 Engage the emitter using HARM PB mode, then RTB.
 ```
 
+### Registered aircraft — once per acquired assignment, debug only
+
+```text
+[DynamicTraining] [DEBUG] CAP assignment 2
+Registered aircraft: BLUE_HORNET_RAMAT_SOLO_01-1 (objectID=16783362)
+Wing: BLUE_HORNET_RAMAT_SOLO_01
+```
+
+This records the aircraft fixed at acceptance for every category. It does not include UCIDs, scores, or coordinate briefing data. Assignments that fail preparation may still have an acceptance trace.
+
+### Failure event receipt and participant match — debug only
+
+```text
+[DynamicTraining] [DEBUG] Failure event received: event=Ejection; eventID=<kind ID>; time=3160.272; unit=BLUE_HORNET_RAMAT_SOLO_01-1; objectID=16783362; subscriberRetained=true
+[DynamicTraining] [DEBUG] run2:CAP:2
+Failure event matched: event=Ejection; unit=BLUE_HORNET_RAMAT_SOLO_01-1; objectID=16783362; state=ACTIVE; done=false
+```
+
+Receipt is logged once per MOOSE callback for Crash / Dead / PilotDead / Ejection / UnitLost, including enemy and unrelated units. Match is logged for a registered participant only; the following normal settlement entry shows FAILED / RTB_FAILURE and points. A receipt without a match can be compared with the captured aircraft ID. The event-kind ID differs from the incrementing `event_id` in DCS's internal Scripting history.
+
+Raw identity methods may fail after destruction; these fields then show UNAVAILABLE. Diagnostic probes are protected and never change the object/ID scoring match. The match entry's done=true indicates an already settled participant in a still-active wing; it cannot receive another settlement. No trace is sent to the screen, and no UCID is logged.
+
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-4; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-5; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 

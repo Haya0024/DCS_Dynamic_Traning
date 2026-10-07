@@ -266,10 +266,27 @@ test("MOOSE weak subscribers survive garbage collection after Intercept and resp
     local subscribers = 0
     for _ in pairs(s.eventSubscribers[s.env.EVENTS.Ejection]) do subscribers = subscribers + 1 end
     assert(subscribers == 1, "MOOSE weak subscriber was collected or duplicated")
+    local unmatchedAt = #s.logs
+    local unrelated = { getName = function() return s.player.unitName end, getID = function() return 999999 end }
+    s:event("Ejection", s.player, nil, nil, unrelated)
+    assert(s:mission() == r and r.state == "ACTIVE")
+    for i = unmatchedAt + 1, #s.logs do assert(not s.logs[i]:find("Failure event matched:", 1, true)) end
+    s.player.raw.getID = function() error("destroyed object ID unavailable") end
     s.player.alive = false; s:event("Ejection", s.player); s:event("Crash", s.player)
     assert(not s:mission() and r.spawn.group.destroyed)
     local p = r.participants[1]
     assert(p.done and p.receipt.result == "FAILED" and p.receipt.points == 0)
+    local registered, received, matched, initialized = false, false, false, 0
+    for _, log in ipairs(s.logs) do
+        assert(not log:find("ucid-a", 1, true))
+        if log:find("Registered aircraft: Player10 (objectID=50000)", 1, true) then registered = true end
+        if log:find("Failure event received: event=Ejection", 1, true) and
+            log:find("objectID=UNAVAILABLE; subscriberRetained=true", 1, true) then received = true end
+        if log:find(r.id, 1, true) and log:find("Failure event matched: event=Ejection", 1, true) and
+            log:find("objectID=50000; state=ACTIVE; done=false", 1, true) then matched = true end
+        if log:find("Runtime initialized; version=training-5;", 1, true) then initialized = initialized + 1 end
+    end
+    assert(registered and received and matched and initialized == 1)
     s.player.alive = true; s.player.id = 50001; s.player:newDCSObject()
     s.players = { s.player.raw }; advance(s, 2)
     s:score(90); s:lastMessageContains("Settled Missions: 2"); s:lastMessageContains("Death Count: 2")

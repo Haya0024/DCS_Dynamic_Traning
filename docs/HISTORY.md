@@ -99,6 +99,12 @@ CAP-31に同じ弱キー登録で配送する模擬境界と実際の`collectgar
 
 Lua全349ケース（CAP31）、BUILD2、SYNC3、INSTALL5が通過。実ミッションのSync/Check成功。サーバー側は更新した.mizを差し替えてミッション再開始が必要。Hook更新は不要。修正版の専用サーバーでのMAN-53確認は未実施、過去にAbortで保存された成績を直接修正していない。
 
+### 2026-10-07 死亡イベント診断ログ（training-5）
+
+サーバーログでイベント未受信・機体照合不一致・精算失敗を分けるため、受注時に固定したWing/機体名/object ID、死亡系MOOSE callbackの受信と受信者保持状態、登録参加者への一致と精算前state/doneをDEBUGへ記録する。Crash / Dead / PilotDead / Ejection / UnitLostだけが受信トレース対象。照合後の精算・任務解放・保存確認は既存ログで追う。画面の本文・表示時間・採点条件は維持し、UCIDは出力しない。
+
+破壊後のraw getID/getName失敗は保護しUNAVAILABLEと記録する。元の実体参照・固定IDによる照合を緩めず、同名別IDは受信ログだけで精算しない。CAP-31を拡張してこれらの診断、UCID秘匿、初期化版ログ1回、GC後の失敗／成功精算を確認。Lua全349ケース、BUILD2、SYNC3、INSTALL5と実ミッションSync/Checkが通過。実サーバーでの診断出力確認は未実施、サーバーには更新版.mizを差し替えてミッション再開始が必要。
+
 ## 成績保存の診断履歴
 
 2026-10-06 17:45 JSTの実DCSログで、BLUE_HORNET_SC_AI2_01のPlayer Statisticsが `Session only; persistence hook not connected.` であることを確認した。Hookの読み込み、同梱bundleとの一致、ホストAPI許可は確認済みだが、scores.datは未作成で接続ログもない。実行中endpointの所在／callbackの呼び出しを区別できるログが旧Hookになかったため、診断ログを追加する。診断Hook導入後のDCS確認と根本原因の確定は未実施。

@@ -1,10 +1,10 @@
 # CAP 訓練任務
 
-更新日: 2026-10-06
+更新日: 2026-10-07
 
 ## 今回の仕様
 
-F10のGenerate CAPで、受注時のBLUE F/A-18C人間参加者を固定する。同じWing/UCIDの受注ロック、個別中止・帰還評価を既存任務と共有する。
+F10のTask: CAPで、受注時のBLUE F/A-18C人間参加者を固定する。同じWing/UCIDの受注ロック、個別中止・帰還評価を既存任務と共有する。
 現在MEにあるCAP_ZONE_CENTRAL_COAST / CAP_ZONE_GOLAN / CAP_ZONE_NORTH_COAST / CAP_ZONE_HOMS_WESTの4円形trigger zoneを等確率で選ぶ。名前はConfig.capで管理し、中心座標・半径はruntimeのMOOSE ZONEから取得する。MEのzone・template・view設定をLuaから変更しない。
 受注直後に `CAP AREA: <中心DDM>`（分の小数3桁）と達成条件を60秒設定で1回表示する。空域名・半径・PATROL CENTER行は表示しない。Mission Statusも同じ形式で再確認できる。
 

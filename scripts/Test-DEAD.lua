@@ -27,7 +27,7 @@ local function setup(options)
 end
 local function begin(s, index, zone, player)
     s.randomValues = { index or 1, 1, zone or 1 }
-    s:command("Generate SEAD", player); s:tick(s.time + 1)
+    s:command("Task: SEAD", player); s:tick(s.time + 1)
     return assert(s:mission(player))
 end
 local function destroy(s, unit, event)
@@ -58,7 +58,7 @@ local function preserved(index, suppressed, options)
 end
 local function followOnDead(s, airborne, player)
     (player or s.player).airborne = airborne ~= false
-    s:command("Generate DEAD", player)
+    s:command("Task: DEAD", player)
     return assert(s:mission(player))
 end
 local function finish(s, r, event)
@@ -109,11 +109,11 @@ test("Preserve is idempotent and retains the damaged original site after SEAD se
     s:score(150); s:assertClean()
 end)
 
-test("CLEANUP and still-active SEAD sites are never Generate DEAD candidates", function()
+test("CLEANUP and still-active SEAD sites are never Task: DEAD candidates", function()
     local s = setup(); local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true
     s:tick(2); local r = begin(s)
-    s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
-    primary(s, r, true); s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    primary(s, r, true); s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
     assert(not s:mission(other) and r.site.disposition == "CLEANUP" and s:mission() == r); s:assertClean()
 end)
 
@@ -121,10 +121,10 @@ test("a preserved site stays reserved until every original SEAD participant fini
     local s = setup(); s:occupyWing()
     local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(2)
     local r = begin(s); primary(s, r, false); s:command("Preserve Site for DEAD")
-    recover(s); s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    recover(s); s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
     assert(r.site.reservedByAssignmentID == r.assignmentID and not s:mission(other))
     s:event("Ejection", s.wingman); assert(r.site.reservedByAssignmentID == nil)
-    s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
     assert(r.site.retainedWingName == s.player.group:GetName() and not s:mission(other))
     local dead = followOnDead(s); assert(dead.site == r.site)
     s:score(150); s:score(90, s.wingman); s:assertClean()
@@ -188,8 +188,8 @@ test("Preserve then Continue changes RETAIN to IN_USE and cleanup follows comple
     finish(s, r); recover(s); assert(site.cleaned and not s:sites()[site.id]); s:assertClean()
 end)
 
-test("Generate DEAD safely rejects an empty pool and releases Wing and UCID locks", function()
-    local s = setup(); s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
+test("Task: DEAD safely rejects an empty pool and releases Wing and UCID locks", function()
+    local s = setup(); s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
     assert(#s.spawns == 0 and #s.randomCalls == 0 and not next(s:sites()))
     assert(not s:mission()); s:generate(); assert(s:mission().category == "Intercept"); s:assertClean()
 end)
@@ -300,7 +300,7 @@ test("ground Follow-on DEAD abort or aircraft replacement closes its reservation
     end
 end)
 
-test("Generate DEAD chooses the nearest retained site using the current flight-number leader", function()
+test("Task: DEAD chooses the nearest retained site using the current flight-number leader", function()
     local s = setup(); local other = s:addPilot("Other", "ucid-other", 40)
     other.airborne, other.position.x, other.position.z = true, -80000, 0; s:tick(2)
     local a = begin(s, 1, 1)
@@ -315,7 +315,7 @@ test("Generate DEAD chooses the nearest retained site using the current flight-n
     s.player.position.x, s.wingman.position.x = 41000, 79000
     s.player.position.z, s.wingman.position.z = 0, 0
     s.player.group.units = { s.wingman, s.player }
-    s:command("Generate DEAD", s.wingman)
+    s:command("Task: DEAD", s.wingman)
     assert(s:mission().site == a.site and b.site.disposition == "RETAIN" and foreign.site.disposition == "RETAIN")
     s:assertClean()
 end)
@@ -337,27 +337,27 @@ test("one retained site cannot be acquired by two Wings even during ground depar
     local s, site = preserved(1, false)
     local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(s.time + 2)
     local r = followOnDead(s, false)
-    s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
     assert(s:mission() == r and not s:mission(other) and site.reservedByAssignmentID == r.assignmentID)
-    s:command("Generate Intercept", other); assert(s:mission(other).category == "Intercept"); s:assertClean()
+    s:command("Task: Intercept", other); assert(s:mission(other).category == "Intercept"); s:assertClean()
 end)
 
 test("DEAD obeys the existing Wing and UCID blocker across all three categories", function()
     local s = setup(); local r = begin(s)
-    s:command("Generate DEAD"); s:lastMessageContains("SEAD mission is already active")
+    s:command("Task: DEAD"); s:lastMessageContains("SEAD mission is already active")
     primary(s, r, false); s:command("Preserve Site for DEAD"); recover(s); r = followOnDead(s)
-    for _, command in ipairs({ "Generate DEAD", "Generate SEAD", "Generate Intercept" }) do
+    for _, command in ipairs({ "Task: DEAD", "Task: SEAD", "Task: Intercept" }) do
         s:command(command); s:lastMessageContains("DEAD mission is already active")
     end
     s:occupyWing("SameAccount", "ucid-a")
-    s:command("Generate Intercept"); assert(s:mission() == r); s:assertClean()
+    s:command("Task: Intercept"); assert(s:mission() == r); s:assertClean()
 end)
 
 test("Acquire failure never consumes a retained site", function()
     local s, site = preserved(1, false); local missions = module(s, "Missions")
     local acquire = missions.Acquire
     missions.Acquire = function() return false, "Injected Acquire rejection" end
-    s:command("Generate DEAD"); s:lastMessageContains("Injected Acquire rejection")
+    s:command("Task: DEAD"); s:lastMessageContains("Injected Acquire rejection")
     assert(site.disposition == "RETAIN" and not site.reservedByAssignmentID and not s:mission())
     missions.Acquire = acquire; assert(followOnDead(s).site == site); s:assertClean()
 end)
@@ -369,7 +369,7 @@ test("snapshot failure after reservation rolls back the retained site and Wing/U
         if calls == 3 then error("Injected snapshot failure") end
         return getUnits(self)
     end
-    s:command("Generate DEAD"); s:lastMessageContains("reservation rolled back")
+    s:command("Task: DEAD"); s:lastMessageContains("reservation rolled back")
     assert(not s:mission() and site.disposition == "RETAIN" and site.followOnAvailable)
     assert(not site.reservedByAssignmentID and not site.cleanupRequested and #s.errors == 1)
     g.GetUnits = getUnits; assert(followOnDead(s).site == site)
@@ -382,7 +382,7 @@ test("briefing or reward preparation failure rolls back without deleting the pre
         local formatter = coordinate.ToStringLLDDM
         if problem == "briefing" then coordinate.ToStringLLDDM = function() error("Injected briefing failure") end
         else config.dead.fullReward = -1 end
-        s:command("Generate DEAD"); s:lastMessageContains("reservation rolled back")
+        s:command("Task: DEAD"); s:lastMessageContains("reservation rolled back")
         assert(not s:mission() and site.disposition == "RETAIN" and not site.reservedByAssignmentID and not g.destroyed)
         assert(#s.errors == 1)
         coordinate.ToStringLLDDM, config.dead.fullReward = formatter, 150
@@ -434,13 +434,13 @@ test("externally destroyed retained sites lose follow-on eligibility and are swe
     local s, site, g = preserved(1, false)
     for _, u in ipairs(g.units) do u.alive = false end
     s:tick(s.time + 1); assert(site.state == "DESTROYED" and site.cleaned and not s:sites()[site.id])
-    s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites"); assert(#s.spawns == 1); s:assertClean()
+    s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites"); assert(#s.spawns == 1); s:assertClean()
 end)
 
 test("unknown retained-site observations block selection without deleting the site", function()
     local s, site, g = preserved(1, false); local getUnits = g.GetUnits
     g.GetUnits = function() error("Injected site observation failure") end
-    s:tick(s.time + 1); s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites")
+    s:tick(s.time + 1); s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites")
     assert(site.disposition == "RETAIN" and not site.followOnAvailable and not g.destroyed and not s:mission())
     assert(site.remainingTargetCount == nil and site.state ~= "DESTROYED")
     g.GetUnits = getUnits; assert(followOnDead(s).site == site); s:assertClean()
@@ -563,8 +563,8 @@ end)
 test("an active DEAD assignment blocks the same UCID after moving to another Wing", function()
     local s, site = preserved(1, false); local r = followOnDead(s)
     local other = s:addPilot("MovedPilot", "ucid-a", 40); other.airborne = true; s:tick(s.time + 2)
-    s:command("Generate Intercept", other); s:lastMessageContains("DEAD mission is already active")
-    s:command("Generate DEAD", other); s:lastMessageContains("DEAD mission is already active")
+    s:command("Task: Intercept", other); s:lastMessageContains("DEAD mission is already active")
+    s:command("Task: DEAD", other); s:lastMessageContains("DEAD mission is already active")
     assert(not s:mission(other) and s:mission() == r and site.reservedByAssignmentID == r.assignmentID)
     s:assertClean()
 end)
@@ -593,7 +593,7 @@ end)
 test("participant readiness failure during acceptance rolls back both Site and assignment reservations", function()
     local s, site, g = preserved(1, false); local inAir = s.player.InAir
     s.player.InAir = function() error("Injected participant readiness failure") end
-    s:command("Generate DEAD"); s:lastMessageContains("reservation rolled back")
+    s:command("Task: DEAD"); s:lastMessageContains("reservation rolled back")
     assert(not s:mission() and site.disposition == "RETAIN" and site.followOnAvailable)
     assert(not site.reservedByAssignmentID and not g.destroyed and #s.errors == 1)
     s.player.InAir = inAir; assert(followOnDead(s).site == site)
@@ -621,7 +621,7 @@ test("preserved-site keeper logout cleans its group without changing settled SEA
     s.connections[10] = nil; s:tick(s.time + 1)
     assert(site.cleaned and g.destroyed and not s:sites()[site.id] and site.cleanupReason == "PRESERVER_DISCONNECTED")
     s.connections[10] = { id = 10, name = s.player.name, ucid = "ucid-a", side = 2, slot = "10" }
-    s:score(150); s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
+    s:score(150); s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
     assert(not s:mission() and #s.spawns == 1); s:assertClean()
 end)
 
@@ -665,7 +665,7 @@ test("logout before original SEAD settlement detaches the site while preserving 
     assert(site.cleaned and not site.reservedByAssignmentID and g.destroyed)
     assert(s:mission() == r and r.state == "RTB_PENDING" and not r.participants[1].done)
     s.connections[10] = { id = 10, name = s.player.name, ucid = "ucid-a", side = 2, slot = "10" }
-    s:command("Generate DEAD"); s:lastMessageContains("SEAD mission is already active")
+    s:command("Task: DEAD"); s:lastMessageContains("SEAD mission is already active")
     recover(s); s:score(150); assert(not s:mission()); s:assertClean()
 end)
 
@@ -796,7 +796,7 @@ test("all SA6 or SA8 site vehicles lost means no DEAD even while wrappers report
         assert(site.state == "DESTROYED" and site.remainingTargetCount == 0 and not site.followOnAvailable)
         for _, unit in ipairs(g.units) do assert(unit.alive) end
         assert(not has(s, "Continue as DEAD") and not has(s, "Preserve Site for DEAD"))
-        recover(s); s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
+        recover(s); s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
         s:score(150); s:assertClean()
     end
 end)
@@ -929,7 +929,7 @@ test("nil life observations preserve retained sites with unknown remaining count
     s:tick(s.time + 1)
     assert(site.observationUnavailable and site.remainingTargetCount == nil and not site.followOnAvailable)
     assert(site.state == "SUPPRESSED" and site.disposition == "RETAIN" and not site.cleaned and not g.destroyed)
-    s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
+    s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites available for DEAD.")
     assert(not s:mission() and not site.reservedByAssignmentID and #s.spawns == 1)
     s:tick(s.time + 1)
     local observations = 0
@@ -1026,7 +1026,7 @@ test("MP2 early SEAD-only RTB leaves Immediate DEAD and locks for the remaining 
     assert(p.done and p.deadReceipt.points == 0 and not p.deadScoring.primaryCompletedAt)
     assert(s:mission() == r and r.state == "DEAD_ACTIVE" and not r.site.cleaned)
     assert(r.site.disposition == "IN_USE" and r.site.reservedByAssignmentID == r.assignmentID)
-    s:command("Generate Intercept"); assert(s:mission() == r and #s.spawns == 1)
+    s:command("Task: Intercept"); assert(s:mission() == r and #s.spawns == 1)
     finish(s, r); recover(s, s.wingman)
     assert(not p.deadScoring.primaryCompletedAt and p.deadReceipt.points == 0 and r.site.cleaned)
     s:score(150); s:lastMessageContains("DEAD Score: 0")
@@ -1093,7 +1093,7 @@ test("Preserve reserves its wing across SEAD settlement and ground rearm while r
     assert(not site.reservedByAssignmentID and site.disposition == "RETAIN" and not g.destroyed)
     local retainedAt, keeper = site.retainedAt, site.retainedBy
     local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(s.time + 2)
-    s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites available for DEAD.")
+    s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites available for DEAD.")
     assert(not s:mission(other) and not sites.pilots["ucid-other"] and site.retainedWingName == wingName)
     local r = followOnDead(s, false)
     assert(r.state == "ARMED" and r.site == site and r.spawn.group == g and #s.spawns == 1)
@@ -1119,11 +1119,11 @@ end)
 test("failed Follow-on DEAD setup rolls back assignment use while keeping its wing's exclusive reservation", function()
     local s, site = preserved(1, false); local config = module(s, "Config")
     local wingName, retainedAt, keeper = site.retainedWingName, site.retainedAt, site.retainedBy
-    config.dead.fullReward = -1; s:command("Generate DEAD")
+    config.dead.fullReward = -1; s:command("Task: DEAD")
     assert(not s:mission() and not site.reservedByAssignmentID and site.disposition == "RETAIN")
     assert(site.retainedWingName == wingName and site.retainedAt == retainedAt and site.retainedBy == keeper)
     local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(s.time + 2)
-    s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
     assert(not s:mission(other) and not site.cleaned and #s.errors == 1)
     config.dead.fullReward = 150; assert(followOnDead(s).site == site)
 end)
@@ -1131,7 +1131,7 @@ end)
 test("changing to another wing under the same UCID does not transfer a preserved site reservation", function()
     local s, site = preserved(1, false)
     local other = s:addPilot("MovedPilot", "ucid-a", 40); other.airborne = true; s:tick(s.time + 2)
-    s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
     assert(not s:mission(other) and site.disposition == "RETAIN" and not site.cleaned)
     assert(site.retainedWingName == s.player.group:GetName() and not site.reservedByAssignmentID)
     assert(followOnDead(s).site == site); s:assertClean()
@@ -1156,7 +1156,7 @@ test("explicit reservation release allows another wing to use the same damaged s
     assert(not has(s, "Release Site Reservation"))
     local r = followOnDead(s, true, other)
     assert(r.site == site and r.spawn.group == g and g.units[1].life == 99 and #s.spawns == spawned)
-    s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites")
     assert(not s:mission() and site.reservedByAssignmentID == r.assignmentID)
     finish(s, r); recover(s, other); s:score(150, other); s:score(150); s:assertClean()
 end)
@@ -1178,7 +1178,7 @@ test("release during source SEAD recovery waits for all participants before star
     assert(not site.unreservedSince and site.reservedByAssignmentID == r.assignmentID)
     assert(not has(s, "Preserve Site for DEAD") and has(s, "Continue as DEAD"))
     s:tick(s.time + 1800); assert(not site.cleaned and not site.unreservedSince)
-    s:command("Generate DEAD", other); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD", other); s:lastMessageContains("No preserved SAM sites")
     recover(s); assert(s:mission() == r and not site.unreservedSince)
     s:event("Ejection", s.wingman)
     assert(site.unreservedSince == s.time and not site.reservedByAssignmentID)
@@ -1208,7 +1208,7 @@ end)
 test("failed public DEAD preparation restores the original unreserved deadline", function()
     local s, site = preserved(1, false); s:command("Release Site Reservation")
     local since, config = site.unreservedSince, module(s, "Config")
-    s:tick(since + 1799); config.dead.fullReward = -1; s:command("Generate DEAD")
+    s:tick(since + 1799); config.dead.fullReward = -1; s:command("Task: DEAD")
     assert(not s:mission() and site.disposition == "AVAILABLE" and not site.reservedByAssignmentID)
     assert(site.unreservedSince == since and #s.errors == 1)
     config.dead.fullReward = 150; s:tick(since + 1800); assert(site.cleaned)
@@ -1217,7 +1217,7 @@ end)
 test("expired shared sites are refused even before the periodic cleanup sweep", function()
     local s, site = preserved(1, false); s:command("Release Site Reservation")
     s.time = site.unreservedSince + 1800
-    s:command("Generate DEAD"); s:lastMessageContains("No preserved SAM sites")
+    s:command("Task: DEAD"); s:lastMessageContains("No preserved SAM sites")
     assert(not s:mission() and site.cleanupRequested and not site.reservedByAssignmentID)
     s:tick(s.time + 1); assert(site.cleaned); s:assertClean()
 end)

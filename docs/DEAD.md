@@ -1,6 +1,6 @@
 # SEAD → DEAD follow-on仕様
 
-更新日: 2026-10-06
+更新日: 2026-10-07
 
 画面メッセージ・DCSログの本文、タイミング、表示時間は [MESSAGES.md](MESSAGES.md) を参照する。
 Follow-on DEADの通知はSEADと同じ流れにする。準備成功後に短い `DEAD mission accepted.`（10秒）、受注時の座標付きブリーフィング（60秒設定）を1回、ACTIVE移行時は座標を含まない `DEAD TRAINING START` と目標・RTB指示（25秒）を出す。地上受注後の離陸でもブリーフィングを自動再掲しない。予約待ち・開始時の残数などはDEBUGへ記録し、Statusでは座標・残数を任意確認できる。
@@ -10,13 +10,13 @@ Follow-on DEADの通知はSEADと同じ流れにする。準備成功後に短�
 DEADは必ず既存SEADで生成されたSAM Siteを引き継ぐ継続任務とする。種類は次の2つだけ。
 
 - Immediate DEAD: SEAD Primary完了後、同じSortieで `Continue as DEAD` を選び、同じSiteを攻撃する。
-- Follow-on DEAD: `Preserve Site for DEAD` → SEADのRTB・精算 → 次Sortieの `Generate DEAD` で、保持したSiteを取得して攻撃する。
+- Follow-on DEAD: `Preserve Site for DEAD` → SEADのRTB・精算 → 次Sortieの `Task: DEAD` で、保持したSiteを取得して攻撃する。
 
-`Generate DEAD` はpreserved Siteがある場合だけ成立する。候補がなければ `No preserved SAM sites available for DEAD.` と表示して終了する。
+`Task: DEAD` はpreserved Siteがある場合だけ成立する。候補がなければ `No preserved SAM sites available for DEAD.` と表示して終了する。
 新しいランダムSAM Siteを生成するDEADは実装対象外。
 元のGroup、損傷、発信状態、残存車両を継承する。Spawn・機種抽選・Zone抽選・Life復元・Radar再設定は行わない。
 標準は `CLEANUP`。後で使うSiteだけプレイヤーが明示的に `RETAIN` を選ぶ。
-Preserveは保持元ウィング専用のサイト予約とする。SEADのRTB・精算後も保持予約を維持し、同じウィングが再武装後にGenerate DEADで取得する。`Release Site Reservation` を明示選択した場合だけ、同じSiteを他Wingにも開放する。
+Preserveは保持元ウィング専用のサイト予約とする。SEADのRTB・精算後も保持予約を維持し、同じウィングが再武装後にTask: DEADで取得する。`Release Site Reservation` を明示選択した場合だけ、同じSiteを他Wingにも開放する。
 実装と模擬テストを確認してから結果を記録する。DCS内での確認は別途必要。
 
 ## 責務
@@ -86,10 +86,10 @@ DEAD進行中のnil・例外・不正値・オブジェクトID不一致は残�
 | `CLEANUP` | SEAD達成＋残存あり、Preserve | `RETAIN`。時刻を保存、元SEADの予約は全員精算まで維持 |
 | `CLEANUP` / `RETAIN` / `AVAILABLE` | 元SEAD達成後、Continue | `IN_USE`。同じassignmentでDEAD phaseへ |
 | `RETAIN` | 元SEAD終了、残存あり | 旧assignmentの使用予約だけ解除。保持元Wingの専用予約とGroupは維持 |
-| `RETAIN` | Generate DEAD取得成功 | `IN_USE`。新assignmentで予約 |
+| `RETAIN` | Task: DEAD取得成功 | `IN_USE`。新assignmentで予約 |
 | `RETAIN` | Release Site Reservation | `AVAILABLE`。Wing専用予約を解除。元SEADの使用予約は終了まで維持 |
-| `AVAILABLE` | 使用中assignmentなし | 未予約時間の計測開始。他WingもGenerate DEADで取得可能 |
-| `AVAILABLE` | Generate DEAD取得成功 | `IN_USE`。計測停止、同じGroupを新assignmentで予約 |
+| `AVAILABLE` | 使用中assignmentなし | 未予約時間の計測開始。他WingもTask: DEADで取得可能 |
+| `AVAILABLE` | Task: DEAD取得成功 | `IN_USE`。計測停止、同じGroupを新assignmentで予約 |
 | `AVAILABLE` | 未予約のまま連続30分 | `CLEANUP`。削除失敗はSweepで再試行 |
 | `IN_USE` | DEAD全対象破壊 | `CLEANUP`。全員精算まで予約を維持 |
 | `IN_USE` | 任務中止・全員喪失・離陸予約取消 | `CLEANUP`へ倒し削除。孤児Siteを作らない |
@@ -102,7 +102,7 @@ F10はグループ共有で押した本人を取得できないため、Preserve
 接続中のUCIDを1秒の監視とDEAD候補確認時に照合する。観戦席・別スロット・別coalitionへの移動はログアウトではない。
 UCID未照合の場合は取得済みの接続player IDを使う。API例外・取得不備・識別子なしでは切断を確定せず保持を続ける。
 保持者がログアウトしたRETAIN Siteは元SEAD精算前でもSite予約を解除してCleanupする。任務記録・確定済みPrimary・個別採点は維持する。
-すでにContinueまたはGenerate DEADでIN_USEになったSiteはこのログアウトCleanupの対象外とし、使用中の任務の終了処理を使う。
+すでにContinueまたはTask: DEADでIN_USEになったSiteはこのログアウトCleanupの対象外とし、使用中の任務の終了処理を使う。
 削除失敗は既存Sweepで再試行する。一度Cleanupへ移したSiteを再接続で復元しない。
 明示Preserve後にSEADを任意Abortした場合も保持方針は維持するが、SEADポイントは従来通り0。
 Siteはセッション内のみ。専用保持中のtimeout・Delete retained siteメニュー・永続保存は追加しない。
@@ -157,10 +157,10 @@ DEAD途中の事故でもSEAD Primary成功を失わず、SEAD90／DEAD0。両�
 ```text
 SEAD RTB_PENDING → Preserve(RETAIN) → SEAD個別精算 → 元record Close
                                                            ↓ Siteは残る
-Generate DEAD → Site予約(IN_USE) → ARMED / ACTIVE → RTB_PENDING → DEAD精算 → Cleanup
+Task: DEAD → Site予約(IN_USE) → ARMED / ACTIVE → RTB_PENDING → DEAD精算 → Cleanup
 ```
 
-Generate DEADの候補は保持予約先が受注ウィングと一致するRETAIN Site、または明示開放済みで期限内のAVAILABLE Site。followOnAvailable=true、削除未依頼・未完了、使用中assignmentなし、生存対象1両以上を要求する。
+Task: DEADの候補は保持予約先が受注ウィングと一致するRETAIN Site、または明示開放済みで期限内のAVAILABLE Site。followOnAvailable=true、削除未依頼・未完了、使用中assignmentなし、生存対象1両以上を要求する。
 元SEADが未終了のRETAIN Siteは予約中なので候補にしない。
 受注時の長機現在位置と `plan.actualSpawnPoint`（なければ `spawn.coordinate`）の水平距離で、取得可能な専用保持・共有候補の最寄りを選ぶ。より近くても別Wingが専用保持しているSiteは候補にしない。
 SEAD終了時に `Missions.wings` / `Missions.pilots` の任務ロックは解除し、次Sortieの新任務を受注可能にする。`retainedWingName` はSite側に残すので、任務終了を理由に他Wingへ解放しない。
@@ -209,7 +209,7 @@ Follow-on DEADは地域、SAM種類、主要レーダーの履歴（Primary rada
 SEADのTOO/PB秘匿はFollow-on DEADには適用しない。内部Group名・object IDは表示しない。
 Immediate DEADはSEAD情報の秘匿を維持し、残数・follow-on phaseを追加表示する。
 
-通常メニューにGenerate DEADを追加。SEAD達成後に残存ありの場合だけ同じ階層へContinue/Preserveを追加する。
+通常メニューにTask: DEADを追加。SEAD達成後に残存ありの場合だけ同じ階層へContinue/Preserveを追加する。
 Preserve後はPreserveを消しContinueは残す。Continue後や残存全滅・任務終了で両方を消す。
 signatureにfollow-on選択可否を含め、既存の再生成方式で反映する。古いcallbackもrecord/site/予約を再検証する。
 
@@ -226,7 +226,7 @@ Player StatisticsへDEAD Scoreを追加。
 3. 何も選ばずRTBした場合はSEAD150、全員終了後に従来通りCleanup。
 4. Continueで同じ損傷したGroupを攻撃し、全滅後RTBでSEAD150＋DEAD150、任務数1件。
 5. Continue途中の事故はSEAD90＋DEAD0、両目標達成後事故は各90。重複通知で再加算せず、全員終了後に残Siteを削除。
-6. Preserve→全員RTB→再武装→Generate DEADで同じ残存車両を攻撃し、DEAD150。
+6. Preserve→全員RTB→再武装→Task: DEADで同じ残存車両を攻撃し、DEAD150。
 7. Follow-on DEADの達成後事故90、達成前事故・Abort0、全員終了後Cleanup。
 8. MP2の一部精算・途中参加・長機喪失でも対象と採点を混同しない。
 9. 別WingはSEAD精算後・再武装中にも保持Siteを取得できない。同Wingに複数保持Siteがある場合のみ最寄りを取得し、取得時の使用予約で二重取得も拒否する。

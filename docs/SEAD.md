@@ -1,10 +1,10 @@
 # SEAD 訓練ミッション仕様
 
-更新日: 2026-10-05
+更新日: 2026-10-07
 
 ## 今回の実装範囲
 
-F10 の `Dynamic Training → Generate SEAD` で、SA-6 または SA-8 を1グループ生成する。
+F10 の `Dynamic Training → Task: SEAD` で、SA-6 または SA-8 を1グループ生成する。
 受注時に TOO / PB を各50%で抽選し、方式・SAM・Zone・配置予定点を固定する。
 計画の作成と SAM の実体生成を分離する。地上受注では計画だけを作成し、登録参加者全員の離陸後20秒で生成する。
 受注時から全員が空中なら、計画確定と受注情報表示の直後に生成する。
@@ -155,7 +155,7 @@ Enemy radar suppressed.
 `Preserve Site for DEAD` を明示選択した場合だけ `RETAIN` とし、全員精算後もSiteを保持する。
 Preserve時の長機を保持者として固定し、そのプレイヤーのログアウトを確認した場合はRETAIN SiteをCleanupする。観戦席・別スロットへの移動は切断扱いにしない。
 このCleanupは元SEAD精算前でも可能だが、SEADのPrimary結果・帰還評価・Wing/UCIDロックは変更しない。すでにDEAD使用中のIN_USE Siteは対象外。
-PreserveしたSiteは元SEADの全員終了後も保持元Wing専用に予約する。任務ロックと旧assignmentの使用予約は終了時に解除するが、Siteの保持予約先は維持し、RTB・再武装後に同WingだけがGenerate DEADで取得できる。
+PreserveしたSiteは元SEADの全員終了後も保持元Wing専用に予約する。任務ロックと旧assignmentの使用予約は終了時に解除するが、Siteの保持予約先は維持し、RTB・再武装後に同WingだけがTask: DEADで取得できる。
 `Continue as DEAD` は同じrecordを `DEAD_ACTIVE` へ移す。既存Groupを再生成せず、生存車両だけを対象に固定する。
 Immediate DEADではSEADの達成結果・任務ID・採点カテゴリを維持し、独立した追加DEAD報酬を設定する。DEAD全滅後にRTBへ戻り、帰還時に各150、両目標達成後事故は各90、DEAD未達成事故はSEAD90／DEAD0。任意Abortは両方0。任務数は1件を維持する。詳細は [DEAD.md](DEAD.md)。
 DEAD未達成でも新しい着地からSEADの帰還を評価し、安全帰還確定時はSEAD150／DEAD0で個別終了する。未精算の僚機は継続でき、後の達成を精算済み参加者へ遡って付けない。
@@ -164,7 +164,7 @@ IN_USEのまま全員終了した場合はCLEANUPへ倒す。RETAIN専用保持�
 ウィングの終了処理はサイトの解放を通知するだけとし、SAMの削除・再試行は独立したサイト管理が担う。
 削除に失敗したサイトも参照を失わず、監視tickで再試行する。参照は削除完了まで保持する。
 生成途中の検証失敗による即時削除は、完成したサイトのCleanupとは別の失敗復旧とする。
-保持SiteのGenerate DEADは新しい任務IDを使用し、DEAD Scoreへ独立精算する。
+保持SiteのTask: DEADは新しい任務IDを使用し、DEAD Scoreへ独立精算する。
 Site stateの残存判定はSEADエミッターの終端状態と別に監視する。DEADで残存車両を破壊してもSEAD結果は変えない。
 `record.primaryResult = "DESTROYED"` は主要レーダー破壊だけを意味する。SA-6のLauncherが1両以上生存していればDEAD継続可能で、Site全滅は生存RED ground車両が0の場合だけとする。
 損傷＋Radar OFF60秒のSUPPRESSEDでは、生存レーダーもLauncherもDEAD対象に含める。SEAD完了済みの前提は `site.seadCompleted`、残存数は実Groupから取得する `site.remainingTargetCount` として分離する。

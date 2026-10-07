@@ -688,7 +688,7 @@ end)
 test("CAP settlement persists separately after legacy restoration and survives a fresh hook session", function()
     local fs = filesystem(); fs.files[path] = legacyFile()
     local s = scenario(); s:addCAPZones(); local h = hook(s, fs); h:frame(0); s:score(300)
-    s:command("Generate CAP"); local record = s:mission()
+    s:command("Task: CAP"); local record = s:mission()
     s.player.airborne = true
     s.player.position = { x = record.capPlan.center.x, y = 6000, z = record.capPlan.center.y }
     for time = 1, 121 do s:tick(time) end

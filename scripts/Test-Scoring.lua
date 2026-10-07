@@ -130,7 +130,7 @@ test("menu owner wins even when another BLUE player is first", function()
     local s = scenario(); local other = s:addPilot("Other", "ucid-b", 20)
     s.players = { other.raw, s.player.raw }; s:tick(2)
     other.airborne = true; other.position = { x = 9000, y = 1000, z = 10000 }
-    other.heading = 180; s:command("Generate Intercept", other)
+    other.heading = 180; s:command("Task: Intercept", other)
     assert(#s.spawns == 1)
     assert(math.abs(s.spawns[1].position.x - s.player.position.x) > 1000)
     s:complete(); s:event("Ejection", other)

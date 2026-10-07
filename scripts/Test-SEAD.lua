@@ -26,7 +26,7 @@ local function setup(templateIndex, options)
     return s, s.zones[names[1]]
 end
 local function generate(s)
-    s:command("Generate SEAD")
+    s:command("Task: SEAD")
     s:lastMessageContains("SEAD mission accepted.")
 end
 local function status(s, expected, pilot)
@@ -152,7 +152,7 @@ test("unsafe selected zone terminates after 50 tries even when other zones exist
     assert(s.zones[names[1]].calls == 50)
     for i = 2, #names do assert(s.zones[names[i]].calls == 0) end
     s.surfaceLand = nil
-    s:command("Generate SEAD"); s:tick(61); assert(#s.spawns == 1)
+    s:command("Task: SEAD"); s:tick(61); assert(#s.spawns == 1)
 end)
 
 test("missing zones are skipped; all missing zones fail and permit retry", function()
@@ -160,9 +160,9 @@ test("missing zones are skipped; all missing zones fail and permit retry", funct
     generate(s); s:tick(1)
     assert(#s.spawns == 1 and s.zones[names[2]].calls == 1); s:assertClean()
     s = setup(); local zones = s.zones; s.zones = {}
-    s:command("Generate SEAD")
+    s:command("Task: SEAD")
     s:lastMessageContains("setup failed"); assert(#s.errors == 1)
-    s.zones = zones; s:command("Generate SEAD"); s:tick(3); assert(#s.spawns == 1)
+    s.zones = zones; s:command("Task: SEAD"); s:tick(3); assert(#s.spawns == 1)
 end)
 
 test("template, terrain, scan and spawn failures release locks and clean spawned enemies", function()
@@ -172,12 +172,12 @@ test("template, terrain, scan and spawn failures release locks and clean spawned
         elseif failure == "terrain" then s.terrainHeight = function() error("terrain API unavailable") end
         elseif failure == "scan" then s.scanObjects = function() error("scenery API unavailable") end
         else s[failure] = true end
-        s:command("Generate SEAD"); s:tick(1)
+        s:command("Task: SEAD"); s:tick(1)
         assert(#s.errors == 1)
         for _, g in ipairs(s.spawns) do assert(g.destroyed) end
         s.missingTemplate, s.terrainHeight, s.scanObjects = nil, nil, nil
         s.failSpawn, s.failAlarm, s.failRouteStop = false, false, false
-        s:command("Generate SEAD"); s:tick(2)
+        s:command("Task: SEAD"); s:tick(2)
         assert(s.spawns[#s.spawns].fromVec2 and not s.spawns[#s.spawns].destroyed)
     end
 end)
@@ -185,15 +185,15 @@ end)
 test("Intercept and SEAD cross-block both while selecting and while active", function()
     local s, zone = setup()
     generate(s)
-    s:command("Generate Intercept"); s:lastMessageContains("SEAD mission is already armed")
+    s:command("Task: Intercept"); s:lastMessageContains("SEAD mission is already armed")
     assert(zone.calls == 0 and #s.randomValues == 0)
-    s:command("Generate SEAD"); assert(zone.calls == 0)
+    s:command("Task: SEAD"); assert(zone.calls == 0)
     s:tick(1)
-    s:command("Generate Intercept"); s:lastMessageContains("SEAD mission is already active")
+    s:command("Task: Intercept"); s:lastMessageContains("SEAD mission is already active")
     assert(#s.spawns == 1)
     s:command("Abort Mission")
     s.player.airborne = true; s.generate()
-    s:command("Generate SEAD"); s:lastMessageContains("Intercept mission is already active")
+    s:command("Task: SEAD"); s:lastMessageContains("Intercept mission is already active")
     assert(#s.spawns == 2); s:assertClean()
 end)
 
@@ -221,7 +221,7 @@ end)
 test("distinct wings can select SEAD and Intercept independently", function()
     local s = setup()
     local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(2)
-    generate(s); s.randomValues = {}; s:command("Generate Intercept", other)
+    generate(s); s.randomValues = {}; s:command("Task: Intercept", other)
     s:tick(3); assert(#s.spawns == 2)
     local aircraft, sam = s.spawns[1], s.spawns[2]
     assert(aircraft.name ~= sam.name and sam.fromVec2)
@@ -245,7 +245,7 @@ test("two SEAD wings avoid an occupied site and receive different aliases", func
         end
         return { units, {}, {} }
     end
-    s.randomValues = { 1, 2, 1 }; s:command("Generate SEAD", other); s:tick(4)
+    s.randomValues = { 1, 2, 1 }; s:command("Task: SEAD", other); s:tick(4)
     assert(#s.spawns == 2 and zone.calls == 3)
     assert(s.spawns[1].position.x == 20000 and s.spawns[2].position.x == 21000)
     assert(s.spawns[1].name ~= s.spawns[2].name); s:assertClean()
@@ -304,7 +304,7 @@ test("SA6 radar alone clears with launchers alive; the site and blocker persist 
     s:lastMessageContains("Enemy radar destroyed.")
     assert(g.units[2].alive and g.units[3].alive and g.units[4].alive and not g.destroyed)
     s:score(0); status(s, "RTB_PENDING")
-    s:command("Generate Intercept"); s:lastMessageContains("SEAD mission is already active")
+    s:command("Task: Intercept"); s:lastMessageContains("SEAD mission is already active")
     recover(s); s:score(150)
     s:lastMessageContains("SEAD Score: 150"); s:lastMessageContains("Intercept Score: 0")
     assert(g.destroyed); status(s, "Idle"); s:assertClean()
@@ -375,7 +375,7 @@ test("MP2 shares the radar objective but settles 150 and 90 individually", funct
     recover(s, s.player)
     s:score(150); s:score(0, s.wingman)
     assert(not g.destroyed)
-    s:command("Generate SEAD"); s:lastMessageContains("already active")
+    s:command("Task: SEAD"); s:lastMessageContains("already active")
     s:event("Ejection", s.wingman)
     s:score(150); s:score(90, s.wingman); assert(g.destroyed); s:assertClean()
 end)
@@ -405,7 +405,7 @@ test("another wing's radar events and previous assignments cannot clear the curr
     s:event("Dead", old.units[1]); status(s, "ACTIVE")
     local other = s:addPilot("Other", "ucid-other", 40)
     other.airborne, other.position.x = true, -80000; s:tick(3)
-    s.randomValues = { 1, 2, 2 }; s:command("Generate SEAD", other); s:tick(4)
+    s.randomValues = { 1, 2, 2 }; s:command("Task: SEAD", other); s:tick(4)
     local otherGroup = s.spawns[3]
     destroyRadar(s, otherGroup)
     status(s, "RTB_PENDING", other); status(s, "ACTIVE")
@@ -430,7 +430,7 @@ end)
 
 test("missing or untrackable primary radars fail safely and allow a fresh request", function()
     local s = setup(); s.groundTemplates.TPL_SEAD_SA6.units[1].type = "Kub 2P25 ln"
-    s:command("Generate SEAD"); s:lastMessageContains("setup failed")
+    s:command("Task: SEAD"); s:lastMessageContains("setup failed")
     assert(#s.spawns == 0 and #s.errors == 1)
     s.groundTemplates.TPL_SEAD_SA6.units[1].type = "Kub 1S91 str"
     s.randomValues = { 1, 2, 1 }
@@ -624,14 +624,14 @@ test("zone selection uses flight-number leader rather than player enumeration or
     local s = setup(); local wing = s:occupyWing()
     wing.position.x = 1000000
     s.player.group.units = { wing, s.player }
-    s:command("Generate SEAD", wing); s:tick(1)
+    s:command("Task: SEAD", wing); s:tick(1)
     assert(s:mission().plan.acceptancePosition.x == -80000 and #s.spawns == 1)
     s:assertClean()
 end)
 
 test("no zones in range or a missing selected zone safely fail without changing zone", function()
     local s = setup(); s.player.position.x = 1000000
-    s:command("Generate SEAD"); s:lastMessageContains("setup failed")
+    s:command("Task: SEAD"); s:lastMessageContains("setup failed")
     assert(#s.errors == 1 and not s:mission())
     s.player.position.x = -80000; s.randomValues = { 1, 1, 1 }
     generate(s); s:tick(1); assert(#s.spawns == 1)
@@ -663,7 +663,7 @@ test("two grounded wings reserve different actual sites before any SAM exists", 
     local other = s:addPilot("Other", "ucid-other", 40); other.position.x = -80000; s:tick(2)
     generate(s); s:tick(3); assert(#s.spawns == 0)
     zone.points[2], zone.points[3] = zone.center, { x = zone.center.x + 1000, y = 0 }
-    s.randomValues = { 2, 1, 1 }; s:command("Generate SEAD", other); s:tick(4)
+    s.randomValues = { 2, 1, 1 }; s:command("Task: SEAD", other); s:tick(4)
     assert(#s.spawns == 0 and zone.calls == 3)
     local a, b = s:mission(), s:mission(other)
     assert(a.plan.actualSpawnPoint.x == 20000 and b.plan.actualSpawnPoint.x == 21000 and a.id ~= b.id)
@@ -720,7 +720,7 @@ test("damaged live emitters need sixty full OFF seconds in both modes and both S
             s:tick(62); s:lastMessageContains("Enemy radar suppressed.")
             assert(r.state == "RTB_PENDING" and r.primaryResult == "SUPPRESSED" and radar.alive and not g.destroyed)
             status(s, "RTB_PENDING"); s:lastMessageContains("Primary result: SUPPRESSED")
-            s:score(0); s:command("Generate SEAD"); s:lastMessageContains("already active")
+            s:score(0); s:command("Task: SEAD"); s:lastMessageContains("already active")
             radar.radarEmitting = true; s:tick(63); assert(r.primaryResult == "SUPPRESSED")
             recover(s, nil, 70); s:score(150)
             s:lastMessageContains("SEAD Score: 150"); s:lastMessageContains("Primary Success: 1")
@@ -864,7 +864,7 @@ end)
 test("suppression timers are scoped to their own wing and cannot complete another assignment", function()
     local s, g = started(); local other = s:addPilot("Other", "ucid-other", 40)
     other.airborne, other.position.x = true, -80000; s:tick(3)
-    s.randomValues = { 2, 1, 2 }; s:command("Generate SEAD", other); s:tick(4)
+    s.randomValues = { 2, 1, 2 }; s:command("Task: SEAD", other); s:tick(4)
     local b = s.spawns[2]
     g.units[1].life, g.units[1].radarEmitting = 99, false
     for t = 5, 65 do s:tick(t) end
@@ -971,7 +971,7 @@ test("abort cleanup is independent of success and releases only its own site", f
     local s, g = started(); local first = s:mission()
     local other = s:addPilot("Other", "ucid-other", 40)
     other.airborne, other.position.x = true, -80000; s:tick(3)
-    s.randomValues = { 2, 1, 2 }; s:command("Generate SEAD", other); s:tick(4)
+    s.randomValues = { 2, 1, 2 }; s:command("Task: SEAD", other); s:tick(4)
     local second = s:mission(other)
     assert(s:sites()[first.id] and s:sites()[second.id])
     s:command("Abort Mission")

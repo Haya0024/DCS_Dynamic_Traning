@@ -1,6 +1,6 @@
 # テスト仕様書
 
-更新日: 2026-10-06
+更新日: 2026-10-07
 
 ## 目的と対象
 
@@ -355,7 +355,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-03 | 生存SA-8をSuppressしてContinue | 1両をDEAD対象、帰還でSEAD150＋DEAD150 |
 | DEAD-04 | 通常SEAD、選択なしでRTB | SEAD150、従来通りSite削除 |
 | DEAD-05 | Preserveのcallbackを複数回実行、RTB | 時刻・状態不変、同じ損傷GroupをRETAIN、元任務終了で使用予約だけ解除し保持元Wingの予約は維持 |
-| DEAD-06 | 未完了SEADや未PreserveのSiteに別WingからGenerate DEAD | 候補にならず、元SEADを変更しない |
+| DEAD-06 | 未完了SEADや未PreserveのSiteに別WingからTask: DEAD | 候補にならず、元SEADを変更しない |
 | DEAD-07 | MP2でPreserve後、片方だけ精算、別Wingが取得を試す | 元全員終了前後とも別Wingを拒否。終了後は保持元Wingのみ取得可能 |
 | DEAD-08 | 即DEADへ継続、Spawn/乱数APIを拒否するfixture | 同record・ID・Group・計画・Life・Radarを維持、再Acquire・再Spawn・再抽選なし |
 | DEAD-09 | SEADでレーダーと1発射機を破壊後Continue | 生存2両だけsnapshot、全対象破壊でRTBへ、SEAD150＋DEAD150 |
@@ -363,7 +363,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-11 | Immediate途中に5種の事故、重複通知 | SEAD90を一度だけ付与、IN_USEをCleanup、DEAD Scoreは0 |
 | DEAD-12 | Immediate途中の任意Abort | SEAD0＋DEAD0を精算、Site削除 |
 | DEAD-13 | Preserve後にContinue、DEAD完了・RTB | RETAIN→IN_USE→CLEANUP、保持を解除して削除 |
-| DEAD-14 | 候補なしでGenerate DEAD、その後Intercept受注 | 定型通知で拒否、新規Site・Spawn・抽選なし、Wing/UCIDロックを残さない |
+| DEAD-14 | 候補なしでTask: DEAD、その後Intercept受注 | 定型通知で拒否、新規Site・Spawn・抽選なし、Wing/UCIDロックを残さない |
 | DEAD-15 | 保持後Follow-on DEAD受注、Spawn APIを拒否 | 元Group・計画・損傷を継承、新ID・category DEADで予約 |
 | DEAD-16 | Follow-on DEADの受注・開始とStatus、DMS APIを使用不可にする、表示時間を90秒へ変更 | 実配置点のDDMを受注時1回自動表示、Statusは同情報90秒で再確認、開始は座標なし25秒。内部Group/object ID・Estimated表現なし |
 | DEAD-17 | 地上MP2受注、1対象喪失、全員離陸 | snapshot維持、ARMEDで予約済み、全員離陸で即ACTIVE、20秒待ちなし。受注通知10秒1回、座標ブリーフィング60秒1回、開始25秒。予約待ち説明はDEBUGのみ |
@@ -410,7 +410,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-58 | Immediate/同WingのFollow-on DEAD使用中に元保持者切断 | IN_USE Siteを削除せず、使用中の任務を維持 |
 | DEAD-59 | 接続API例外・欠落・不正/sparse一覧・情報不明・識別子なし | 切断と誤認せず保持、接続確認の正常化後はCleanup可能 |
 | DEAD-60 | UCIDなしのserverエントリ、切断CleanupのDestroyが2回失敗、再接続 | serverを除外して切断確認、3回目削除成功、保持へ戻さず採点維持 |
-| DEAD-61 | 2人の保持Site、一方切断直後に他方がGenerate DEAD | 定期Sweep前でも切断Siteを除外、その保持者のSiteだけ削除 |
+| DEAD-61 | 2人の保持Site、一方切断直後に他方がTask: DEAD | 定期Sweep前でも切断Siteを除外、その保持者のSiteだけ削除 |
 | DEAD-62 | UCID未照合だが接続player IDは取得済み、観戦・切断 | 観戦では保持、接続IDが一覧から消えたらCleanup |
 | DEAD-63 | SA-6レーダー破壊＋生存Launcher1/3両、Immediate/Follow-onを実施 | Primary DESTROYEDとSite SUPPRESSEDを分離、1/3両だけ対象、再Spawnなし、全滅後もSEAD結果維持 |
 | DEAD-64 | SA-6 Suppression後、両DEAD経路でLauncherだけ破壊→レーダー破壊 | 生存4両を対象、レーダーが残る間は未達成、全滅でDEAD達成、SEAD SUPPRESSED履歴維持 |
@@ -439,7 +439,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-87 | Preserve→SEAD精算→地上再武装、他Wing受注拒否、元Wing受注・離陸・DEAD達成・RTB | 旧任務ロック解除後もretainedWingNameを維持。元Wingだけが同Groupを取得、時刻・保持者不変、再Spawnなし、合計300・Cleanup |
 | DEAD-88 | 別Wing／Wing指定なし／保持元不明で選定・直接Reserve | 選定と使用予約の両方で拒否、他Wingへ共有せず、元Wing正常復帰で取得可能 |
 | DEAD-89 | 元WingのDEAD準備失敗、別Wing受注、元Wing再試行 | 使用予約・任務ロックだけrollback、保持予約・時刻・保持者を維持し、別Wingを拒否 |
-| DEAD-90 | 同UCIDが別Wingへ移動してGenerate DEAD | 保持元Wingの予約を引き継がず拒否。元Wingでは取得可能 |
+| DEAD-90 | 同UCIDが別Wingへ移動してTask: DEAD | 保持元Wingの予約を引き継がず拒否。元Wingでは取得可能 |
 | DEAD-91 | 専用保持のまま3600秒経過 | 未予約timerなし、Site保持、元Wingで取得可能 |
 | DEAD-92 | 元Wingで予約解除、別Wingが取得、元Wingも取得を試す | 同じ損傷Groupを共有取得、再Spawn・二重受注なし、DEAD150 |
 | DEAD-93 | 開放後1799秒／1800秒 | 境界前は保持、1800秒でCleanup、SEAD成績不変・DEAD0 |
@@ -447,7 +447,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | DEAD-95 | 共有候補を期限前に地上DEAD受注、元保持者切断、1800秒経過 | ARMED中も使用予約でtimeout停止、Site維持、全員離陸でACTIVE |
 | DEAD-96 | 共有候補の元保持者が切断 | 即削除せず、未予約期限でCleanup |
 | DEAD-97 | 共有候補の期限1秒前にDEAD準備失敗 | assignment/Wing/UCIDをrollback、元の未予約開始時刻を維持、期限延長なし |
-| DEAD-98 | Sweep前の期限到達時にGenerate DEAD | 安全拒否、使用予約なし、次Sweepで削除 |
+| DEAD-98 | Sweep前の期限到達時にTask: DEAD | 安全拒否、使用予約なし、次Sweepで削除 |
 | DEAD-99 | 古いPreserve／Release callbackを再実行、DEAD受注後にも実行 | 共有を専用へ戻さず、時刻を延長せず、使用予約を解除しない |
 | DEAD-100 | 共有候補のIsAliveがnil、期限到達、Destroy失敗 | 全滅誤認なし、timeout削除を再試行、DEAD報酬なし |
 | DEAD-101 | timeout設定を0／5秒へ変更 | 不正設定では専用保持維持、有効な5秒設定で期限適用 |
@@ -584,12 +584,12 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-24 | SA-6レーダーだけ破壊・Suppress、別試行でSA-8を全滅 | 残存がある場合だけContinue/Preserve。SA-8全滅では選択肢なし |
 | MAN-25 | SEADからContinueし、損傷・発信状態と車両を確認、残存全滅してRTB | 同じGroupを使用、SEAD150＋DEAD150、合計300、任務1件 |
 | MAN-26 | Immediate途中に事故、別試行で両目標達成後事故、全体Abort | 未達成事故SEAD90／DEAD0、達成後事故各90、Abort両方0、全員終了でCleanup |
-| MAN-27 | Preserve、全員RTB・再武装、地上でGenerate DEAD、全員離陸 | 同じSiteが残り、新IDで予約。ARMED中もSAMは存在、全員離陸でACTIVE、20秒待ちなし |
+| MAN-27 | Preserve、全員RTB・再武装、地上でTask: DEAD、全員離陸 | 同じSiteが残り、新IDで予約。ARMED中もSAMは存在、全員離陸でACTIVE、20秒待ちなし |
 | MAN-28 | Follow-on DEADの開始・Status座標確認、全残存対象破壊後RTB、別試行で事故/Abort | SITE LOCATIONは実配置点のDDM・分の小数3桁で初期60秒表示。DEAD150/90/0、SEAD Scoreを変えない、全員終了後Cleanup |
 | MAN-29 | 複数保持Siteを作り、異なる長機位置から受注 | 最も近いRETAINを選び、2Wingが同Siteを二重取得できない |
 | MAN-30 | MP2でPreserve後に1人だけ精算、別WingがDEAD取得を試す | 元SEAD全員終了前後とも別Wingは取得不可。元Wingは全員終了後に取得可能 |
 | MAN-31 | 2つのFollow-on DEADを並行実行し、片方だけ中止・達成 | 対象・敵・ポイント・ロック・Cleanupを混同しない |
-| MAN-32 | 保持Siteを味方が外部攻撃で全滅、Generate DEAD | 全滅したSiteは候補にならず、再生成しない |
+| MAN-32 | 保持Siteを味方が外部攻撃で全滅、Task: DEAD | 全滅したSiteは候補にならず、再生成しない |
 | MAN-33 | Immediate・Follow-on DEADのStatusと一時メニューを遷移ごとに確認 | disposition・予約可否・残数・DEAD Scoreが一致し、不要になったContinue/Preserveを消す |
 | MAN-34 | 保持・DEAD精算後にミッション再開始 | Siteと進行中任務は復元しない。Hookで保存済みの成績だけを復元する |
 | MAN-35 | Preserve時の長機がRTB後にログアウト、別試行で精算前にログアウト | 1秒監視でRETAIN Site削除、SEAD採点・任務ロックを巻き戻さない |
@@ -601,8 +601,8 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-41 | 保存先の書込みを一時的に失敗させ、精算後に権限を復旧（テスト用コピー） | 保存未確認表示とログ、正常復帰で同じ累計を1回保存。MissionScripting.luaの変更なし |
 | MAN-42 | SEAD達成→Continue、車両を残してBLUE基地／空母へRTB | 5 knots以下（空母は甲板相対）を10秒維持するとSEAD150／DEAD0、全員終了で残Site Cleanup。着陸確認中の事故はSEAD90／DEAD0 |
 | MAN-43 | MP2 Immediateで1人がDEAD未達成のままRTB、もう1人が攻撃継続 | 帰還者SEAD150／DEAD0で固定。僚機終了までSite・ロック維持、僚機が達成して帰還すれば300。着陸確認中の目標達成では確認タイマーを維持 |
-| MAN-44 | Preserve→SEAD全員RTB→再武装中に別WingがGenerate DEAD、その後元Wingで受注 | SEAD精算後も他Wingは候補なし。元Wingは同じ残存・損傷Groupを取得し、地上受注後の離陸でACTIVE。旧SEAD任務ロックは残らない |
-| MAN-45 | 元WingがRelease Site Reservation、別WingでGenerate DEAD。別試行ではMP2精算前に開放 | 同じ残存Groupを別Wingが取得、二重受注なし。元SEAD全員終了までは別Wingを拒否、採点・任務ロック維持 |
+| MAN-44 | Preserve→SEAD全員RTB→再武装中に別WingがTask: DEAD、その後元Wingで受注 | SEAD精算後も他Wingは候補なし。元Wingは同じ残存・損傷Groupを取得し、地上受注後の離陸でACTIVE。旧SEAD任務ロックは残らない |
+| MAN-45 | 元WingがRelease Site Reservation、別WingでTask: DEAD。別試行ではMP2精算前に開放 | 同じ残存Groupを別Wingが取得、二重受注なし。元SEAD全員終了までは別Wingを拒否、採点・任務ロック維持 |
 | MAN-46 | 開放したSiteを未予約で30分放置。専用保持・地上DEAD受注も別試行 | 共有未予約30分でCleanup。専用保持中・ARMED使用予約中は削除なし。元保持者切断は共有Siteに影響しない |
 | MAN-47 | Intercept／SEAD／Follow-on DEADを地上・空中受注し、待機中着地・再離陸、StatusとDCSログを確認 | 指定した詳細はDEBUGのみ、Intercept画面はRange／Altitude／HOT。SEAD受注にMODEなし、計画に生成待ち説明なし、開始にPilotsなし。DEADも受注→座標1回→短い開始で自動再掲なし。Statusで座標を再確認可能 |
 | MAN-48 | 同期済みSyria.mizを開き直して開始。BLUE/REDでF10確認、ズーム・地図回転・通常Marker入力・任務メニューを操作 | 現在BLUEのAkrotiri/Beirut-Rafic Hariri/Incirlik/Ramat Davidに薄青Circleと青文字1枚の基地名。RED/Neutral/Ship/FARPは追加Drawingなし、BLUE側だけ表示。readOnly、南オフセットで文字可読、黒い複製文字なし。Marker入力・任務・帰還・採点が従来どおり。Allies Only/Fog of War維持。ログの描画数4を確認 |
@@ -695,6 +695,9 @@ CAP-trial-1追加後はLua全342ケース（INT16、CAP30、SCORE26、WING27、P
 同日のCAP表示整理後は、CAP-01/03/25で受注/Statusの `CAP AREA: <DDM>`、Radius/PATROL CENTER行の非表示、進入時 `CAP on station.` のみを検証した。Lua全342ケース、BUILD2、SYNC3が通過し、実Syria.mizのSync/Checkも成功。時計・敵生成・達成・採点条件は変更していない。整理後の実DCS表示はMAN-52で確認待ち。
 
 2026-10-06 21:15〜21:16 JST、DCS更新後の2.9.30.28738（Windows MT）、同PCでのホスト実行を確認した。21:15:44のrun3/source=primary接続・保存確認と21:16:47のStop最終確認が成功。終了後primary schema2/run3/revision0とbackup run2/revision2を読取codec検証し、Total/Career/CAP各90、既存統計を保持していた。Hookと生成bundleのhash一致、autoexec.cfgの既知hash一致。更新後の接続失敗ログはない。MAN-51/55の次セッションへの累計引継ぎ部分を確認したが、Statistics画面・更新後の新規精算・帰還150・得点付き旧schema移行は未実施。証跡はbuild/persistence-update-20261006.log。実成績への直接書込みや実装修正は行っていない。
+
+F10の受注メニューは2026-10-07から `Task: Intercept / CAP / SEAD / DEAD` とする。模擬操作のコマンド名と対応表も同じ表記を使い、ケース数・達成条件・採点の期待値は維持する。DCS内ではMAN-02/05/27/52でメニュー名と受注、エラー時の再受注案内を確認する。
+名称変更後はLua全342ケース（9スイート）、BUILD2、SYNC3、INSTALL5確認グループが通過した。実ミッション `mission/Persistent_and_Dynamic_FA-18C_Training.miz` へのBuild/Sync/Checkも成功。直前backupとの比較でDynamicTraining.lua以外の全ZIP entryが不変、埋め込みLua内の4メニューがTask表記であることを確認した。MEの既存ブリーフィングに旧メニュー名の記載はなかった。受注・敵生成・帰還・採点条件は維持している。変更後の実DCSメニュー表示は確認待ち。
 
 手動・回帰確認の記録には、次の形式を使う。結果は `PASS / FAIL / 未実施 / 条件未成立` のいずれかとする。
 

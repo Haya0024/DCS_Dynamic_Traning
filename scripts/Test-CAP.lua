@@ -6,7 +6,7 @@ local function new()
 end
 local function accept(s, player, choices)
     s.randomValues = choices or { 1, 1, 30 }
-    s:command("Generate CAP", player)
+    s:command("Task: CAP", player)
     return assert(s:mission(player))
 end
 local function enter(s, record, player)
@@ -170,12 +170,12 @@ test("MP2 recovery settles individually at full reward and keeps the shared lock
     local s = new(); s:occupyWing(); local r = accept(s); enter(s, r, s.wingman); advance(s, 121); s:complete()
     s:land(s:base(), s.time, s.player); advance(s, 11); s:score(150, s.player)
     assert(s:mission() == r and not r.spawn.group.destroyed)
-    s:command("Generate Intercept"); s:lastMessageContains("already active")
+    s:command("Task: Intercept"); s:lastMessageContains("already active")
     s:event("Ejection", s.wingman); s:score(90, s.wingman); assert(not s:mission())
 end)
 test("CAP and Intercept in separate wings keep aliases objectives and locks separate", function()
     local s = new(); local other = s:addPilot("Other", "ucid-other", 30); other.airborne = true
-    local r = accept(s); s:tick(2); s:command("Generate Intercept", other); local intercept = s:mission(other)
+    local r = accept(s); s:tick(2); s:command("Task: Intercept", other); local intercept = s:mission(other)
     enter(s, r); advance(s, 31); assert(r.spawn.group.name ~= intercept.spawn.group.name)
     s:complete(r.spawn.group); assert(intercept.state == "ACTIVE" and r.state == "ACTIVE")
     s:complete(intercept.spawn.group); assert(intercept.state == "RTB_PENDING" and r.state == "ACTIVE")
@@ -206,7 +206,7 @@ test("missing or malformed CAP zones fail acceptance without leaving a wing lock
     for _, broken in ipairs({ "missing", "radius" }) do
         local s = new()
         if broken == "missing" then s.zones.CAP_ZONE_GOLAN = nil else s.zones.CAP_ZONE_GOLAN.radius = 0 end
-        s:command("Generate CAP"); assert(not s:mission() and #s.spawns == 0)
+        s:command("Task: CAP"); assert(not s:mission() and #s.spawns == 0)
         s.player.airborne = true; s.generate(); assert(s:mission().category == "Intercept")
     end
 end)
@@ -234,10 +234,10 @@ test("explicitly destroyed wrappers with no remaining DCS ID still finish the tr
 end)
 test("duplicate and cross-category acceptance plus the same UCID in another wing cannot reroll CAP", function()
     local s = new(); local r = accept(s); local calls = #s.randomCalls
-    s:command("Generate CAP"); s:lastMessageContains("CAP mission is already active")
-    s:command("Generate SEAD"); s:lastMessageContains("CAP mission is already active")
+    s:command("Task: CAP"); s:lastMessageContains("CAP mission is already active")
+    s:command("Task: SEAD"); s:lastMessageContains("CAP mission is already active")
     local other = s:addPilot("Other", "ucid-a", 30); s:tick(2)
-    s:command("Generate CAP", other); s:lastMessageContains("CAP mission is already active")
+    s:command("Task: CAP", other); s:lastMessageContains("CAP mission is already active")
     assert(s:mission() == r and not s:mission(other) and #s.randomCalls == calls)
 end)
 test("circular boundary is included while one meter beyond it pauses patrol time", function()

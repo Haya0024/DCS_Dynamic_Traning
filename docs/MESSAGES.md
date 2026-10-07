@@ -1,8 +1,10 @@
 # Mission messages and DCS logs
 
-Updated: 2026-10-06
+Updated: 2026-10-07
 
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
+
+The four F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, and `Task: DEAD`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the existing behavior.
 
 ## Output channels
 
@@ -153,7 +155,7 @@ SEAD reward also retained.
 
 ```text
 SAM site reservation released.
-Available to all wings for Generate DEAD.
+Available to all wings via 'Task: DEAD'.
 Cleanup after 30 minutes without a reservation.
 ```
 
@@ -393,7 +395,7 @@ Status shows all matching assignments in one message. Any coordinate-bearing ass
 
 ## Screen: CAP acceptance, patrol and completion
 
-`Generate CAP` uses the existing group menu. Acceptance is shown for 10 seconds:
+`Task: CAP` uses the existing group menu. Acceptance is shown for 10 seconds:
 
 ```text
 CAP mission accepted.
@@ -429,7 +431,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
 `Mission Status` lasts 60 seconds for CAP and appends the accepted briefing, `Patrol: 40% (48/120 seconds)`, `Clock: RUNNING` / `WAITING / PAUSED` / `TIME COMPLETE`, and `Hostiles remaining: 2` / `0` / `NOT SPAWNED`. It does not redraw or reroll the area.
-CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant messages, points, totals and persistence status. Setup failure shows `ERROR: CAP setup failed. See DCS log; Generate CAP to retry.` for 20 seconds. A monitor/spawn failure settles each registered participant with `CAP setup/spawn failed. No reward.` for 20 seconds.
+CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant messages, points, totals and persistence status. Setup failure shows `ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.` for 20 seconds. A monitor/spawn failure settles each registered participant with `CAP setup/spawn failed. No reward.` for 20 seconds.
 Acceptance selection and actual spawn details are DEBUG only: `CAP accepted; zone=<name> template=<name> enemy at on-station second <n>` and `CAP enemy spawned; template=<name> units=<n> altitude=<n> ft`. No separate hostile spawn message appears on screen. Normal CAP group messages are mirrored to the DCS MESSAGE log.
 Idle status now includes `CAP: Idle.` after the existing category lines.
 
@@ -504,9 +506,9 @@ Each table row is one actual message body. Different mission categories produce 
 | SEAD planning cancelled | `SEAD selection cancelled. Player aircraft changed or unavailable.` | 10 |
 | Pre-start aircraft/occupant changed | `Intercept reservation cancelled. Player aircraft changed or unavailable.` | 10 |
 | Ground DEAD cancelled | `DEAD reservation cancelled. Player aircraft changed or unavailable.` | 10 |
-| Intercept spawn failed | `ERROR: Intercept enemy spawn failed. Select Generate Intercept to retry.` | 15 |
-| SEAD setup failed | `ERROR: SEAD setup failed. See DCS log; Generate SEAD to retry.` | 15 |
-| SEAD spawn failed | `ERROR: SEAD spawn failed. Generate SEAD to retry; see DCS log.` | 20 |
+| Intercept spawn failed | `ERROR: Intercept enemy spawn failed. Select 'Task: Intercept' to retry.` | 15 |
+| SEAD setup failed | `ERROR: SEAD setup failed. See DCS log; select 'Task: SEAD' to retry.` | 15 |
+| SEAD spawn failed | `ERROR: SEAD spawn failed. Select 'Task: SEAD' to retry; see DCS log.` | 20 |
 | DEAD preparation failed | `ERROR: DEAD setup failed. Site reservation rolled back; see DCS log.` | 20 |
 | Stale Continue/Preserve | `Follow-on DEAD is no longer available for this SEAD mission.` | 10 |
 | Stale/unauthorized site release | `This site reservation is no longer available to release.` | 10 |
@@ -518,7 +520,7 @@ Each table row is one actual message body. Different mission categories produce 
 | Protected monitor exception | `ERROR: Mission monitor. See DCS log.` | 15 |
 
 Ground DEAD cancellation also sends each participant a FAILED settlement with `DEAD reservation cancelled. No reward.`.
-Other protected exceptions use their operation name, such as `ERROR: Generate SEAD. See DCS log.`. Internal operations with no Group have no screen delivery.
+Other protected exceptions use their operation name, such as `ERROR: Task: SEAD. See DCS log.`. Internal operations with no Group have no screen delivery.
 
 Placement failure — 25 seconds; this example assumes all 50 attempts failed the height-range check:
 
@@ -528,7 +530,7 @@ Area: Palmyra
 No safe site in 50 attempts.
 Uneven terrain (height range > 20 m): 50
 Largest height range sampled before rejection: 24.3 m.
-Generate SEAD to retry.
+Select 'Task: SEAD' to retry.
 ```
 
 Placement API exception — 25 seconds:
@@ -536,7 +538,7 @@ Placement API exception — 25 seconds:
 ```text
 ERROR: SEAD placement failed.
 Site check error. See DCS log.
-Generate SEAD to retry.
+Select 'Task: SEAD' to retry.
 ```
 
 ## DCS log: normal message mirror
@@ -723,7 +725,7 @@ Each row is an example of a separate log entry. No screen duration applies.
 | SEAD setup fails | `[DynamicTraining] SEAD setup: Invalid SEAD mode.` | Per failure; Lua may prepend a source line |
 | SEAD spawn fails | `[DynamicTraining] SEAD spawn: SEAD SpawnFromVec2 returned nil.` | Per failure |
 | DEAD setup fails | `[DynamicTraining] DEAD setup: Invalid DEAD full reward.` | Per failure; actual reason can include a Lua source line |
-| Other protected exception | `[DynamicTraining] Generate SEAD: Invalid SEAD full reward.` | Per exception, no general deduplication; Lua may prepend a source line |
+| Other protected exception | `[DynamicTraining] Task: SEAD: Invalid SEAD full reward.` | Per exception, no general deduplication; Lua may prepend a source line |
 
 Matching placement failure diagnostic:
 

@@ -219,7 +219,7 @@ local function Start(record)
         if not ok or not spawn then
             Close(record)
             env.error("[DynamicTraining] SEAD spawn: " .. tostring(ok and problem or spawn))
-            Message(record.group, "ERROR: SEAD spawn failed. Generate SEAD to retry; see DCS log.", 20)
+            Message(record.group, "ERROR: SEAD spawn failed. Select 'Task: SEAD' to retry; see DCS log.", 20)
             return
         end
         record.spawn, record.state = spawn, "ACTIVE"
@@ -238,7 +238,7 @@ local function Start(record)
     if not ok or not spawn then
         Close(record)
         env.error("[DynamicTraining] Spawn: " .. tostring(ok and problem or spawn))
-        Message(record.group, "ERROR: Intercept enemy spawn failed. Select Generate Intercept to retry.", 15)
+        Message(record.group, "ERROR: Intercept enemy spawn failed. Select 'Task: Intercept' to retry.", 15)
         return
     end
     record.spawn, record.state = spawn, "ACTIVE"
@@ -276,7 +276,7 @@ local function Generate(groupName, category)
         if not ok then
             Close(record)
             env.error("[DynamicTraining] CAP setup: " .. tostring(plan))
-            Message(group, "ERROR: CAP setup failed. See DCS log; Generate CAP to retry.", 20)
+            Message(group, "ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.", 20)
             return
         end
         record.capPlan, record.state = plan, "ACTIVE"
@@ -339,7 +339,7 @@ local function Generate(groupName, category)
         if not ok then
             Close(record)
             env.error("[DynamicTraining] SEAD setup: " .. tostring(job))
-            Message(group, "ERROR: SEAD setup failed. See DCS log; Generate SEAD to retry.", 15)
+            Message(group, "ERROR: SEAD setup failed. See DCS log; select 'Task: SEAD' to retry.", 15)
             return
         end
         record.selection, record.plan, record.state = job, job.plan, "PLANNING"
@@ -582,10 +582,10 @@ ScanPlayers = function()
             local root = MENU_GROUP:New(group, "Dynamic Training")
             menus[name] = { root = root, signature = signature }
             for _, command in ipairs({
-                { "Generate Intercept", Generate },
-                { "Generate CAP", function(groupName) Generate(groupName, "CAP") end },
-                { "Generate SEAD", function(groupName) Generate(groupName, "SEAD") end },
-                { "Generate DEAD", function(groupName) Generate(groupName, "DEAD") end }, { "Mission Status", Status },
+                { "Task: Intercept", Generate },
+                { "Task: CAP", function(groupName) Generate(groupName, "CAP") end },
+                { "Task: SEAD", function(groupName) Generate(groupName, "SEAD") end },
+                { "Task: DEAD", function(groupName) Generate(groupName, "DEAD") end }, { "Mission Status", Status },
                 { "Abort Mission", Abort }, { "Player Statistics", Statistics }
             }) do
                 local label, action = command[1], command[2]
@@ -623,7 +623,7 @@ ScanPlayers = function()
                         if authorized and SEADSites.ReleaseReservation(site, name) then
                             local waiting = site.reservedByAssignmentID ~= nil
                             Message(currentGroup, "SAM site reservation released.\n" ..
-                                (waiting and "Available to other wings after SEAD settlement.\n" or "Available to all wings for Generate DEAD.\n") ..
+                                (waiting and "Available to other wings after SEAD settlement.\n" or "Available to all wings via 'Task: DEAD'.\n") ..
                                 string.format("Cleanup after %g minutes without a reservation.",
                                     Config.dead.unreservedSiteCleanupSeconds / 60), 20)
                         else
@@ -668,7 +668,7 @@ local function TickMission(record, time)
             Close(record)
             env.error("[DynamicTraining] SEAD selection: " .. tostring(ok and problem or plan))
             local detail = ok and SEAD.FailureSummary(record.selection) or "Site check error. See DCS log."
-            Message(record.group, "ERROR: SEAD placement failed.\n" .. detail .. "\nGenerate SEAD to retry.", 25)
+            Message(record.group, "ERROR: SEAD placement failed.\n" .. detail .. "\nSelect 'Task: SEAD' to retry.", 25)
         elseif plan then
             -- Plan is complete before any physical spawn. Only the accepted
             -- plan supplies briefing data, including after departure/spawn.

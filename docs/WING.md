@@ -1,6 +1,6 @@
 # ウィング共有任務仕様
 
-更新日: 2026-10-06
+更新日: 2026-10-07
 
 ## 現在の実装と対象
 
@@ -25,7 +25,7 @@ CAPは受注時からACTIVE。元の未精算・操作中・空中の参加者�
 ## 受注と開始
 
 1. 参加する全員が同じグループの Client スロットに搭乗する。
-2. どちらかが F10 の `Dynamic Training → Generate Intercept` を選ぶ。
+2. どちらかが F10 の `Dynamic Training → Task: Intercept` を選ぶ。
 3. その時点の搭乗者・UCID・機体オブジェクトを参加者として固定する。
 4. 全員がすでに空中なら即生成する。地上の参加者がいれば全員の離陸を待つ。
 5. 全員の離陸検出から20秒後に、長機の現在位置・機首方向を基準に敵を生成する。
@@ -77,7 +77,7 @@ SEADも計画中・離陸待ち・20秒待ち・戦闘中・帰還待ち・着�
 エミッターの完了判定は止める。全員終了後のSAMの扱いは独立したサイト管理がdispositionで決め、削除失敗中もウィングの受注ロックは解除する。
 Immediate DEADは同じSEAD record内のDEAD_ACTIVE phaseで、未精算参加者に追加DEAD採点を設定する。SEADとDEADの達成時刻を分離し、両目標達成＋帰還は各自合計300、達成後事故180、DEAD未達成事故90。精算済み参加者へ遡及せず、任務数は1件。Follow-on DEADは新規DEAD recordで最寄り保持Siteを予約し、既存の個別帰還・排他を使う。
 Immediate DEAD未達成でも安全帰還した人はSEAD150／DEAD0で個別精算する。未精算の僚機はDEADを継続でき、後の達成を精算済み参加者へ遡って付与しない。全員終了まではSiteと受注ロックを維持する。
-保持SiteはPreserve元のWing専用とし、元SEAD終了後も別Wingには解放しない。元SEADの任務ロックと使用中assignmentだけを解除し、保持予約はRTB・再武装を越えて維持する。同WingのGenerate DEADが新assignmentで取得する。詳細は [DEAD.md](DEAD.md)。
+保持SiteはPreserve元のWing専用とし、元SEAD終了後も別Wingには解放しない。元SEADの任務ロックと使用中assignmentだけを解除し、保持予約はRTB・再武装を越えて維持する。同WingのTask: DEADが新assignmentで取得する。詳細は [DEAD.md](DEAD.md)。
 例外として、Preserve時の登録長機がログアウトしたRETAIN SiteはSite予約だけ解除しCleanupする。元SEADの個別精算・Wing/UCIDロックは維持し、IN_USEのDEAD Siteはこの処理で削除しない。
 保持元Wingが `Release Site Reservation` を選ぶとWing専用予約を解除し、AVAILABLEとして他Wingにも開放する。元SEAD全員終了までは使用予約を維持する。使用予約もない状態が連続30分続いたAVAILABLE SiteはCleanupする。共有候補取得も既存のWing/UCID排他とSite使用予約を使い、二重受注を防ぐ。
 1人だけ精算しても、そのウィングと登録 UCID のロックは解除しない。

@@ -42,10 +42,10 @@ CAPは地上でも受注でき、指定空域をすぐに案内します。登�
 
 ```text
 Dynamic Training
-├─ Generate Intercept
-├─ Generate CAP
-├─ Generate SEAD
-├─ Generate DEAD
+├─ Task: Intercept
+├─ Task: CAP
+├─ Task: SEAD
+├─ Task: DEAD
 ├─ Mission Status
 ├─ Abort Mission
 └─ Player Statistics
@@ -58,7 +58,7 @@ BLUE所属の陸上AirbaseはF10上に青色Drawingで表示します。表示�
 
 ## CAPの進め方
 
-`Generate CAP` はMEの4候補空域から1つを等確率で選び、受注時に `CAP AREA: <中心DDM>` を案内します。受注時に登録された未精算・操作中の参加者の誰かが空中で空域内にいる間だけ120秒を積算し、全員退出中は停止、再進入で再開します。進捗は20%ごとに通知します。AI・途中参加者・個人中止者は時間の加算対象に含めません。
+`Task: CAP` はMEの4候補空域から1つを等確率で選び、受注時に `CAP AREA: <中心DDM>` を案内します。受注時に登録された未精算・操作中の参加者の誰かが空中で空域内にいる間だけ120秒を積算し、全員退出中は停止、再進入で再開します。進捗は20%ごとに通知します。AI・途中参加者・個人中止者は時間の加算対象に含めません。
 
 敵は同じ累計時間の30〜120秒で1編隊出現します。累計120秒と敵機全滅の両方で達成し、100%でも敵が残っていれば戦闘を続けます。達成後の帰還成功150／事故90ポイントをCAP Scoreに記録します。仕様は [CAP](docs/CAP.md) を参照してください。
 
@@ -74,12 +74,12 @@ SA-6のレーダーを破壊しても、発射機が残っていればDEADへ進
 |---|---|
 | **そのまま帰還** | SEADを精算し、全参加者の終了後にサイトを自動削除 |
 | **Continue as DEAD** | 同じ出撃のまま残存車両を攻撃。両目標達成後の帰還でSEAD＋DEADを精算。倒しきれず帰還した場合はSEAD分だけ精算 |
-| **Preserve Site for DEAD** | サイトを保持してSEADを精算。帰還・再武装後、次の出撃で `Generate DEAD` を受注 |
+| **Preserve Site for DEAD** | サイトを保持してSEADを精算。帰還・再武装後、次の出撃で `Task: DEAD` を受注 |
 
 DEADは、元のSEADで生成された同じSAMグループを使います。損傷や残存車両を引き継ぎ、攻撃するたびに敵が元に戻ることはありません。
 保持したSAMは再武装中も世界に存在します。
 
-`Preserve Site for DEAD` で保持したサイトは、RTB・精算後も同じウィング専用に予約されます。再武装後に `Generate DEAD` でそのサイトを取得してください。複数保持している場合は編隊リーダー機に最も近いものを選び、別ウィングのサイトは取得しません。
+`Preserve Site for DEAD` で保持したサイトは、RTB・精算後も同じウィング専用に予約されます。再武装後に `Task: DEAD` でそのサイトを取得してください。複数保持している場合は編隊リーダー機に最も近いものを選び、別ウィングのサイトは取得しません。
 候補がなければ `No preserved SAM sites available for DEAD.` と表示します。
 予約を手放す場合は `Release Site Reservation` を選んでください。同じサイトを他ウィングも受注できる共有候補へ開放します。元SEADの全員精算後、誰も予約していない状態が30分続くと自動削除します。専用保持中やDEAD受注中は、この時間で削除しません。
 地上受注時は全員の離陸を待ちますが、SAMの再生成や20秒の生成待ちはありません。
@@ -143,6 +143,9 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 
 編集元は `src/*.lua` と `vendor/MOOSE/Moose.lua`、設定は [src/config.lua](src/config.lua) にまとめています。
 [Build-Mission.ps1](scripts/Build-Mission.ps1) が各モジュールを `build/DynamicTraining.lua` に結合します。生成物は直接編集しません。
+
+Gitではソース、テスト、仕様書、共通のVS Codeタスクを管理します。`mission/*.miz` はMEで編集する基地・Zone・テンプレート・トリガーを含む実行用ミッション、`vendor/MOOSE/Moose.lua` は使用版を固定する依存ファイルとして管理します。
+生成済みbundleと検証出力の `build/`、ログ、バックアップ、一時ファイル、DCS/Tacview録画、実プレイヤーの `scores.dat`、環境変数ファイル、VS Codeの個人設定はGitへ追加しません。除外ルールは [.gitignore](.gitignore) にまとめています。
 
 Luaを変更したら、リポジトリのルートで次を実行して `.miz` 内のスクリプトを更新します。同期時に結合も行います。
 

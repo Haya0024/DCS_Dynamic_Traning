@@ -12,7 +12,7 @@ Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨�
 
 ### 出撃準備と任務操作
 
-プレイヤー機の初期兵装は空です。地上で再武装を要請し、訓練内容に合わせて兵装を選んでください。「Generate Intercept」「Generate CAP」「Generate SEAD」「Generate DEAD」で任務を受注し、「Mission Status」で受注中の情報や進捗を確認できます。「Abort Mission」はグループ全体の任務中止、「Abort Sortie」は名前と機体を指定した参加者だけの中止です。「Player Statistics」で自分の累計成績と保存状態を確認できます。
+プレイヤー機の初期兵装は空です。地上で再武装を要請し、訓練内容に合わせて兵装を選んでください。「Task: Intercept」「Task: CAP」「Task: SEAD」「Task: DEAD」で任務を受注し、「Mission Status」で受注中の情報や進捗を確認できます。「Abort Mission」はグループ全体の任務中止、「Abort Sortie」は名前と機体を指定した参加者だけの中止です。「Player Statistics」で自分の累計成績と保存状態を確認できます。
 
 ### Intercept — 迎撃
 
@@ -28,7 +28,7 @@ Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨�
 
 ### DEAD — 防空サイト破壊
 
-SEADで制圧したサイトの残存車両をすべて破壊してください。「Continue as DEAD」は同じ出撃のまま継続攻撃する選択です。「Preserve Site for DEAD」はサイトを保持してSEADを精算し、帰還・再武装後に同じグループで「Generate DEAD」を受注する選択です。元の敵の損傷と残存車両を引き継ぎ、新しいSAMは生成しません。保持された候補がなければ「Generate DEAD」は受注できません。DEAD開始時の生存対象をすべて破壊すると達成です。保持したサイトは同じグループ専用に予約され、「Release Site Reservation」で他グループへ開放できます。
+SEADで制圧したサイトの残存車両をすべて破壊してください。「Continue as DEAD」は同じ出撃のまま継続攻撃する選択です。「Preserve Site for DEAD」はサイトを保持してSEADを精算し、帰還・再武装後に同じグループで「Task: DEAD」を受注する選択です。元の敵の損傷と残存車両を引き継ぎ、新しいSAMは生成しません。保持された候補がなければ「Task: DEAD」は受注できません。DEAD開始時の生存対象をすべて破壊すると達成です。保持したサイトは同じグループ専用に予約され、「Release Site Reservation」で他グループへ開放できます。
 
 ### 帰還とポイント
 
@@ -50,7 +50,7 @@ Persistent and Dynamic F/A-18C Training provides repeatable F/A-18C training in 
 
 ### Preparation and mission controls
 
-Player aircraft start without weapons. Request rearming on the ground and choose a loadout suited to your training. Accept a task with "Generate Intercept", "Generate CAP", "Generate SEAD", or "Generate DEAD", and use "Mission Status" to review its information and progress. "Abort Mission" cancels the entire group's mission; "Abort Sortie" cancels only the named participant's sortie. "Player Statistics" displays your accumulated results and their save status.
+Player aircraft start without weapons. Request rearming on the ground and choose a loadout suited to your training. Accept a task with "Task: Intercept", "Task: CAP", "Task: SEAD", or "Task: DEAD", and use "Mission Status" to review its information and progress. "Abort Mission" cancels the entire group's mission; "Abort Sortie" cancels only the named participant's sortie. "Player Statistics" displays your accumulated results and their save status.
 
 ### Intercept
 
@@ -66,7 +66,7 @@ Locate the SA-6 or SA-8 site in the assigned region. Complete the objective by d
 
 ### DEAD — Destruction of Enemy Air Defenses
 
-Destroy all remaining vehicles at a site previously suppressed during SEAD. "Continue as DEAD" continues the attack during the same sortie. "Preserve Site for DEAD" keeps the site for a later sortie: recover and settle SEAD, rearm, then select "Generate DEAD" with the same flight group. The original enemies retain their damage and surviving vehicles; no new SAM is spawned. "Generate DEAD" requires an available preserved site. Destroy every target that was alive when DEAD began to complete the objective. A preserved site is reserved for the same group; "Release Site Reservation" makes it available to other groups.
+Destroy all remaining vehicles at a site previously suppressed during SEAD. "Continue as DEAD" continues the attack during the same sortie. "Preserve Site for DEAD" keeps the site for a later sortie: recover and settle SEAD, rearm, then select "Task: DEAD" with the same flight group. The original enemies retain their damage and surviving vehicles; no new SAM is spawned. "Task: DEAD" requires an available preserved site. Destroy every target that was alive when DEAD began to complete the objective. A preserved site is reserved for the same group; "Release Site Reservation" makes it available to other groups.
 
 ### Recovery and points
 

@@ -307,7 +307,7 @@ local function scenario(options)
         local commands = assert(self.commands[player.group:GetName()], "no group menu")
         assert(commands[title], "missing command")()
     end
-    function s.generate() s:command("Generate Intercept") end
+    function s.generate() s:command("Task: Intercept") end
     function s:tick(time)
         self.time = time
         for _, scheduled in ipairs(self.timers) do

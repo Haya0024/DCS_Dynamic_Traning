@@ -1,3 +1,30 @@
-mission/*.miz.bak
-mission/*.miz.*.tmp
-build/
+# Generated mission and persistence-hook bundles, inspection output and fixtures.
+/build/
+
+# Backups, temporary files and runtime logs.
+*.bak
+*.tmp
+*.log
+
+# DCS/Tacview recordings and real player score data.
+*.trk
+*.acmi
+scores.dat
+scores.dat.*
+
+# Local environment values. Keep a shareable example if one is added.
+.env
+.env.*
+!.env.example
+
+# Share project tasks; keep individual editor settings local.
+/.vscode/*
+!/.vscode/tasks.json
+
+# OS and editor temporary files.
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo

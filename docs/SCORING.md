@@ -1,6 +1,6 @@
 # プレイヤー採点・帰還評価仕様
 
-更新日: 2026-10-06
+更新日: 2026-10-07
 
 現在の採点対象は Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続60秒、DEADは開始時の残存対象全滅でクリアとする。CAPはzone内累計120秒と敵航空機全滅の両方でクリア。詳細は [CAP.md](CAP.md)。
 Immediate DEADは同じSEAD sortie内のphaseとして、SEADのID・達成結果・報酬を維持し、独立したDEAD報酬を追加する。詳細は [DEAD.md](DEAD.md)。
@@ -217,7 +217,7 @@ DCS のミッション環境で `require` や外部ファイル読み込みを�
 
 実際のマルチプレイでは次を確認する。
 
-1. F10 の `Generate Intercept` で満額150ポイントが表示される（採点なしの場合は UCID / スロット取得を確認）。
+1. F10 の `Task: Intercept` で満額150ポイントが表示される（採点なしの場合は UCID / スロット取得を確認）。
 2. 敵全滅で帰還指示となり、次の Intercept が抑止される。
 3. BLUE 飛行場・空母で停止して帰還確定後、成績に150ポイントを反映する。
 4. 別の試行でクリア後に脱出・墜落した場合、90ポイントを一度だけ反映する。

@@ -5,14 +5,14 @@
       "label": "DCS: Sync mission Lua",
       "type": "process",
       "command": "powershell.exe",
-      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Sync-Mission.ps1"],
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Sync-Mission.ps1", "-MissionPath", "${workspaceFolder}/mission/Persistent_and_Dynamic_FA-18C_Training.miz"],
       "problemMatcher": []
     },
     {
       "label": "DCS: Watch mission Lua",
       "type": "process",
       "command": "powershell.exe",
-      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Sync-Mission.ps1", "-Watch"],
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/Sync-Mission.ps1", "-MissionPath", "${workspaceFolder}/mission/Persistent_and_Dynamic_FA-18C_Training.miz", "-Watch"],
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated" },

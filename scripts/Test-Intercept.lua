@@ -143,7 +143,7 @@ test("concurrent wing formations are selected independently", function()
     local s = scenario(); s.player.airborne = true
     local other = s:addPilot("Other", "ucid-other", 20); other.airborne = true; s:tick(2)
     s.randomValues = { 60, 15000, 0, 2 }; s.generate()
-    s.randomValues = { 80, 30000, 60, 5 }; s:command("Generate Intercept", other)
+    s.randomValues = { 80, 30000, 60, 5 }; s:command("Task: Intercept", other)
     assert(#s.spawns == 2)
     assert(s.spawns[1].formation == 65538 and s.spawns[2].formation == 262146)
     assert(s.spawns[1].name ~= s.spawns[2].name)
@@ -224,7 +224,7 @@ test("new assignments redraw templates and concurrent wings remain independent",
         local s = scenario(); s.player.airborne = true
         local other = s:addPilot("Other", "ucid-other", 20); other.airborne = true; s:tick(2)
         s.randomValues = { 60, 15000, 0, 1, 1 }; s.generate()
-        s.randomValues = { 60, 15000, 0, 1, otherIndex }; s:command("Generate Intercept", other)
+        s.randomValues = { 60, 15000, 0, 1, otherIndex }; s:command("Task: Intercept", other)
         local a, b = s.spawns[1], s.spawns[2]
         assert(a.name ~= b.name)
         s:complete(b)
@@ -263,7 +263,7 @@ test("solo and MP2 show one range altitude aspect start; hostiles countdown and 
             s:lastMessageContains("Waiting for ALL registered pilots to take off.")
             assert(messages("Hostiles will spawn") == 0)
             s.generate()
-            if mp2 then s:command("Generate Intercept", s.wingman) end
+            if mp2 then s:command("Task: Intercept", s.wingman) end
             s.player.airborne, s.wingman.airborne = true, true
             s:event("Takeoff", s.player); s:tick(2); s:tick(4)
             assert(messages("Hostiles will spawn") == 0 and logs("Hostiles will spawn") == 1)
@@ -283,7 +283,7 @@ test("solo and MP2 show one range altitude aspect start; hostiles countdown and 
         assert(string.find(text, "Aspect: HOT", 1, true) and not string.find(text, "Pilots:", 1, true))
         assert(s.messages[#s.messages].seconds == 15)
         s.generate()
-        if mp2 then s:command("Generate Intercept", s.wingman) end
+        if mp2 then s:command("Task: Intercept", s.wingman) end
         s:event("Takeoff", s.player)
         s:tick(32); s:tick(34)
         assert(#s.spawns == 1 and messages("Intercept MISSION START") == 1)

@@ -1,12 +1,12 @@
 # 実装構成と設計上の約束
 
-更新日: 2026-10-07
+更新日: 2026-10-09
 
 ## 対象
 
 Intercept / CAP / SEAD / DEADの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。将来案は実装済みの機能と分ける。
 
-この構成は`training-5`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-6`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
 ## 責務と依存
 
@@ -15,6 +15,7 @@ Intercept / CAP / SEAD / DEADの現在の実装を説明する。訓練の条件
 | 設定 | `config.lua` | 訓練値・時間・候補・報酬。各任務の設定は`intercept` / `cap` / `sead` / `dead`に置く |
 | 搭乗者 | `player.lua` | BLUE Hornetの動的列挙、UCID・機体・イベント照合 |
 | 任務台帳 | `missions.lua` | Wing/UCIDロック、受注順、活動中任務とSiteの参照 |
+| 訓練地域 | `training_zones.lua` | ME Zone優先、追加設定円の非登録MOOSE参照・再利用。候補選定・距離判定は各任務が担当 |
 | 空中目標 | `air_targets.lua` | Intercept/CAPの生成済み機体のID固定、喪失イベント、生存観測 |
 | 任務 | `intercept.lua` / `cap.lua` | 敵航空機の生成・経路と削除待ち。CAPは計画・滞在時間・進捗も管理 |
 | 地上目標 | `sead.lua` / `sead_objective.lua` | SAM計画・安全配置と主要レーダーFSMを分離 |

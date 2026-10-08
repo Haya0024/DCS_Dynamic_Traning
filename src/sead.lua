@@ -57,7 +57,7 @@ function SEAD.Begin(assignmentID, missionID, playerPosition)
     for _, zone in ipairs(settings.zones) do
         assert(type(zone) == "string" and zone ~= "" and not seen[zone], "Invalid/duplicate SEAD zone.")
         seen[zone] = true
-        local object = ZONE:FindByName(zone)
+        local object = TrainingZones.Find(zone)
         if object then
             local center = assert(object:GetVec2(), "SEAD zone center unavailable: " .. zone)
             local dx, dy = center.x - playerPosition.x, center.y - playerPosition.z
@@ -160,7 +160,7 @@ end
 function SEAD.Spawn(job)
     local plan = job.plan
     local point = assert(plan.actualSpawnPoint, "SEAD plan has no approved site.")
-    local zone = assert(ZONE:FindByName(plan.zoneName), "Planned SEAD zone unavailable.")
+    local zone = assert(TrainingZones.Find(plan.zoneName), "Planned SEAD zone unavailable.")
     -- Conditions may change while awaiting departure. Recheck this exact site;
     -- an occupied/unsafe site fails rather than changing the accepted mission.
     local valid, reason = TerrainClear(job, zone, point)
@@ -201,7 +201,7 @@ end
 function SEAD.Step(job, reservations)
     assert(not job.plan.actualSpawnPoint, "SEAD mission plan is already complete.")
     local zoneName = job.plan.zoneName
-    local zone = assert(ZONE:FindByName(zoneName), "Planned SEAD zone unavailable: " .. zoneName)
+    local zone = assert(TrainingZones.Find(zoneName), "Planned SEAD zone unavailable: " .. zoneName)
     for _ = 1, job.settings.attemptsPerTick do
         job.attempts, job.totalAttempts = job.attempts + 1, job.totalAttempts + 1
         local point = zone:GetRandomVec2()

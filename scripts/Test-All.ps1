@@ -34,6 +34,7 @@ try {
         & (Join-Path $PSScriptRoot $test)
     }
     & (Join-Path $PSScriptRoot 'Test-PersistenceInstall.ps1') -LuaPath $LuaPath
+    & (Join-Path $PSScriptRoot 'Test-ZoneCoverage.ps1') -LuaPath $LuaPath
     Write-Output 'All Lua and integration tests passed. Actual mission sync is a separate step.'
 } finally {
     Pop-Location

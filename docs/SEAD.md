@@ -1,6 +1,6 @@
 # SEAD 訓練ミッション仕様
 
-更新日: 2026-10-07
+更新日: 2026-10-09
 
 ## 今回の実装範囲
 
@@ -180,12 +180,15 @@ Site stateの残存判定はSEADエミッターの終端状態と別に監視す
 受注ごとに2候補から等確率で1つ選ぶ。ME の配置間隔・機体種類・兵装を継承する。
 テンプレートのグループ名はスクリプトや同期処理で変更しない。
 
-配置候補は次の4つの円形 Trigger Zone。現在の半径は各18,288 m。
+配置候補は10円形Zone。次の既存ME4 Zoneの半径は各18,288 m。
 
 - `SEAD_ZONE_PALMYRA`
 - `SEAD_ZONE_SALAMIYAH`
 - `SEAD_ZONE_DUMAYR`
 - `SEAD_ZONE_TABQA`
+
+追加は `SEAD_ZONE_OSMANIYE` / `SEAD_ZONE_ISLAHIYE` / `SEAD_ZONE_KILIS` / `SEAD_ZONE_MORPHOU` / `SEAD_ZONE_NICOSIA_NORTH` / `SEAD_ZONE_AKKAR` の6円、各半径9,260 m（5 NM）。中心・半径はConfig.zoneDefinitionsに置き、training_zones.luaで非登録のMOOSE ZONE_RADIUSとして保持する。既存ME Zoneを優先し、MEの設定・名前・位置をLuaから変更しない。受注時の40〜130 NM判定、選定後の50回検査、安全配置条件は同じ。
+全候補の座標と各出撃地点からの2〜3候補は [TRAINING_AREAS.md](TRAINING_AREAS.md)。実ミッションの全Client駐機位置と各地点の全候補の計画・生成・解除をTest-ZoneCoverageで模擬検証済み。新地域の実地形・建物判定・交戦はDCS内確認待ち。
 
 名前と判定値は [src/config.lua](../src/config.lua) の `sead` に集約する。
 ME で名前を変更したら設定・仕様書・テストの対応も更新する。
@@ -306,7 +309,7 @@ SEAD62件・DEAD103件を含む対応表と現在の全件数は [TESTING.md](TE
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。
 
-DCS 内では4 Zone それぞれで SA-6／SA-8 の車両位置、建物からの離隔、地面への配置、レーダー・発射動作を確認する。
+DCS 内では10 ZoneそれぞれでSA-6／SA-8の車両位置、建物からの離隔、地面への配置、レーダー・発射動作を確認する。
 地上受注で計画を受け取ってもSAMが出現せず、全員の離陸後20秒で同じ計画のSAMが出現することを確認する。
 地上・空中受注のTOO / PBで座標付きブリーフィングが自動で1回だけ表示され、生成時には繰り返されず、Mission Statusでは同じ座標を再確認できることを確認する。
 TOOで捜索座標が表示され、機種・正確な座標・PBコードが表示されないこと、PBのコードと推定座標を使ってHARMを設定・攻撃できることを確認する。

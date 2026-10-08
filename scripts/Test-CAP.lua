@@ -33,7 +33,8 @@ end
 test("all four configured areas are selectable with runtime center/radius and acceptance DDM", function()
     for index = 1, 4 do
         local s = new(); local record = accept(s, nil, { index, 1, 30 })
-        assert(record.capPlan.center.x == index * 100000 and record.capPlan.radius == 18288)
+        assert(record.capPlan.center.x == 100100 and record.capPlan.center.y == index * 10000 + 300
+            and record.capPlan.radius == 18288)
         local message = s.messages[#s.messages]
         assert(message.seconds == 60 and message.text:find("CAP AREA: LL DDM", 1, true))
         assert(not message.text:find("PATROL CENTER", 1, true) and not message.text:find("Radius:", 1, true))
@@ -284,7 +285,7 @@ test("MOOSE weak subscribers survive garbage collection after Intercept and resp
             log:find("objectID=UNAVAILABLE; subscriberRetained=true", 1, true) then received = true end
         if log:find(r.id, 1, true) and log:find("Failure event matched: event=Ejection", 1, true) and
             log:find("objectID=50000; state=ACTIVE; done=false", 1, true) then matched = true end
-        if log:find("Runtime initialized; version=training-5;", 1, true) then initialized = initialized + 1 end
+        if log:find("Runtime initialized; version=training-6;", 1, true) then initialized = initialized + 1 end
     end
     assert(registered and received and matched and initialized == 1)
     s.player.alive = true; s.player.id = 50001; s.player:newDCSObject()
@@ -298,6 +299,49 @@ test("MOOSE weak subscribers survive garbage collection after Intercept and resp
     assert(not s:mission()); s:score(240)
     s:lastMessageContains("Settled Missions: 3"); s:lastMessageContains("Death Count: 2")
     s:categoryScores({ interceptScore = 90, capScore = 150 }); s:assertClean()
+end)
+
+test("acceptance distance includes forty and one hundred NM and excludes both outside edges", function()
+    for draw = 1, 2 do
+        local s = new()
+        s.player.position = { x = -1000000, y = 0, z = 0 }
+        for i, name in ipairs({ "CAP_ZONE_CENTRAL_COAST", "CAP_ZONE_GOLAN", "CAP_ZONE_NORTH_COAST", "CAP_ZONE_HOMS_WEST" }) do
+            local nm = ({ 39.999, 40, 100, 100.001 })[i]
+            s.zones[name].center = { x = s.player.position.x + nm * 1852, y = 0 }
+        end
+        local r = accept(s, nil, { draw, 1, 30 })
+        assert(r.capPlan.name == (draw == 1 and "CAP_ZONE_GOLAN" or "CAP_ZONE_NORTH_COAST"))
+        assert(s.randomCalls[1].minimum == 1 and s.randomCalls[1].maximum == 2)
+        assert(r.capPlan.acceptancePosition.x == -1000000)
+        local plan = r.capPlan
+        s.player.position.x = 1000000; advance(s, 20)
+        s:command("Mission Status")
+        assert(r.capPlan == plan and #s.randomCalls == 3 and plan.elapsed == 0)
+    end
+end)
+
+test("no in-range CAP area refuses without scoring or locking and permits a fresh request", function()
+    local s = new(); s.player.position.x = 1000000
+    s:command("Task: CAP")
+    assert(not s:mission() and #s.spawns == 0 and #s.randomCalls == 0 and #s.errors == 0)
+    s:lastMessageContains("No CAP areas within 40-100 NM.")
+    s.player.position.x = 100
+    assert(accept(s).category == "CAP")
+end)
+
+test("CAP filters from the lowest flight-number accepted pilot and releases a failed position probe", function()
+    local s = new(); s:occupyWing()
+    s.player.number, s.wingman.number = 2, 1
+    s.player.position.x, s.wingman.position.x = 1000000, 100
+    local r = accept(s)
+    assert(r.owner.unit == s.wingman and r.capPlan.acceptancePosition.x == 100)
+    s:command("Abort Mission")
+    local original = s.wingman.GetVec3
+    s.wingman.GetVec3 = function() error("position unavailable") end
+    s:command("Task: CAP")
+    assert(not s:mission() and #s.errors == 1)
+    s.wingman.GetVec3 = original
+    assert(accept(s).owner.unit == s.wingman)
 end)
 
 print(string.format("All %d CAP tests passed (simulated DCS/MOOSE).", count))

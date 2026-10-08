@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-5" }
+DynamicTrainingRuntime = { version = "training-6" }
 Persistence.Publish()
 
 local menus = {}
@@ -248,11 +248,17 @@ local function Generate(groupName, category)
     if problem then Message(group, problem, 15) end
     if category == "CAP" then
         record.owner = roster[1]
-        local ok, plan = pcall(CAP.Plan, timer.getTime())
+        local ok, plan = pcall(function() return CAP.Plan(record.owner.unit:GetVec3(), timer.getTime()) end)
         if not ok then
             Close(record)
             env.error("[DynamicTraining] CAP setup: " .. tostring(plan))
             Message(group, "ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.", 20)
+            return
+        end
+        if not plan then
+            Close(record)
+            Message(group, string.format("No CAP areas within %g-%g NM. Change position and retry.",
+                Config.cap.minDistanceNM, Config.cap.maxDistanceNM), 20)
             return
         end
         record.capPlan, record.state = plan, "ACTIVE"

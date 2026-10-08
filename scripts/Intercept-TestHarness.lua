@@ -77,7 +77,7 @@ local function scenario(options)
     function s:addCAPZones()
         self.zones = self.zones or {}
         for index, name in ipairs({ "CAP_ZONE_CENTRAL_COAST", "CAP_ZONE_GOLAN", "CAP_ZONE_NORTH_COAST", "CAP_ZONE_HOMS_WEST" }) do
-            local zone = { center = { x = index * 100000, y = index * 10000 }, radius = 18288 }
+            local zone = { center = { x = 100100, y = index * 10000 + 300 }, radius = 18288 }
             function zone:GetVec2() return self.center end
             function zone:GetRadius() return self.radius end
             function zone:IsVec3InZone(point)
@@ -249,6 +249,21 @@ local function scenario(options)
     env.AI = { Option = { Air = { id = { FORMATION = 5 } } } }
     s.env = env
     env.ZONE = { FindByName = function(_, name) return s.zones and s.zones[name] end }
+    s.runtimeZones = {}
+    env.ZONE_RADIUS = { New = function(_, name, center, radius, doNotRegister)
+        assert(doNotRegister == true)
+        local zone = { name = name, center = center, radius = radius }
+        function zone:GetVec2() return self.center end
+        function zone:GetRadius() return self.radius end
+        function zone:GetRandomVec2() return self.center end
+        function zone:IsVec2InZone(p)
+            return (p.x - self.center.x)^2 + (p.y - self.center.y)^2 <= self.radius^2
+        end
+        function zone:IsVec3InZone(p) return self:IsVec2InZone({ x = p.x, y = p.z }) end
+        assert(not s.runtimeZones[name], "runtime circle constructed twice")
+        s.runtimeZones[name] = zone
+        return zone
+    end }
     env.math = setmetatable({}, { __index = math })
     function env.math.random(minimum, maximum)
         local value = table.remove(s.randomValues, 1) or minimum

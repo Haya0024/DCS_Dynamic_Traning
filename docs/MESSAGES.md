@@ -1,6 +1,6 @@
 # Mission messages and DCS logs
 
-Updated: 2026-10-07
+Updated: 2026-10-09
 
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
 
@@ -436,6 +436,8 @@ CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / 
 Acceptance selection and actual spawn details are DEBUG only: `CAP accepted; zone=<name> template=<name> enemy at on-station second <n>` and `CAP enemy spawned; template=<name> units=<n> altitude=<n> ft`. No separate hostile spawn message appears on screen. Normal CAP group messages are mirrored to the DCS MESSAGE log.
 Idle Status and Abort Mission use the same Intercept / SEAD / DEAD / CAP list, including `CAP: Idle.`.
 
+When no CAP center is within the configured acceptance distance, show the requesting group `No CAP areas within 40-100 NM. Change position and retry.` for 20 seconds and mirror it to the MESSAGE log. The limits come from Config.cap. Release the Wing/UCID lock without starting scoring, spawning enemies, or displaying acceptance/briefing messages. Out-of-range selection is a normal refusal; missing/malformed zones and position API exceptions still use the setup error above.
+
 ## Screen: Player Statistics — 25 seconds, requested manually
 
 ```text
@@ -717,7 +719,7 @@ Raw identity methods may fail after destruction; these fields then show UNAVAILA
 
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-5; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-6; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 

@@ -2,6 +2,16 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-09 CAP距離制限と訓練地域追加（training-6）
+
+受注位置からの距離を見ずに4空域から選ぶCAPでは、Ramat→North CoastやIncirlik→Golanで中心まで約216 NMとなっていた。従来SEADの40〜130 NM条件ではIncirlik・Akrotiri・空母の初期位置に候補がなく、Beirutは2候補、Ramatは1候補だった。
+
+CAPを受注時長機から中心40〜100 NMに限定し、既存4空域に5円を追加。SEADは40〜130 NMを維持して既存4地域に6円を追加した。追加円はConfig.zoneDefinitionsから非登録MOOSE ZONE_RADIUSとして用意し、ME設定を変更しない。既存ME Zoneを優先し、中心・半径・名前を維持する。CAP候補なしは通常通知20秒とロック解放、採点なしで拒否する。
+
+実.mizの全BLUE Hornet Client駐機位置で両任務ともIncirlik/Beirut/空母は3、Akrotiri/Ramatは2候補。各出撃地点の全候補の受注、SEAD計画・Spawn、中止・ロック解放を本番bundleと模擬地形で確認した。配置と距離はTRAINING_AREAS.mdにまとめる。
+
+Lua全352ケース（CAP34、他スイート件数維持）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。最初の一括検証はサンドボックス内の一時file置換で停止したため、通常環境で再実行して全通過を確認した。実ミッションSync/Check成功、置換は既存の埋め込みLuaだけ。Hookの保存schemaや実保存データは変更していない。追加SEAD地域の実地形・建物条件・交戦、追加CAP空域はDCS内確認待ち（MAN-06/52/56）。
+
 ## 自動テスト・DCS確認の履歴
 
 2026-10-04のDEAD追加前はLua145ケース、BUILDの2確認グループ、SYNCの3確認グループの通過を確認済み。

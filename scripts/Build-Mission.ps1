@@ -7,7 +7,7 @@ $outputPath = Join-Path $projectRoot 'build/DynamicTraining.lua'
 $modules = [ordered]@{
     config = 'Config'; notifications = 'Notifications'; map_overlay = 'MapOverlay'
     score_data = 'ScoreData'; player = 'Player'; scoring = 'Scoring'; persistence = 'Persistence'
-    missions = 'Missions'; air_targets = 'AirTargets'; intercept = 'Intercept'; cap = 'CAP'
+    missions = 'Missions'; training_zones = 'TrainingZones'; air_targets = 'AirTargets'; intercept = 'Intercept'; cap = 'CAP'
     sead_objective = 'SEADObjective'; sead = 'SEAD'; sead_sites = 'SEADSites'; dead = 'DEAD'
     recovery = 'Recovery'; mission_report = 'MissionReport'
 }

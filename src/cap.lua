@@ -4,9 +4,13 @@ local function finite(value)
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
 end
 local function integer(value) return finite(value) and value % 1 == 0 end
-function CAP.Plan(time)
+function CAP.Plan(playerPosition, time)
     local cfg = Config.cap
     assert(type(cfg.zones) == "table" and #cfg.zones > 0, "CAP zones are empty.")
+    assert(type(playerPosition) == "table" and finite(playerPosition.x) and finite(playerPosition.z),
+        "CAP acceptance position unavailable.")
+    assert(finite(cfg.minDistanceNM) and finite(cfg.maxDistanceNM) and cfg.minDistanceNM >= 0
+        and cfg.maxDistanceNM >= cfg.minDistanceNM, "Invalid CAP zone distance limits.")
     assert(finite(cfg.holdSeconds) and cfg.holdSeconds > 0 and integer(cfg.progressStepPercent)
         and cfg.progressStepPercent > 0 and 100 % cfg.progressStepPercent == 0, "Invalid CAP patrol timing.")
     assert(integer(cfg.enemySpawnMinSeconds) and integer(cfg.enemySpawnMaxSeconds)
@@ -24,13 +28,17 @@ function CAP.Plan(time)
     for _, name in ipairs(cfg.zones) do
         assert(type(name) == "string" and name ~= "" and not seen[name], "Invalid/duplicate CAP zone.")
         seen[name] = true
-        local zone = assert(ZONE:FindByName(name), "CAP zone not found: " .. name)
+        local zone = assert(TrainingZones.Find(name), "CAP zone not found: " .. name)
         local center, radius = zone:GetVec2(), zone:GetRadius()
         assert(center and finite(center.x) and finite(center.y) and finite(radius) and radius > 0,
-            "CAP requires a valid circular trigger zone: " .. name)
-        candidates[#candidates + 1] = { zone = zone, name = name,
-            center = { x = center.x, y = center.y }, radius = radius }
+            "CAP requires a valid circular zone: " .. name)
+        local distance = math.sqrt((center.x - playerPosition.x)^2 + (center.y - playerPosition.z)^2) / 1852
+        if distance >= cfg.minDistanceNM and distance <= cfg.maxDistanceNM then
+            candidates[#candidates + 1] = { zone = zone, name = name,
+                center = { x = center.x, y = center.y }, radius = radius }
+        end
     end
+    if #candidates == 0 then return nil end
     local plan = candidates[math.random(1, #candidates)]
     local templates = Config.intercept.templates
     assert(type(templates) == "table" and #templates > 0, "CAP enemy templates are empty.")
@@ -43,6 +51,7 @@ function CAP.Plan(time)
     plan.spawnMinNM, plan.spawnMaxNM = cfg.spawnOutsideMinNM, cfg.spawnOutsideMaxNM
     plan.minAltitudeFt, plan.maxAltitudeFt, plan.speedMps = cfg.minAltitudeFt, cfg.maxAltitudeFt, cfg.speedMps
     plan.elapsed, plan.nextPercent, plan.lastSample, plan.inside = 0, cfg.progressStepPercent, time, false
+    plan.acceptancePosition = { x = playerPosition.x, y = playerPosition.z }
     return plan
 end
 function CAP.Briefing(plan)

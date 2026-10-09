@@ -20,6 +20,10 @@ local function eligible(category, origin)
     for _, name in ipairs(cfg.zones) do
         local z = me[name] or config.zoneDefinitions[name]
         assert(z, "Missing configured zone: " .. name)
+        if category == "sead" and not me[name] then
+            assert(z.radiusMeters == me.SEAD_ZONE_PALMYRA.radius,
+                "Additional SEAD radius must match the existing ME area: " .. name)
+        end
         local center = z.center or { x = z.x, y = z.y }
         local distance = math.sqrt((center.x - origin.x)^2 + (center.y - origin.y)^2) / 1852
         if distance >= cfg.minDistanceNM and distance <= cfg.maxDistanceNM then found[#found + 1] = name end

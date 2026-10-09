@@ -137,7 +137,7 @@ BLUE 空港への RTB を追加評価対象とする。
 ## SEAD 訓練ミッション（実装済み・ゲーム内確認待ち）
 
 - `TPL_SEAD_SA6`（レーダー＋発射機3両）と `TPL_SEAD_SA8`（1両）を等確率で選ぶ。
-- Zoneは既存ME4＋追加6の計10候補。追加はOSMANIYE / ISLAHIYE / KILIS / MORPHOU / NICOSIA_NORTH / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、追加円の中心・半径はConfig.zoneDefinitions。
+- Zoneは既存ME4＋追加6の計10候補。追加はOSMANIYE / ISLAHIYE / KILIS / MORPHOU / NICOSIA_NORTH / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、追加円の中心・半径はConfig.zoneDefinitions。追加6地域の半径は既存MEと同じ18,288 m（約9.9 NM）。
 - `Task: SEAD` の受注時に TOO / PB を等確率で抽選し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
 - 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
 - TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。
@@ -371,7 +371,7 @@ CAS: 720
 - 地上受注でも即ACTIVEで空域への到達待ち。CAPにInterceptの離陸待ち・20秒Spawn待ちを適用しない。個人中止でCAPをARMEDへ戻さない。
 - 既存Wing/UCIDロックと個別帰還を使い、満額150・達成後事故90・未達成事故/Abort0をCAP Scoreへ独立加算。全参加者終了で敵をCleanupし失敗を再試行する。
 - 保存schema2はcapScoreを追加し、schema1の従来成績をCAP=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
-- 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（34ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。新SEAD地域の実地形と交戦はDCS内確認待ち。
+- 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（34ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。全SEAD地域・両SAM各50点の実地形配置診断は2026-10-09実施済み。全追加SEAD円をMEと同じ18,288 mへ拡大し、Islahiye / Akkar / Morphou / Nicosiaの中心を調整。調整後の全10地域・両SAM各50点で適合点を発見し、観測エラー0。詳細はdocs/SEAD_PLACEMENT_CHECK.md。実Spawn・交戦はDCS内確認待ち。
 
 ---
 

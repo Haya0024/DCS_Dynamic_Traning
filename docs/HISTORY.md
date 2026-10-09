@@ -2,6 +2,39 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-09 追加SEAD半径の統一と配置中心の改善（training-7）
+
+追加6地域を先にMEと同じ半径18,288 mへ拡大し、全20組合せ各50点を実DCSで再検査した。中心不変では適合310/1,000・観測エラー0。適合点の少ないIslahiye / Akkar / Morphou / Nicosiaは診断座標を根拠に中心を調整し、同じLAND・高低差・障害物条件で再検査した。最終位置のSA-6/SA-8はIslahiye10/12、Akkar14/10、Morphou7/7、Nicosia6/9（各50点）。全10地域・両SAMの最終設定に一致する複数実行を合算した結果は適合352/1,000・観測エラー0。単一の1,000点連続実行とは区別する。
+
+Morphou East / Nicosia Eastへ表示地域名を合わせ、Zone識別子は維持した。4空港と空母の全出撃Client駐機位置でCAP / SEADの2〜3候補を維持する。Nicosiaは一部駐機位置の40 NM境界を避けるよう中心を再調整した。中心・距離はTRAINING_AREAS、条件別結果と生ログ所在はSEAD_PLACEMENT_CHECKを参照。
+
+ボタン操作なしでSteamの通常コマンド起動を使い、隔離プロファイルだけで検査して終了した。通常Config・Hook・成績は変更しない。Lua全356ケース、BUILD2、SYNC3、INSTALL5、ZONES2が通過。実ミッションSync/Check成功、既存DynamicTraining.lua以外のZIP内容不変を確認。SAMの実Spawn・交戦は確認待ち。
+
+## 2026-10-09 全SEAD地域の実地形50点抽選
+
+通常のSEAD計画からSEAD.CheckPlacementを抽出し、同じ判定で全10地域×SA-6/SA-8を各50点、計1,000点検査する専用ミッションを作成した。SAM実Spawn、任務台帳・採点・保存bridgeは起動しない。既存Triggerやテンプレートを変更せず、検査用コピーだけに既存埋め込みLuaをSyncした。
+
+最初の直接起動はSteamが再起動を要求した。隔離プロファイルのserver起動はLogin failed code 400と空のTerrainでミッションを開始できず、検査結果として扱わない。検査プロセスだけを止めて、--norender / --nopause / --mission-fileによる直接読み込みへ変更し、Syriaの実地形読み込みと検査開始を確認した。
+
+2026-10-09 09:11:49〜09:20:11 JST、DCS 2.9.30.28738 / Syria terrain revision 7039で20 RESULTとCOMPLETE checked=1000/passed=350/errors=0を確認。9地域は両テンプレートで50点以内に適合点を発見。
+
+| 地域 | SA-6成功/50 | SA-8成功/50 | SA-6初回成功 | SA-8初回成功 |
+|---|---:|---:|---:|---:|
+| Palmyra | 24 | 23 | 2 | 1 |
+| Salamiyah | 18 | 26 | 1 | 1 |
+| Dumayr | 41 | 45 | 1 | 1 |
+| Tabqa | 34 | 42 | 4 | 1 |
+| Osmaniye | 21 | 23 | 2 | 1 |
+| Islahiye | 0 | 0 | NONE | NONE |
+| Kilis | 8 | 7 | 4 | 2 |
+| Morphou | 2 | 5 | 15 | 19 |
+| Nicosia North | 2 | 3 | 20 | 31 |
+| Akkar | 10 | 16 | 5 | 5 |
+
+Islahiyeは両テンプレート0/50、高低差拒否が合計96/100点。MorphouとNicosia Northも適合点が少なく、配置候補の中心・範囲に改善余地がある。設定は今回変更していない。診断中に描画model読み込み警告が出ており、実Spawnと通常描画の確認は未実施。拒否理由・対象hash・生ログの所在は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md) を参照する。MAN-57の静的配置診断は実施済み、MAN-06の実Spawn・交戦確認とは分ける。
+
+Lua全356ケース（SEAD66）、BUILD2、SYNC3、INSTALL5、ZONES2が通過し、実ミッションのSync/Checkも成功。SEAD-63〜66は診断制御の模擬テストで、実地形結果と混ぜない。検査完了後に検査用DCSを終了し、通常Config・Hook・実成績・MissionScripting.luaは変更していない。
+
 ## 2026-10-09 CAP距離制限と訓練地域追加（training-6）
 
 受注位置からの距離を見ずに4空域から選ぶCAPでは、Ramat→North CoastやIncirlik→Golanで中心まで約216 NMとなっていた。従来SEADの40〜130 NM条件ではIncirlik・Akrotiri・空母の初期位置に候補がなく、Beirutは2候補、Ramatは1候補だった。

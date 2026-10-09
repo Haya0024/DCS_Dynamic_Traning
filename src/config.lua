@@ -21,12 +21,12 @@ return {
     -- Additional Syria circles in DCS Vec2 meters (x=northing, y=easting).
     -- Existing ME circles are resolved first; no ME zone is moved or replaced.
     zoneDefinitions = {
-        SEAD_ZONE_OSMANIYE = { center = { x = 223136, y = 73828 }, radiusMeters = 9260 },
-        SEAD_ZONE_ISLAHIYE = { center = { x = 217068, y = 95940 }, radiusMeters = 9260 },
-        SEAD_ZONE_KILIS = { center = { x = 194417, y = 117757 }, radiusMeters = 9260 },
-        SEAD_ZONE_AKKAR = { center = { x = -50497, y = 10330 }, radiusMeters = 9260 },
-        SEAD_ZONE_MORPHOU = { center = { x = 42998, y = -263036 }, radiusMeters = 9260 },
-        SEAD_ZONE_NICOSIA_NORTH = { center = { x = 38152, y = -237728 }, radiusMeters = 9260 },
+        SEAD_ZONE_OSMANIYE = { center = { x = 223136, y = 73828 }, radiusMeters = 18288 },
+        SEAD_ZONE_ISLAHIYE = { center = { x = 213414, y = 80579 }, radiusMeters = 18288 },
+        SEAD_ZONE_KILIS = { center = { x = 194417, y = 117757 }, radiusMeters = 18288 },
+        SEAD_ZONE_AKKAR = { center = { x = -45416, y = 17335 }, radiusMeters = 18288 },
+        SEAD_ZONE_MORPHOU = { center = { x = 37949, y = -249346 }, radiusMeters = 18288 },
+        SEAD_ZONE_NICOSIA_NORTH = { center = { x = 29000, y = -226958 }, radiusMeters = 18288 },
         CAP_ZONE_CYPRUS_WEST = { center = { x = -101732, y = -355355 }, radiusMeters = 18288 },
         CAP_ZONE_CYPRUS_EAST = { center = { x = -50673, y = -181022 }, radiusMeters = 18288 },
         CAP_ZONE_LEVANT_SOUTH = { center = { x = -248435, y = -233050 }, radiusMeters = 18288 },
@@ -56,7 +56,7 @@ return {
         zoneLabels = { SEAD_ZONE_PALMYRA = "Palmyra", SEAD_ZONE_SALAMIYAH = "Salamiyah",
             SEAD_ZONE_DUMAYR = "Dumayr", SEAD_ZONE_TABQA = "Tabqa",
             SEAD_ZONE_OSMANIYE = "Osmaniye", SEAD_ZONE_ISLAHIYE = "Islahiye", SEAD_ZONE_KILIS = "Kilis",
-            SEAD_ZONE_MORPHOU = "Morphou", SEAD_ZONE_NICOSIA_NORTH = "Nicosia North", SEAD_ZONE_AKKAR = "Akkar" },
+            SEAD_ZONE_MORPHOU = "Morphou East", SEAD_ZONE_NICOSIA_NORTH = "Nicosia East", SEAD_ZONE_AKKAR = "Akkar" },
         minDistanceNM = 40,
         maxDistanceNM = 130,
         pbEstimateErrorMinNM = 1,

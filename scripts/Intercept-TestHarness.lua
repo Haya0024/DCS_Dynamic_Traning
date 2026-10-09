@@ -342,7 +342,7 @@ local function scenario(options)
     function s:tick(time)
         self.time = time
         for _, scheduled in ipairs(self.timers) do
-            if scheduled.due <= time then scheduled.due = scheduled.callback(scheduled.arg, time) end
+            if scheduled.due and scheduled.due <= time then scheduled.due = scheduled.callback(scheduled.arg, time) end
         end
     end
     function s:event(name, unit, place, time, raw)

@@ -1083,4 +1083,54 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
   end
 end)
 
+local function placementDiagnostic(s)
+    local cfg = dofile("src/config.lua")
+    local function loadModule(path)
+        local chunk = assert(loadfile(path)); setfenv(chunk, s.env); return chunk()
+    end
+    s.env.Config = cfg
+    s.env.TrainingZones = loadModule("src/training_zones.lua")
+    s.env.SEADObjective = loadModule("src/sead_objective.lua")
+    local sead = loadModule("src/sead.lua")
+    local diagnostic = dofile("scripts/SEAD-PlacementCheck.lua")
+    local output = {}
+    local results = diagnostic.Start(cfg, sead, s.env.TrainingZones, s.env.timer,
+        function(text) output[#output + 1] = text end)
+    for time = 1, 501 do s:tick(time) end
+    assert(results.complete and #results.rows == 20 and #s.spawns == 0 and not s:mission())
+    assert(#cfg.sead.zones == 10 and #cfg.sead.templates == 2)
+    assert(output[#output]:find("COMPLETE pairs=20", 1, true))
+    return results
+end
+
+test("placement diagnostic samples all ten areas and both templates fifty times even after early success", function()
+    local results = placementDiagnostic(setup())
+    assert(results.checked == 1000 and results.passed == 1000 and results.errors == 0)
+    for _, row in ipairs(results.rows) do assert(row.checked == 50 and row.passed == 50 and row.firstSuccess == 1) end
+end)
+
+test("placement diagnostic reports fifty rejected terrain samples without implying success or spawning SAMs", function()
+    local s = setup(); s.surfaceLand = function() return false end
+    local results = placementDiagnostic(s)
+    assert(results.checked == 1000 and results.passed == 0 and results.errors == 0)
+    for _, row in ipairs(results.rows) do assert(row.checked == 50 and row.rejections["non-LAND"] == 50 and not row.firstSuccess) end
+end)
+
+test("placement diagnostic separates a missing template from valid samples in the remaining pairs", function()
+    local s = setup(); s.missingTemplate = "TPL_SEAD_SA6"
+    local results = placementDiagnostic(s)
+    assert(results.checked == 500 and results.passed == 500 and results.errors == 10)
+    for _, row in ipairs(results.rows) do
+        if row.template == "TPL_SEAD_SA6" then assert(row.setupError and row.checked == 0)
+        else assert(row.checked == 50 and row.passed == 50) end
+    end
+end)
+
+test("placement diagnostic counts observation exceptions separately instead of treating them as terrain rejection", function()
+    local s = setup(); s.terrainHeight = function() error("terrain unavailable") end
+    local results = placementDiagnostic(s)
+    assert(results.checked == 1000 and results.passed == 0 and results.errors == 1000)
+    for _, row in ipairs(results.rows) do assert(row.errors == 50 and row.rejections["observation error"] == 50) end
+end)
+
 print(string.format("All %d SEAD tests passed (simulated DCS/MOOSE).", count))

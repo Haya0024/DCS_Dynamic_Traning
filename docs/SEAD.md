@@ -11,7 +11,7 @@ F10 の `Dynamic Training → Task: SEAD` で、SA-6 または SA-8 を1グル�
 配置・方式別の情報表示・主要レーダーの状態遷移による成功判定・個別帰還採点・中止を実装する。
 SEAD完了後の残存Siteは、標準のCleanup、即時のDEAD継続、明示保持後の別SortieのDEADに対応する。
 Follow-onの境界・採点・予約は [DEAD.md](DEAD.md) を参照する。SEADの受注計画・配置・目標条件は維持する。
-コードと模擬テストは実装済み。DCS 内での地形・建物判定、SAM の交戦、TOO / PB の攻撃、レーダー破壊と採点の確認は未実施。
+コードと模擬テストは実装済み。全10地域・両SAM各50点の地形・建物判定診断は2026-10-09に実DCSで実施済み（詳細はSEAD_PLACEMENT_CHECK）。実Spawn、SAMの交戦、TOO / PBの攻撃、レーダー破壊と採点の確認は未実施。
 
 ## 受注計画と攻撃方式
 
@@ -187,8 +187,8 @@ Site stateの残存判定はSEADエミッターの終端状態と別に監視す
 - `SEAD_ZONE_DUMAYR`
 - `SEAD_ZONE_TABQA`
 
-追加は `SEAD_ZONE_OSMANIYE` / `SEAD_ZONE_ISLAHIYE` / `SEAD_ZONE_KILIS` / `SEAD_ZONE_MORPHOU` / `SEAD_ZONE_NICOSIA_NORTH` / `SEAD_ZONE_AKKAR` の6円、各半径9,260 m（5 NM）。中心・半径はConfig.zoneDefinitionsに置き、training_zones.luaで非登録のMOOSE ZONE_RADIUSとして保持する。既存ME Zoneを優先し、MEの設定・名前・位置をLuaから変更しない。受注時の40〜130 NM判定、選定後の50回検査、安全配置条件は同じ。
-全候補の座標と各出撃地点からの2〜3候補は [TRAINING_AREAS.md](TRAINING_AREAS.md)。実ミッションの全Client駐機位置と各地点の全候補の計画・生成・解除をTest-ZoneCoverageで模擬検証済み。新地域の実地形・建物判定・交戦はDCS内確認待ち。
+追加は `SEAD_ZONE_OSMANIYE` / `SEAD_ZONE_ISLAHIYE` / `SEAD_ZONE_KILIS` / `SEAD_ZONE_MORPHOU` / `SEAD_ZONE_NICOSIA_NORTH` / `SEAD_ZONE_AKKAR` の6円、各半径18,288 m（約9.9 NM、既存ME4地域と同じ）。中心・半径はConfig.zoneDefinitionsに置き、training_zones.luaで非登録のMOOSE ZONE_RADIUSとして保持する。既存ME Zoneを優先し、MEの設定・名前・位置をLuaから変更しない。受注時の40〜130 NM判定、選定後の50回検査、安全配置条件は同じ。
+全候補の座標と各出撃地点からの2〜3候補は [TRAINING_AREAS.md](TRAINING_AREAS.md)。実ミッションの全Client駐機位置と各地点の全候補の計画・生成・解除をTest-ZoneCoverageで模擬検証済み。新地域を含む全10地域の配置条件は2026-10-09に実DCSで両SAM各50点を検査。全追加SEAD円をMEと同じ18,288 mへ拡大し、Islahiye / Akkar / Morphou / Nicosiaの中心を調整。調整後の全10地域・両SAM各50点で適合点を発見し、観測エラー0。詳細はSEAD_PLACEMENT_CHECKを参照。実Spawn・交戦は確認待ち。
 
 名前と判定値は [src/config.lua](../src/config.lua) の `sead` に集約する。
 ME で名前を変更したら設定・仕様書・テストの対応も更新する。
@@ -304,7 +304,7 @@ SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSi
   状態遷移、60秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
 
 `scripts/Test-All.ps1`で両bundleを結合後、Lua全9スイートとBuild/Sync/Installテストを実行する。
-SEAD62件・DEAD103件を含む対応表と現在の全件数は [TESTING.md](TESTING.md) を参照する。
+SEAD66件・DEAD103件を含む対応表と現在の全件数は [TESTING.md](TESTING.md) を参照する。
 実際のDCSでのRadar状態・損傷Life・イベント順序・残存SAMのCleanupはゲーム内確認待ち。
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。
@@ -318,3 +318,5 @@ SA-6 は発射機を残してレーダーだけ破壊し、SA-8 は車両を破�
 無傷のRadar OFFでは未達成、損傷＋OFFで計測開始、途中のONでリセット、損傷＋連続60秒OFFでSuppressedとなることを確認する。
 完了後のRadar再開・残存車両撃破で結果が変わらず、全員の精算まで残存Groupが保持されることを確認する。
 その後の帰還150、墜落・死亡・脱出90、達成前の事故0、および SEAD Score の加算を確認する。
+
+全地域の実地形で50点ずつ抽選する専用検査は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。通常計画と診断はSEAD.CheckPlacementの同じ配置判定を使い、診断ではSAM生成・採点・保存を行わない。SEAD-63〜66は診断制御の模擬検証であり、実地形の成功率とは分ける。

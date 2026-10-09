@@ -198,6 +198,24 @@ function SEAD.Spawn(job)
     return result
 end
 
+-- Shared by normal planning and the real-terrain placement diagnostic.
+-- This checks a candidate only: no spawn, mission completion, or scoring.
+function SEAD.CheckPlacement(job, zone, point, reservations)
+    if not point then return false, "no coordinate" end
+    local valid, reason = TerrainClear(job, zone, point)
+    if valid then valid, reason = ObjectsClear(job, point) end
+    if valid then
+        for _, other in ipairs(reservations or {}) do
+            local dx, dy = point.x - other.point.x, point.y - other.point.y
+            local clearance = job.radius + other.radius + job.settings.buildingClearanceMeters
+            if dx * dx + dy * dy < clearance * clearance then
+                return false, "another reserved SEAD site"
+            end
+        end
+    end
+    return valid, reason
+end
+
 function SEAD.Step(job, reservations)
     assert(not job.plan.actualSpawnPoint, "SEAD mission plan is already complete.")
     local zoneName = job.plan.zoneName
@@ -205,22 +223,8 @@ function SEAD.Step(job, reservations)
     for _ = 1, job.settings.attemptsPerTick do
         job.attempts, job.totalAttempts = job.attempts + 1, job.totalAttempts + 1
         local point = zone:GetRandomVec2()
-        local valid, reason = false, "no coordinate"
-        if point then
-            valid, reason = TerrainClear(job, zone, point)
-            if valid then valid, reason = ObjectsClear(job, point) end
-            if valid then
-                -- Keep unspawned wing plans apart, too. Actual objects are
-                -- still checked above and again when this plan is spawned.
-                for _, other in ipairs(reservations or {}) do
-                    local dx, dy = point.x - other.point.x, point.y - other.point.y
-                    local clearance = job.radius + other.radius + job.settings.buildingClearanceMeters
-                    if dx * dx + dy * dy < clearance * clearance then
-                        valid, reason = false, "another reserved SEAD site"; break
-                    end
-                end
-            end
-        end
+        -- Keep unspawned wing plans apart, too; recheck when actually spawned.
+        local valid, reason = SEAD.CheckPlacement(job, zone, point, reservations)
         if valid then
             job.plan.actualSpawnPoint = { x = point.x, y = point.y }
             local settings = job.settings

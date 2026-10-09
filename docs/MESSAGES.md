@@ -2,6 +2,8 @@
 
 Updated: 2026-10-09
 
+The separate placement-only diagnostic mission logs `[SEADPlacementCheck] START`, one `RESULT zone=<name> template=<name> checked=50 passed=<n> firstSuccess=<n|NONE> errors=<n> rejected=<counts>` for each of 20 pairs, and `COMPLETE pairs=20 checked=1000 passed=<n> errors=<n>`. Accepted diagnostic points use `VALID_POINT zone=<name> template=<name> sample=<n> x=<northing> y=<easting>`; exact coordinates appear only in the diagnostic log, not normal mission messages. Setup/observation exceptions use `SETUP_ERROR` / `OBSERVATION_ERROR` and are distinct from terrain rejection. These messages have no screen output and are absent from the normal training mission. See [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md) for the procedure and measured results.
+
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
 
 The four F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, and `Task: DEAD`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the existing behavior.
@@ -719,7 +721,7 @@ Raw identity methods may fail after destruction; these fields then show UNAVAILA
 
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-6; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-7; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 

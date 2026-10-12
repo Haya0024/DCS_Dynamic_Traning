@@ -508,7 +508,6 @@ Each table row is one actual message body. Different mission categories produce 
 | Pre-start aircraft/occupant changed | `Intercept reservation cancelled. Player aircraft changed or unavailable.` | 10 |
 | Ground DEAD cancelled | `DEAD reservation cancelled. Player aircraft changed or unavailable.` | 10 |
 | Intercept spawn failed | `ERROR: Intercept enemy spawn failed. Select 'Task: Intercept' to retry.` | 15 |
-| Intercept enemy deletion pending at assignment close | `ERROR: Enemy cleanup. See DCS log.` | 15 |
 | SEAD setup failed | `ERROR: SEAD setup failed. See DCS log; select 'Task: SEAD' to retry.` | 15 |
 | SEAD spawn failed | `ERROR: SEAD spawn failed. Select 'Task: SEAD' to retry; see DCS log.` | 20 |
 | DEAD preparation failed | `ERROR: DEAD setup failed. Site reservation rolled back; see DCS log.` | 20 |
@@ -523,7 +522,7 @@ Each table row is one actual message body. Different mission categories produce 
 
 Ground DEAD cancellation also sends each participant a FAILED settlement with `DEAD reservation cancelled. No reward.`.
 Other protected exceptions use their operation name, such as `ERROR: Task: SEAD. See DCS log.`. Internal operations with no Group have no screen delivery.
-An Intercept deletion retry adds no screen message. At assignment close the initial deletion failure displays the cleanup error once; when setup fails after spawning, the existing spawn-error notification is used. Pending/recovered deletion is logged separately, and retries continue every 5 mission seconds by default.
+Intercept deletion pending at assignment close and subsequent retries have no screen notification. When setup fails after spawning, the existing spawn-error notification is used. Pending/recovered deletion is logged separately, and retries continue every 5 mission seconds by default.
 
 Placement failure — 25 seconds; this example assumes all 50 attempts failed the height-range check:
 

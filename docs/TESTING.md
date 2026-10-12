@@ -1,6 +1,6 @@
 # テスト仕様書
 
-更新日: 2026-10-09
+更新日: 2026-10-12
 
 ## 目的と対象
 
@@ -27,7 +27,7 @@
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
-| ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 2確認グループ | 実.mizの全Client駐機位置でCAP/SEAD各2〜3候補、追加SEAD半径とME半径の一致、全候補の受注・SEAD生成・解除、非登録円・参照再利用・ME優先・不正定義 |
+| ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 2確認グループ | 実.mizの全Client駐機位置でCAP/SEAD各2〜3候補、全19円のME登録・可視性・半径・名前/IDの一意性、全候補の受注・SEAD生成・解除、MEのみの参照・欠落時解除・再受注 |
 
 Luaは合計356ケース（INT22＋CAP34＋SCORE26＋WING27＋PAR16＋SEAD66＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。Test-ZoneCoverage.luaはZONESが実.mizのmissionデータを前置して実行する結合検証で、356ケースとは別の2確認グループとして数える。
 
@@ -35,7 +35,11 @@ PowerShellは複数のassertをまとめたPASSグループで、Luaのケース
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-09、`training-7`。Test-AllでLua全356ケース、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP-32〜34は40/100 NM境界、候補なしの通常拒否・ロック解放、受注時長機位置と観測例外を確認。ZONESは4空港と空母の全出撃用Client位置で各2〜3候補と、各地点の全候補の受注・SEAD生成・中止を確認。既定先の実ミッションSync/Checkも成功。新地域を含む全10地域・両SAM各50点の実地形配置診断はMAN-57で実施済み（適合350/1,000、Islahiyeは両方0/50、追加地域半径5 NM時の記録）。training-7では追加6地域をMEと同じ18,288 mへ拡大し、4地域の中心を調整した。最終設定に一致する各地域の検査記録（複数実行）を合算して全20組合せ各50点、適合352/1,000・観測エラー0、全地域・両SAMで適合点を発見。全Client駐機位置の2〜3候補も維持する。実Spawn・交戦と追加CAP空域の確認は未実施。
+最新の自動検証: 2026-10-12、`training-8`。Lua全356ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP9＋SEAD10をすべてME円へ統一し、ZONESは全19円の存在・円形・半径18,288 m・可視性・名前/IDの一意性、全出撃Clientから各2〜3候補と全候補の受注・生成・中止を確認する。ME実体の直接参照、Zone欠落時にLua円で補完しないこと、受注失敗後のロック解放・復旧後の再受注も確認。CAP-31は死亡後の再搭乗位置を出撃地点へ戻すfixtureを明示し、GC・イベント受信の期待値を維持する。SEAD-63〜66は全10候補をME境界のfixtureとして与える。
+
+実.mizのSync/Check成功。移行前のユーザー保存済みファイルとの照合で、追加11円の名前・中心・半径が旧Lua定義と一致し、既存8円・AWACS燃料無限先頭・空母往復・その他のmissionフィールドが不変。ZIP変更はmissionのZone追加と登録済みDynamicTraining.luaだけで、options・MOOSE・resource mapping等を維持。配置診断の地域指定ビルドも成功した。ME画面での表示、実DCSの受注・交戦は今回未確認。
+
+2026-10-09の自動検証（`training-7`）:Test-AllでLua全356ケース、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP-32〜34は40/100 NM境界、候補なしの通常拒否・ロック解放、受注時長機位置と観測例外を確認。ZONESは4空港と空母の全出撃用Client位置で各2〜3候補と、各地点の全候補の受注・SEAD生成・中止を確認。既定先の実ミッションSync/Checkも成功。新地域を含む全10地域・両SAM各50点の実地形配置診断はMAN-57で実施済み（適合350/1,000、Islahiyeは両方0/50、追加地域半径5 NM時の記録）。training-7では追加6地域をMEと同じ18,288 mへ拡大し、4地域の中心を調整した。最終設定に一致する各地域の検査記録（複数実行）を合算して全20組合せ各50点、適合352/1,000・観測エラー0、全地域・両SAMで適合点を発見。全Client駐機位置の2〜3候補も維持する。実Spawn・交戦と追加CAP空域の確認は未実施。
 
 ### 自動テストの前提と限界
 
@@ -643,10 +647,10 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-50 | 更新したHookでDCSを再起動し同期済み実ミッションをホスト。slot未選択・Statistics未操作で10秒待つ | Startupはinitialization pending。ログでMissionLoadEnd→BOOTSTRAP_COMMITTED→CONNECTED（storage/ack確認）を確認しscores.datを検証。初期表示だけで失敗とせず、失敗時はphaseとprimary/backup I/O詳細を記録 |
 | MAN-51 | 保存確認済みの精算後にミッションを閉じ、メニューに戻って10秒待つ。別ミッションも開始 | Stop後frameで通信・新run採番なし。SSEが先に消える場合はSTOP_FLUSH_UNAVAILABLEだけを記録し既存保存を保持。次ミッションは別run、保存済み累計を復元 |
 | MAN-52 | CAPを受注し座標へ移動、退出再進入、Status確認 | 9円形候補から受注時長機の40〜100 NM内だけ選定。追加5空域も確認。CAP AREAへ中心DDMと条件を受注時60秒表示、半径・PATROL CENTER行なし。進入通知はCAP on station.のみ、20%ごと通知、全員退出で停止。zone内累計30〜120秒で1編隊出現し空域へ進入・哨戒 |
-| MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認。Intercept後に同Slot再搭乗し、長時間飛行したCAPの途中脱出も確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成死亡FAILED/0、任意中止ABORT/0。SOLO死亡後はACTIVE・Wing/UCIDロックを残さない。起動ログversion=training-7、Registered aircraft → Failure event received → Failure event matched → FAILED/0 → closedの記録を確認 |
+| MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認。Intercept後に同Slot再搭乗し、長時間飛行したCAPの途中脱出も確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成死亡FAILED/0、任意中止ABORT/0。SOLO死亡後はACTIVE・Wing/UCIDロックを残さない。起動ログversion=training-8、Registered aircraft → Failure event received → Failure event matched → FAILED/0 → closedの記録を確認 |
 | MAN-54 | MP2で片方だけ進入、両者退出、1人個人中止。別Wingでも並行受注 | 元の未精算参加者の誰か1人が内側なら進み、全員外なら停止。中止者0、僚機継続。別Wingの時計・敵・ロックは独立 |
 | MAN-55 | 新Hook導入後DCS再起動、旧schemaの成績でホスト。CAP精算保存後に閉じ再ホスト | schema1をCAP=0で移行し既存得点保持。CAP ScoreとTotal/Careerを保存確認後、次セッションで復元。実成績をfixtureで書き換えない |
-| MAN-56 | training-7で4空港と空母からCAP/SEADを受注。全候補を個別確認し、範囲外位置でCAPを受注して戻る | TRAINING_AREASの各2〜3候補から選定。CAP中心40〜100 NM、SEAD中心40〜130 NM。CAP候補なしの通知20秒とロック解放、戻った後の再受注。SEAD追加6地域の実地形・障害物・SAM交戦もMAN-06で確認 |
+| MAN-56 | training-8で4空港と空母からCAP/SEADを受注。全候補を個別確認し、範囲外位置でCAPを受注して戻る | TRAINING_AREASの各2〜3候補から選定。CAP中心40〜100 NM、SEAD中心40〜130 NM。CAP候補なしの通知20秒とロック解放、戻った後の再受注。SEAD追加6地域の実地形・障害物・SAM交戦もMAN-06で確認 |
 | MAN-57 | 配置検査専用ミッションを開始して一時停止せず完了まで待つ | 全10地域×SA-6/SA-8で各checked=50、20 RESULT、COMPLETE checked=1,000/errors=0。成功数・初回成功回・拒否理由を記録。SAM生成・精算・保存なし。2026-10-09実施済み：20組合せ各50点、初期5 NMは適合350/1,000、Islahiye両方0/50。半径統一・中心調整後は各地域の最終設定に一致する複数実行を合算して適合352/1,000、観測エラー0、全地域で両SAMの適合点を発見。地域指定の再検査では対象地域数×2×50点を確認。結果はSEAD_PLACEMENT_CHECKとHISTORYを参照 |
 
 
@@ -661,7 +665,7 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | 変更箇所 | 最初に確認するスイート | 追加確認 |
 |---|---|---|
 | Interceptの配置・編隊・テンプレート | INT | WING/PARで共有・独立性、MAN-02〜04 |
-| CAPの空域・時計・敵・達成 | CAP全34件、ZONES2 | MAN-52〜56、INT/WING/PAR回帰、既存MEと追加円、テンプレート確認 |
+| CAPの空域・時計・敵・達成 | CAP全34件、ZONES2 | MAN-52〜56、INT/WING/PAR回帰、全候補のME登録、テンプレート確認 |
 | SEAD計画・Zone・地形・情報表示 | SEAD | MAN-05〜08、MEの実設定とfixtureの整合 |
 | 座標表示時間・開始通知 | INT-16 / SEAD-62 / DEAD-16/17 | MAN-02/07/08/28、SEADの計画ブリーフィングと座標付きStatusが初期60秒で表示されること |
 | SEADの状態機械・Life/Radar | SEAD-45〜59 | MAN-09〜14 |

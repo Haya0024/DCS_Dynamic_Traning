@@ -2,8 +2,20 @@
 assert(mission and mission.theatre == "Syria", "Syria mission data required")
 local config = dofile("src/config.lua")
 local scenario = dofile("scripts/Intercept-TestHarness.lua")
-local me = {}
-for _, zone in ipairs(mission.triggers.zones) do me[zone.name] = zone end
+assert(config.zoneDefinitions == nil, "ME must be the only training-zone geometry source")
+local me, zoneIDs = {}, {}
+for _, zone in ipairs(mission.triggers.zones) do
+    assert(not me[zone.name] and not zoneIDs[zone.zoneId], "Duplicate ME zone name or ID")
+    me[zone.name], zoneIDs[zone.zoneId] = zone, true
+end
+for _, category in ipairs({ "cap", "sead" }) do
+    for _, name in ipairs(config[category].zones) do
+        local zone = assert(me[name], "Configured zone must exist in ME: " .. name)
+        assert(zone.type == 0 and zone.radius == 18288 and zone.hidden == false,
+            "Visible 18,288 m circular ME zone required: " .. name)
+    end
+end
+assert(#config.cap.zones == 9 and #config.sead.zones == 10)
 local function circle(name, point, radius)
     local zone = { name = name, center = point, radius = radius }
     function zone:GetVec2() return self.center end
@@ -18,13 +30,9 @@ end
 local function eligible(category, origin)
     local found, cfg = {}, config[category]
     for _, name in ipairs(cfg.zones) do
-        local z = me[name] or config.zoneDefinitions[name]
+        local z = me[name]
         assert(z, "Missing configured zone: " .. name)
-        if category == "sead" and not me[name] then
-            assert(z.radiusMeters == me.SEAD_ZONE_PALMYRA.radius,
-                "Additional SEAD radius must match the existing ME area: " .. name)
-        end
-        local center = z.center or { x = z.x, y = z.y }
+        local center = { x = z.x, y = z.y }
         local distance = math.sqrt((center.x - origin.x)^2 + (center.y - origin.y)^2) / 1852
         if distance >= cfg.minDistanceNM and distance <= cfg.maxDistanceNM then found[#found + 1] = name end
     end
@@ -83,28 +91,31 @@ end
 assert(bases == 5 and slots >= 5, "All four airfields and carrier slots must be covered")
 print("PASS: actual .miz departure slots have 2-3 CAP/SEAD areas; every candidate accepts and spawns in simulation")
 
-local constructors = 0
-local cfg = { zoneDefinitions = { Extra = { center = { x = 1, y = 2 }, radiusMeters = 100 } } }
-local existing = circle("ME", { x = 9, y = 8 }, 100)
-local env = setmetatable({ Config = cfg,
-    ZONE = { FindByName = function(_, name) return name == "ME" and existing or nil end },
-    ZONE_RADIUS = { New = function(_, name, center, radius, unregistered)
-        assert(unregistered == true); constructors = constructors + 1
-        return circle(name, center, radius)
-    end } }, { __index = _G })
-local chunk = assert(loadfile("src/training_zones.lua")); setfenv(chunk, env)
-local zones = chunk()
-local extra = zones.Find("Extra")
-assert(zones.Find("Extra") == extra and constructors == 1 and not zones.Find("Missing"))
-cfg.zoneDefinitions.Extra.center.x = 999
-assert(extra:GetVec2().x == 1, "Runtime center must be a detached copy")
-cfg.zoneDefinitions.ME = { center = { x = 0, y = 0 }, radiusMeters = 10 }
-assert(zones.Find("ME") == existing and existing:GetVec2().x == 9 and constructors == 1)
-for _, invalid in ipairs({ { center = {}, radiusMeters = 1 },
-    { center = { x = math.huge, y = 0 }, radiusMeters = 1 },
-    { center = { x = 0, y = 0 }, radiusMeters = 0 },
-    { center = { x = 0, y = 0 }, radiusMeters = 0/0 } }) do
-    cfg.zoneDefinitions.Invalid = invalid
-    assert(not pcall(zones.Find, "Invalid"))
-end
-print("PASS: additional MOOSE circles are cached, unregistered and validated; ME circles stay unchanged")
+local s = scenario()
+local actual = {}
+for name, z in pairs(me) do actual[name] = circle(name, { x = z.x, y = z.y }, z.radius) end
+s.zones = actual
+s.player.airborne = true
+-- Missing migrated CAP zones must fail safely, rather than fabricate a Lua circle.
+local missing = s.zones.CAP_ZONE_CYPRUS_WEST
+s.zones.CAP_ZONE_CYPRUS_WEST = nil
+s:command("Task: CAP")
+assert(not s:mission() and #s.spawns == 0 and #s.errors == 1)
+s.zones.CAP_ZONE_CYPRUS_WEST = missing
+s:command("Task: CAP")
+local record = assert(s:mission(), "Missing ME zone must not leave an acceptance lock")
+assert(record.capPlan.zone == s.zones[record.capPlan.name], "CAP must use the existing ME object")
+s:command("Abort Mission")
+-- SEAD also needs an actual eligible ME zone; no runtime fallback may rescue it.
+s.zones = {}
+s:command("Task: SEAD")
+assert(not s:mission() and #s.spawns == 0 and #s.errors == 2)
+s.zones = actual
+s:command("Task: SEAD")
+record = assert(s:mission(), "Missing SEAD zones must not leave an acceptance lock")
+s:tick(s.time + 1)
+assert(record.state == "ACTIVE" and record.spawn.group.fromVec2 and #s.spawns == 1)
+assert(s.zones[record.plan.zoneName]:IsVec2InZone(record.plan.actualSpawnPoint))
+s:command("Abort Mission")
+assert(not s:mission())
+print("PASS: ME is the only zone source; missing zones fail safely and release locks for retry")

@@ -1,8 +1,8 @@
 # 訓練Zoneと出撃地点からの距離
 
-更新日: 2026-10-09 / training-7
+更新日: 2026-10-12 / training-8
 
-CAPは受注時の長機からZone中心まで40〜100 NM、SEADは40〜130 NMを含む候補から等確率で1つ選ぶ。CAPは9候補（既存ME4＋追加5）、SEADは10候補（既存ME4＋追加6）。機体位置を動的に使い、空港名による受注条件分岐は設けない。受注後の移動・長機交代で選び直さない。
+CAPは受注時の長機からZone中心まで40〜100 NM、SEADは40〜130 NMを含む候補から等確率で1つ選ぶ。CAPは9候補、SEADは10候補で、すべて実ミッションのME円形Zoneとして登録する。機体位置を動的に使い、空港名による受注条件分岐は設けない。受注後の移動・長機交代で選び直さない。
 
 ## 各出撃地点の候補
 
@@ -32,17 +32,17 @@ CAPは受注時の長機からZone中心まで40〜100 NM、SEADは40〜130 NM�
 | `SEAD_ZONE_SALAMIYAH` | N34°53.202′ E037°20.578′ | 約9.9 NM | ME |
 | `SEAD_ZONE_DUMAYR` | N33°33.074′ E037°04.271′ | 約9.9 NM | ME |
 | `SEAD_ZONE_TABQA` | N35°36.486′ E038°42.714′ | 約9.9 NM | ME |
-| `SEAD_ZONE_OSMANIYE` | N37°03.000′ E036°39.000′ | 約9.9 NM | Lua設定 |
-| `SEAD_ZONE_ISLAHIYE` | N36°57.835′ E036°43.708′ | 約9.9 NM | Lua設定 |
-| `SEAD_ZONE_KILIS` | N36°48.000′ E037°09.000′ | 約9.9 NM | Lua設定 |
-| `SEAD_ZONE_AKKAR` | N34°37.056′ E036°06.281′ | 約9.9 NM | Lua設定 |
-| `SEAD_ZONE_MORPHOU` | N35°15.725′ E033°09.183′ | 約9.9 NM | Lua設定 |
-| `SEAD_ZONE_NICOSIA_NORTH` | N35°11.604′ E033°24.210′ | 約9.9 NM | Lua設定 |
-| `CAP_ZONE_CYPRUS_WEST` | N33°57.000′ E032°06.000′ | 約9.9 NM | Lua設定 |
-| `CAP_ZONE_CYPRUS_EAST` | N34°30.000′ E033°57.000′ | 約9.9 NM | Lua設定 |
-| `CAP_ZONE_LEVANT_SOUTH` | N32°42.000′ E033°30.000′ | 約9.9 NM | Lua設定 |
-| `CAP_ZONE_ISKENDERUN` | N36°27.000′ E036°30.000′ | 約9.9 NM | Lua設定 |
-| `CAP_ZONE_OSMANIYE` | N37°00.000′ E036°39.000′ | 約9.9 NM | Lua設定 |
+| `SEAD_ZONE_OSMANIYE` | N37°03.000′ E036°39.000′ | 約9.9 NM | ME |
+| `SEAD_ZONE_ISLAHIYE` | N36°57.835′ E036°43.708′ | 約9.9 NM | ME |
+| `SEAD_ZONE_KILIS` | N36°48.000′ E037°09.000′ | 約9.9 NM | ME |
+| `SEAD_ZONE_AKKAR` | N34°37.056′ E036°06.281′ | 約9.9 NM | ME |
+| `SEAD_ZONE_MORPHOU` | N35°15.725′ E033°09.183′ | 約9.9 NM | ME |
+| `SEAD_ZONE_NICOSIA_NORTH` | N35°11.604′ E033°24.210′ | 約9.9 NM | ME |
+| `CAP_ZONE_CYPRUS_WEST` | N33°57.000′ E032°06.000′ | 約9.9 NM | ME |
+| `CAP_ZONE_CYPRUS_EAST` | N34°30.000′ E033°57.000′ | 約9.9 NM | ME |
+| `CAP_ZONE_LEVANT_SOUTH` | N32°42.000′ E033°30.000′ | 約9.9 NM | ME |
+| `CAP_ZONE_ISKENDERUN` | N36°27.000′ E036°30.000′ | 約9.9 NM | ME |
+| `CAP_ZONE_OSMANIYE` | N37°00.000′ E036°39.000′ | 約9.9 NM | ME |
 
 
 ## 調整後の追加SEAD中心（DCS Vec2）
@@ -58,17 +58,17 @@ CAPは受注時の長機からZone中心まで40〜100 NM、SEADは40〜130 NM�
 
 ## 定義と変更方法
 
-候補名・地域表示名・距離制限は `src/config.lua` の `cap` / `sead`、追加円形Zoneの中心・半径は `Config.zoneDefinitions` に置く。中心はSyriaのDCS Vec2メートル座標（x=北方向、y=東方向）。他マップへ移植するときはこの地図固有の定義を変更する。
+候補名・地域表示名・距離制限は `src/config.lua` の `cap` / `sead`、全Zoneの中心・半径は `mission/Persistent_and_Dynamic_FA-18C_Training.miz` のME Trigger Zoneを唯一の定義元とする。座標はSyriaのDCS Vec2メートル座標（x=北方向、y=東方向）。他マップへ移植するときはMEでZoneを配置し、Configの候補名を一致させる。
 
-`src/training_zones.lua` は同名の既存ME Zoneを優先し、なければ追加定義から `ZONE_RADIUS:New(name, center, radius, true)` を作る。追加円は非登録でモジュール内に保持し、受注・SEAD計画・生成時の検査で同じ参照を使う。MEのZoneを移動・改名・上書きせず、trigger設定やリソース対応表を変更しない。追加Zoneの描画・全体告知は行わない。
+CAP / SEADと配置診断はMOOSEの `ZONE:FindByName` でME Zoneを直接参照する。Config.zoneDefinitionsとtraining_zones.luaは削除し、Luaで代替円を生成しない。追加していた11円は2026-10-12のユーザー依頼で同じ座標・半径のままMEへ移し、名前・座標・半径はMEで確認・編集できる。初回移行では既存8円を維持し、zoneId 312〜322を重複なく追加した。
 
-Luaと既存埋め込みをSyncすれば反映でき、追加のME操作は不要。MEで同名Zoneを追加した場合はそちらが優先されるため、中心・半径変更後は距離の検証を再実行する。
+Zoneの追加・移動・半径変更はMEで行い、候補名・距離制限の変更はConfigで行う。MEで保存後、Test-ZoneCoverageを実行して候補の存在・円形・距離条件を再確認する。Luaを編集した場合は従来どおりSync/Checkする。ゲーム内反映には更新した.mizでミッションを再開始し、開いているMEではファイルを開き直す。
 
 ## 安全配置と確認範囲
 
 追加SEAD地域もLAND、全車両と地形確認点のZone内収容、200m内の高低差20m以内、障害物から200m以上、他Siteとの離隔を検査する。選んだZoneだけを最大50回試し、不合格なら安全に解除する。別Zoneへの変更や配置条件の緩和は行わない。候補数は中心距離の条件を示し、実地形の配置成功率はDCSで確認する。
 
-`scripts/Test-ZoneCoverage.ps1` は実際の.mizのmissionエントリを読み、すべてのBLUE Hornet Client駐機位置で両任務が2〜3候補になることを検証する。各出撃地点の全候補を本番bundleで受注し、CAP計画・SEADの計画からSpawn・中止・ロック解放まで模擬する。別確認グループでは追加円の非登録・参照再利用・ME優先・座標コピー・不正定義の拒否を確認する。Test-Allに含める。
+`scripts/Test-ZoneCoverage.ps1` は実際の.mizのmissionエントリを読み、すべてのBLUE Hornet Client駐機位置で両任務が2〜3候補になることを検証する。各出撃地点の全候補を本番bundleで受注し、CAP計画・SEADの計画からSpawn・中止・ロック解放まで模擬する。全19円のME登録・名前/ID重複なし・半径18,288 m・可視設定を確認する。別確認グループではME実体の直接参照、Zone欠落時にLuaで補完しないこと、安全な受注解除と復旧後の再受注を確認する。Test-Allに含める。
 
 2026-10-09、半径統一と中心調整後の全10地域・両SAM各50点で適合点を発見。変更しない地域の再検査結果と、変更した地域の最終再検査結果を合算した記録は適合352/1,000、観測エラー0。単一の全地域連続実行ではなく複数の実行の記録で、常時成功の保証とは分ける。実Spawn・交戦、追加CAP空域への到達・哨戒は未確認。手動確認はTESTINGのMAN-06 / MAN-52 / MAN-56を参照する。
 

@@ -1089,12 +1089,20 @@ local function placementDiagnostic(s)
         local chunk = assert(loadfile(path)); setfenv(chunk, s.env); return chunk()
     end
     s.env.Config = cfg
-    s.env.TrainingZones = loadModule("src/training_zones.lua")
+    -- The diagnostic needs all ten ME fixtures, independent of acceptance range.
+    local sample = s.zones[names[1]]
+    for index, name in ipairs(cfg.sead.zones) do
+        if not s.zones[name] then
+            s.zones[name] = { name = name, center = { x = index * 20000, y = 0 }, calls = 0, points = {},
+                GetRandomVec2 = sample.GetRandomVec2, GetVec2 = sample.GetVec2,
+                IsVec2InZone = sample.IsVec2InZone }
+        end
+    end
     s.env.SEADObjective = loadModule("src/sead_objective.lua")
     local sead = loadModule("src/sead.lua")
     local diagnostic = dofile("scripts/SEAD-PlacementCheck.lua")
     local output = {}
-    local results = diagnostic.Start(cfg, sead, s.env.TrainingZones, s.env.timer,
+    local results = diagnostic.Start(cfg, sead, s.env.ZONE, s.env.timer,
         function(text) output[#output + 1] = text end)
     for time = 1, 501 do s:tick(time) end
     assert(results.complete and #results.rows == 20 and #s.spawns == 0 and not s:mission())

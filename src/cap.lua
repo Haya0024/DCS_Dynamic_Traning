@@ -28,7 +28,7 @@ function CAP.Plan(playerPosition, time)
     for _, name in ipairs(cfg.zones) do
         assert(type(name) == "string" and name ~= "" and not seen[name], "Invalid/duplicate CAP zone.")
         seen[name] = true
-        local zone = assert(TrainingZones.Find(name), "CAP zone not found: " .. name)
+        local zone = assert(ZONE:FindByName(name), "CAP zone not found: " .. name)
         local center, radius = zone:GetVec2(), zone:GetRadius()
         assert(center and finite(center.x) and finite(center.y) and finite(radius) and radius > 0,
             "CAP requires a valid circular zone: " .. name)

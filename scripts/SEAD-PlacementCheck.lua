@@ -10,7 +10,7 @@ function PlacementCheck.Start(config, sead, zones, clock, log)
                 rejections = {}, firstSuccess = nil }
             results.rows[#results.rows + 1] = row
             local ok, job, zone = pcall(function()
-                local circle = assert(zones.Find(name), "Zone missing: " .. name)
+                local circle = assert(zones:FindByName(name), "Zone missing: " .. name)
                 local center = circle:GetVec2()
                 -- This isolated diagnostic config forces the requested pair.
                 -- A virtual acceptance position 60 NM away passes normal filtering.

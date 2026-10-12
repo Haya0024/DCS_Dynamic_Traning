@@ -23,7 +23,7 @@ if ($ZoneNames) {
     $selection = "local selected = { $literal }`nlocal known = {}`nfor _, name in ipairs(Config.sead.zones) do known[name] = true end`nfor _, name in ipairs(selected) do assert(known[name], 'Unknown diagnostic zone: ' .. name) end`nConfig.sead.zones = selected`n"
 }
 $entry = "-- Placement diagnostic only. Normal runtime and persistence are not initialized.`n" + $selection + "local PlacementCheck = (function()`n" + $controller + "`nend)()`n" + @'
-SEADPlacementCheckResults = PlacementCheck.Start(Config, SEAD, TrainingZones, timer, function(text)
+SEADPlacementCheckResults = PlacementCheck.Start(Config, SEAD, ZONE, timer, function(text)
     env.info("[SEADPlacementCheck] " .. text)
 end)
 '@

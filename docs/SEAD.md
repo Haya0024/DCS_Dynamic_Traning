@@ -1,6 +1,6 @@
 # SEAD 訓練ミッション仕様
 
-更新日: 2026-10-09
+更新日: 2026-10-12
 
 ## 今回の実装範囲
 
@@ -180,14 +180,14 @@ Site stateの残存判定はSEADエミッターの終端状態と別に監視す
 受注ごとに2候補から等確率で1つ選ぶ。ME の配置間隔・機体種類・兵装を継承する。
 テンプレートのグループ名はスクリプトや同期処理で変更しない。
 
-配置候補は10円形Zone。次の既存ME4 Zoneの半径は各18,288 m。
+配置候補はMEに登録した10円形Zoneで、半径はすべて18,288 m。次の4 Zoneを含む。
 
 - `SEAD_ZONE_PALMYRA`
 - `SEAD_ZONE_SALAMIYAH`
 - `SEAD_ZONE_DUMAYR`
 - `SEAD_ZONE_TABQA`
 
-追加は `SEAD_ZONE_OSMANIYE` / `SEAD_ZONE_ISLAHIYE` / `SEAD_ZONE_KILIS` / `SEAD_ZONE_MORPHOU` / `SEAD_ZONE_NICOSIA_NORTH` / `SEAD_ZONE_AKKAR` の6円、各半径18,288 m（約9.9 NM、既存ME4地域と同じ）。中心・半径はConfig.zoneDefinitionsに置き、training_zones.luaで非登録のMOOSE ZONE_RADIUSとして保持する。既存ME Zoneを優先し、MEの設定・名前・位置をLuaから変更しない。受注時の40〜130 NM判定、選定後の50回検査、安全配置条件は同じ。
+追加は `SEAD_ZONE_OSMANIYE` / `SEAD_ZONE_ISLAHIYE` / `SEAD_ZONE_KILIS` / `SEAD_ZONE_MORPHOU` / `SEAD_ZONE_NICOSIA_NORTH` / `SEAD_ZONE_AKKAR` の6円、各半径18,288 m（約9.9 NM、既存ME4地域と同じ）。中心・半径はすべてME Trigger Zoneに置き、MOOSEのZONE:FindByNameで直接取得する。2026-10-12に追加6円を座標・半径不変でMEへ移行し、Luaの代替定義を削除した。受注時の40〜130 NM判定、選定後の50回検査、安全配置条件は同じ。
 全候補の座標と各出撃地点からの2〜3候補は [TRAINING_AREAS.md](TRAINING_AREAS.md)。実ミッションの全Client駐機位置と各地点の全候補の計画・生成・解除をTest-ZoneCoverageで模擬検証済み。新地域を含む全10地域の配置条件は2026-10-09に実DCSで両SAM各50点を検査。全追加SEAD円をMEと同じ18,288 mへ拡大し、Islahiye / Akkar / Morphou / Nicosiaの中心を調整。調整後の全10地域・両SAM各50点で適合点を発見し、観測エラー0。詳細はSEAD_PLACEMENT_CHECKを参照。実Spawn・交戦は確認待ち。
 
 名前と判定値は [src/config.lua](../src/config.lua) の `sead` に集約する。

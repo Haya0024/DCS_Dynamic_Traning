@@ -285,10 +285,11 @@ test("MOOSE weak subscribers survive garbage collection after Intercept and resp
             log:find("objectID=UNAVAILABLE; subscriberRetained=true", 1, true) then received = true end
         if log:find(r.id, 1, true) and log:find("Failure event matched: event=Ejection", 1, true) and
             log:find("objectID=50000; state=ACTIVE; done=false", 1, true) then matched = true end
-        if log:find("Runtime initialized; version=training-7;", 1, true) then initialized = initialized + 1 end
+        if log:find("Runtime initialized; version=training-8;", 1, true) then initialized = initialized + 1 end
     end
     assert(registered and received and matched and initialized == 1)
     s.player.alive = true; s.player.id = 50001; s.player:newDCSObject()
+    s.player.position = { x = 100, y = 200, z = 300 } -- Respawn at the departure point.
     s.players = { s.player.raw }; advance(s, 2)
     s:score(90); s:lastMessageContains("Settled Missions: 2"); s:lastMessageContains("Death Count: 2")
     s:categoryScores({ interceptScore = 90, capScore = 0 })

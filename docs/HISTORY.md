@@ -2,6 +2,22 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-12 空港・空母ニーボードを同梱
+
+BLUEの4空港の座標・ATC VHF/UHF・TACAN・VORと、CVN-71の無線・TACAN・ICLSを別表にしたPNGを実.mizの `KNEEBOARD/IMAGES/01_BLUE_AIRFIELDS_AND_CARRIER_SYRIA.png` へ追加。ユーザーがMEで変更した空母74Xの識別コードCVNを確認し、画像もCVNへ更新した。空母座標・LINK 4・下部説明文は掲載しない。
+
+追加前の実.mizを `.miz.kneeboard.bak` に保存し、既存8 ZIPエントリの内容不変、追加画像と編集元PNGの一致、ZIP CRC正常を確認。Sync-Mission -Check成功。DCS内の実表示は確認待ち。画像は静的なため、MEの航法設定を変更した際は編集元と同梱版を更新する。
+
+## 2026-10-12 CAP / SEAD ZoneをMEへ統一（training-8）
+
+ユーザーからLua追加ゾーンもMEへ反映し、二通りの定義をなくす依頼を受けた。CAP5＋SEAD6の計11円を既存と同じ名前・中心・半径18,288 mで実.mizのTrigger Zoneへ追加し、zoneId 312〜322を割り当てた。CAP9 / SEAD10の全19円をMEで管理し、Configは候補名・地域表示名・距離条件だけを持つ。CAP / SEAD / 配置診断はZONE:FindByNameで直接取得し、Config.zoneDefinitionsとtraining_zones.luaを削除した。
+
+移行直前のユーザー保存済み.mizを `.miz.zones-migration.bak` として保存。既存8円の全項目、AWACSの燃料無限先頭、空母の往復・TACAN/ICLS/Link4、スロット・テンプレート・トリガー動作・その他のmissionフィールドを維持した。Sync後のZIP比較でも、Zone追加を含むmissionと既存DynamicTraining.lua以外の内容不変を確認した。HEADとの差分に含まれるユーザーのME変更も巻き戻していない。
+
+全356 Luaケース、BUILD2、SYNC3、INSTALL5、ZONES2が通過し、実ミッションSync/Check成功。全出撃ClientでCAP / SEAD各2〜3候補を維持。ZONESの第2確認グループは旧Lua代替円の検証をME実体の参照・Zone欠落時解除・復旧後再受注へ置換した。最初のCAP-31実行では死亡後の再搭乗が旧CAP位置のままで次の任務を受けられず失敗したため、fixtureを出撃地点へ戻す実際の再搭乗条件へ修正し、GC・イベント受信の期待値は維持した。失敗記録はbuild/zone-migration-test-failure.log。
+
+全19円の移行前後の幾何一致を確認し、2026-10-09の地形標本は同じ範囲の実測として残す。今回の移行後に実DCSで再抽選・Spawn・交戦した記録ではない。地域指定の配置診断ミッションはビルド確認済み。ME表示確認にはファイルを開き直し、サーバー反映には更新した.mizでミッションを再開始する。Hook更新は不要。
+
 ## 2026-10-09 追加SEAD半径の統一と配置中心の改善（training-7）
 
 追加6地域を先にMEと同じ半径18,288 mへ拡大し、全20組合せ各50点を実DCSで再検査した。中心不変では適合310/1,000・観測エラー0。適合点の少ないIslahiye / Akkar / Morphou / Nicosiaは診断座標を根拠に中心を調整し、同じLAND・高低差・障害物条件で再検査した。最終位置のSA-6/SA-8はIslahiye10/12、Akkar14/10、Morphou7/7、Nicosia6/9（各50点）。全10地域・両SAMの最終設定に一致する複数実行を合算した結果は適合352/1,000・観測エラー0。単一の1,000点連続実行とは区別する。

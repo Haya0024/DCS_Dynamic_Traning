@@ -131,3 +131,8 @@ Islahiye / Akkar / Morphou / Nicosiaの中心を変更し、半径18,288 mを維
 集計CSVはbuild/SEAD_Placement_Results_Final.csv。source_run列は、Expanded / Relocated1 / Relocated2 / FinalNicosiaの各CSVを指す。対応する診断ログはbuild/SEAD_Placement_Check_Expanded.log、_Relocated1.log、_Relocated2.log、_FinalNicosia.log。各実行のmetadataとhashも同じbuildに保存する。中間位置の不採用結果をCSVに残し、最終集計に混ぜない。
 
 全356 Luaケース、BUILD2、SYNC3、INSTALL5、ZONES2が通過。通常ミッションをSync/Checkし、backupとの比較で既存DynamicTraining.lua以外のZIP内容が不変であることを確認した。検査用DCSは完了後に終了。通常Config、Hook、実成績は変更していない。実SAMのSpawn・交戦・描画は引き続き確認待ち。
+
+
+## 2026-10-12 ME Zoneへの統一（training-8）
+
+ユーザー依頼でLua追加円をME Trigger Zoneへ移し、配置診断も通常任務もZONE:FindByNameで同じME円を使う。Config.zoneDefinitionsとtraining_zones.luaは削除。移行前後で全19円の中心・半径・名前が一致することを検証するため、上記2026-10-09の地形標本は同じ範囲を検査した記録として維持する。移行後に再抽選した実測値とは扱わない。

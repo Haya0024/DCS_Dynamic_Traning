@@ -137,7 +137,7 @@ BLUE 空港への RTB を追加評価対象とする。
 ## SEAD 訓練ミッション（実装済み・ゲーム内確認待ち）
 
 - `TPL_SEAD_SA6`（レーダー＋発射機3両）と `TPL_SEAD_SA8`（1両）を等確率で選ぶ。
-- Zoneは既存ME4＋追加6の計10候補。追加はOSMANIYE / ISLAHIYE / KILIS / MORPHOU / NICOSIA_NORTH / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、追加円の中心・半径はConfig.zoneDefinitions。追加6地域の半径は既存MEと同じ18,288 m（約9.9 NM）。
+- ZoneはすべてMEに登録した計10候補。追加はOSMANIYE / ISLAHIYE / KILIS / MORPHOU / NICOSIA_NORTH / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、全円の中心・半径は実.mizのME Trigger Zoneだけに置く。Luaの代替定義は持たない。追加6地域の半径は既存MEと同じ18,288 m（約9.9 NM）。
 - `Task: SEAD` の受注時に TOO / PB を等確率で抽選し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
 - 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
 - TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。
@@ -364,7 +364,7 @@ CAS: 720
 
 ## CAP 訓練任務（実装済み・DCS内確認待ち）
 
-- `src/config.lua` のcap.zonesにある9円形Zone（既存ME4＋追加5）から、受注時の長機位置から中心まで40〜100 NMの候補を等確率で1つ固定する。4出撃空港と空母の初期位置で両任務とも2〜3候補を確保。追加円はtraining_zones.luaが非登録MOOSE ZONE_RADIUSとして保持し、ME Zoneを変更しない。候補なしは通常通知20秒・採点なしでロックを解除する。受注時に `CAP AREA: <中心DDM>`（分の小数3桁）を案内する。半径・PATROL CENTER行は表示せず、進入通知は `CAP on station.` のみ。
+- `src/config.lua` のcap.zonesにあるMEに登録した9円形Zoneから、受注時の長機位置から中心まで40〜100 NMの候補を等確率で1つ固定する。4出撃空港と空母の初期位置で両任務とも2〜3候補を確保。全円の中心・半径はMEに置き、ZONE:FindByNameで直接参照する。候補なしは通常通知20秒・採点なしでロックを解除する。受注時に `CAP AREA: <中心DDM>`（分の小数3桁）を案内する。半径・PATROL CENTER行は表示せず、進入通知は `CAP on station.` のみ。
 - 未精算・操作中・空中の登録参加者の誰かがZone内なら120秒を積算する。全員Zone外/観測不能なら停止、再進入で再開。AI・途中参加者・個人中止者は数えない。
 - 20/40/60/80/100%を各1回通知。120秒と今回の敵全滅の両方でPrimary達成。100%でも敵が残ればACTIVE。
 - 同じ累計時間30〜120秒から出現時刻を受注時に固定し、Config.intercept.templatesの3候補を暫定使用して1編隊だけ生成する。Zone外周から15〜25NM、15,000〜30,000ft、230m/sで空域へ進入・哨戒する。DT_CAP_<assignmentID>で他任務の敵と分離する。
@@ -435,7 +435,7 @@ Dynamic Training
 - 同一ミッションを二重生成しない
 - Debug 用メッセージを明確にする
 - エラー時にはゲームを止めず、可能な限りログと画面表示を残す
-- `.miz` のミッション設定・トリガー・リソース対応表を直接編集しない。例外として、登録済みの埋め込み Lua は `scripts/Sync-Mission.ps1` による同期を許可する
+- `.miz` のミッション設定・トリガー・リソース対応表を直接編集しない。例外として、登録済みの埋め込み Lua は `scripts/Sync-Mission.ps1` による同期を許可する。2026-10-12のユーザー明示依頼による移行では、Lua定義のCAP5＋SEAD6円を同じ名前・中心・半径でME Trigger Zoneへ登録する変更だけを許可し、既存Zone・機体・経路・トリガー動作・リソース対応表を維持する
 - Mission Editor で設定したテンプレート名を勝手に変更しない
 - MOOSE の API を優先して使用する
 - DCS 標準 Lua API と MOOSE API を混在させる場合は理由をコメントする
@@ -449,7 +449,7 @@ Dynamic Training
 - `src/main.lua`: 実行入口、初期化・F10・状態遷移・イベント・タイマーの調整。埋め込みとbundleの名前は`DynamicTraining.lua`。
 - `src/config.lua`: 設定。各任務の満額は `intercept/cap/sead/dead.fullReward`。
 - `src/player.lua` / `missions.lua`: 搭乗者識別と任務台帳・Wing/UCIDロック。
-- `src/training_zones.lua`: 既存ME Zoneと追加設定円の参照・再利用。座標・候補数はdocs/TRAINING_AREAS.md。
+- CAP / SEADのZoneは実.mizのME Trigger Zoneに統一し、各任務のZONE:FindByNameで参照する。座標・候補数はdocs/TRAINING_AREAS.md。
 - `src/intercept.lua` / `cap.lua` / `air_targets.lua`: 航空任務と共通の敵機観測。
 - `src/sead.lua` / `sead_objective.lua` / `sead_sites.lua` / `dead.lua`: 配置・レーダーFSM・Site寿命・継続攻撃。
 - `src/recovery.lua` / `scoring.lua` / `score_data.lua` / `persistence.lua`: 帰還・採点・schema・ミッション側保存bridge。

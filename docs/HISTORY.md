@@ -2,6 +2,18 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-13 Continue直後の通知にも実配置座標を追加
+
+追加依頼で、Continue as DEADの開始通知末尾へSITE LOCATIONと正確なSite座標を追加。従来の開始・指示・残数・報酬の5行は維持し、DDM・分の小数3桁で1回表示する。座標表示時間は共通のcoordinateBriefingSeconds（初期60秒）へ変更。座標取得・整形は移行前に行い、失敗時は元SEADの帰還評価と採点・Site状態を維持する。Continue前・Preserveのみの秘匿と手動Statusの表示は維持する。
+
+DEAD-08でTOO/PB両経路の通知本文・座標・90秒設定・自動再掲なしを確認し、DEAD-75で座標API失敗時の移行拒否とSEAD150の帰還精算を検証。Lua全356ケースとBUILD2・SYNC3・INSTALL5・ZONES2が通過。実.mizをSync/Checkし、登録済みDynamicTraining.lua以外のZIP内容とニーボードが不変、ZIP CRC正常を確認。DCS内の実表示は確認待ち。
+
+## 2026-10-13 Immediate DEADの実配置座標表示
+
+ユーザー依頼で、Continue as DEAD後のMission Statusへ既存のDEADブリーフィングを追加。Follow-onと同じSite実配置基準点をSITE LOCATIONとしてDDM・分の小数3桁で表示し、DEAD達成後の帰還待ちでも維持する。車両ごとの座標ではない。元SEADの推定点は変更せず、Continue前・Preserveのみでは実配置点を秘匿する。Continueの自動通知へ座標は追加しない。
+
+DEAD-08をTOO/PBの両方式へ拡張し、移行前と保持時の秘匿、移行後と達成後の正確な座標・SAM種類、DDM精度・90秒の設定反映、元計画・損傷・発信状態の維持、再Spawn・再抽選なしを検証。Lua全356ケースとBUILD2・SYNC3・INSTALL5・ZONES2が通過。実.mizを同期し、登録済みDynamicTraining.luaだけの変更、ニーボードとME設定の不変、Sync/Check・ZIP CRCを確認した。DCS内の表示は確認待ち。
+
 ## 2026-10-13 origin/mainとのマージ競合解消
 
 ローカル `4cc137a`（Add Tankers and delete AI2）とリモート `46cd17d`（Fix log）のマージで、main.lua・MESSAGES・TESTING・実.mizが競合した。テキストはCRLF/LFの差を除いて比較し、ローカルのタイトルだけのIntercept開始通知とSOLO/MP2の説明を維持しながら、リモートの敵削除待ち・再試行時の画面ERRORを出さない変更を統合した。INT-19/22の画面非表示検証も維持する。

@@ -400,7 +400,7 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | DEAD-05 | Preserveのcallbackを複数回実行、RTB | 時刻・状態不変、同じ損傷GroupをRETAIN、元任務終了で使用予約だけ解除し保持元Wingの予約は維持 |
 | DEAD-06 | 未完了SEADや未PreserveのSiteに別WingからTask: DEAD | 候補にならず、元SEADを変更しない |
 | DEAD-07 | MP2でPreserve後、片方だけ精算、別Wingが取得を試す | 元全員終了前後とも別Wingを拒否。終了後は保持元Wingのみ取得可能 |
-| DEAD-08 | 即DEADへ継続、Spawn/乱数APIを拒否するfixture | 同record・ID・Group・計画・Life・Radarを維持、再Acquire・再Spawn・再抽選なし |
+| DEAD-08 | TOO/PBから即DEADへ継続、Spawn/乱数とDMS APIを拒否、座標表示を90秒に設定 | 同record・ID・Group・計画・Life・Radarを維持、再Acquire・再Spawn・再抽選なし。Continue前・Preserveのみでは実配置点を秘匿、Continue通知に正確なSite DDMを90秒・1回表示。Continue後とDEAD達成後のStatusは同じ座標・SAM種類と元SEAD推定点を90秒表示 |
 | DEAD-09 | SEADでレーダーと1発射機を破壊後Continue | 生存2両だけsnapshot、全対象破壊でRTBへ、SEAD150＋DEAD150 |
 | DEAD-10 | Immediateの全対象をイベントなしで喪失 | pollingでDEAD達成、SEAD結果を固定、SiteはCLEANUP |
 | DEAD-11 | Immediate途中に5種の事故、重複通知 | SEAD90を一度だけ付与、IN_USEをCleanup、DEAD Scoreは0 |
@@ -467,7 +467,7 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | DEAD-72 | DEAD達成後に、達成前の時刻を持つ事故イベントが届く | SEAD90／DEAD0、SEAD達成時刻とDEAD達成時刻を分離 |
 | DEAD-73 | UCID未照合でImmediate両目標達成・RTB | 両精算は非採点・0、仮アカウントを作らずCleanup |
 | DEAD-74 | Immediate両目標達成後に任意Abort | SEAD0＋DEAD0、任務1、両精算結果ABORT、Cleanup |
-| DEAD-75 | Continue時の満額が負数/無限/NaN/小数/文字列 | 移行前に拒否、元SEADのRTB・150・Cleanupを維持、DEAD採点なし |
+| DEAD-75 | Continue時の満額が負数/無限/NaN/小数/文字列、または座標APIが例外 | 移行前に拒否、元SEADのRTB・150・Cleanupを維持、DEAD採点なし |
 | DEAD-76 | 追加DEADの満額101を60%精算、競合結果で再精算、追加Abort | 60へ切り捨て、一度だけ累計更新、元任務統計を増やさない |
 | DEAD-77 | 保持Siteの全残存車両のIsAliveがnil、受注を試みた後trueへ回復 | Site状態・Groupを保持、残数不明・観測不能・DEAD候補除外、ログ1回。正常化後に同Siteを取得・精算可能 |
 | DEAD-78 | 両DEAD経路の最後の対象がnilを3tick、trueへ回復、falseで喪失 | 未達成・lost=falseを維持、Site残数不明、DEAD観測不能ログ1回。trueで不明解除、falseで達成・帰還300 |
@@ -625,7 +625,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-22 | Hook導入下で複数任務を精算、保存済み表示を確認してミッション・DCSを再開始 | 同じUCIDのTotal/Career・カテゴリ別Score・任務／帰還／死亡統計を復元する。別UCIDの成績は混ざらない |
 | MAN-23 | 最後の参加者が精算・中止し、残存SAMと次の受注を確認 | 残存Groupが削除され、次の受注が可能。完了時点では削除されない |
 | MAN-24 | SA-6レーダーだけ破壊・Suppress、別試行でSA-8を全滅 | 残存がある場合だけContinue/Preserve。SA-8全滅では選択肢なし |
-| MAN-25 | SEADからContinueし、損傷・発信状態と車両を確認、残存全滅してRTB | 同じGroupを使用、SEAD150＋DEAD150、合計300、任務1件 |
+| MAN-25 | SEADからContinueし、開始通知・Status座標・損傷・発信状態と車両を確認、残存全滅してRTB | 同じGroupを使用、Continue直後に実配置点のSITE LOCATIONを1回表示、Continue後と達成後のStatusでも確認可能（DDM・分の小数3桁、初期60秒）、SEAD150＋DEAD150、合計300、任務1件 |
 | MAN-26 | Immediate途中に事故、別試行で両目標達成後事故、全体Abort | 未達成事故SEAD90／DEAD0、達成後事故各90、Abort両方0、全員終了でCleanup |
 | MAN-27 | Preserve、全員RTB・再武装、地上でTask: DEAD、全員離陸 | 同じSiteが残り、新IDで予約。ARMED中もSAMは存在、全員離陸でACTIVE、20秒待ちなし |
 | MAN-28 | Follow-on DEADの開始・Status座標確認、全残存対象破壊後RTB、別試行で事故/Abort | SITE LOCATIONは実配置点のDDM・分の小数3桁で初期60秒表示。DEAD150/90/0、SEAD Scoreを変えない、全員終了後Cleanup |
@@ -673,7 +673,7 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | Interceptの配置・編隊・テンプレート | INT | WING/PARで共有・独立性、MAN-02〜04 |
 | CAPの空域・時計・敵・達成 | CAP全34件、ZONES2 | MAN-52〜56、INT/WING/PAR回帰、全候補のME登録、テンプレート確認 |
 | SEAD計画・Zone・地形・情報表示 | SEAD | MAN-05〜08、MEの実設定とfixtureの整合 |
-| 座標表示時間・開始通知 | INT-16 / SEAD-62 / DEAD-16/17 | MAN-02/07/08/28、SEADの計画ブリーフィングと座標付きStatusが初期60秒で表示されること |
+| 座標表示時間・開始通知 | INT-16 / SEAD-62 / DEAD-08/16/17 | MAN-02/07/08/25/28、SEADの計画ブリーフィングと座標付きStatusが初期60秒で表示されること |
 | SEADの状態機械・Life/Radar | SEAD-45〜59 | MAN-09〜14 |
 | サイト管理・Cleanup | SEAD-57〜61 / DEAD-53〜62 | MAN-18/20/23/35〜37 |
 | DEAD対象・phase・保持・予約 | DEAD | MAN-24〜34、SEAD-45〜61の回帰 |

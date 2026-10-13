@@ -132,7 +132,7 @@ Return to base and rearm.
 Site will be cleaned when the keeper disconnects.
 ```
 
-### Continue as DEAD — 20 seconds, once
+### Continue as DEAD — 60 seconds, once
 
 ```text
 Immediate DEAD started.
@@ -140,7 +140,11 @@ Destroy all remaining SAM site vehicles.
 Remaining targets: 3
 Additional DEAD reward per pilot: 150 points.
 SEAD reward also retained.
+SITE LOCATION:
+LL DDM 034° 40.000'N   037° 55.000'E
 ```
+
+Uses `coordinateBriefingSeconds` (default 60). SITE LOCATION is the exact site placement reference, also available in Mission Status.
 
 ### Immediate DEAD complete — 20 seconds, once
 
@@ -358,6 +362,13 @@ THREAT AREA: LL DDM 034° 39.420'N   037° 57.180'E
 TARGET TYPE: UNKNOWN
 SEAD Primary result: DESTROYED
 Emitter state: DESTROYED
+DEAD MISSION
+AREA: Palmyra
+TARGET SITE: SA-6
+STATUS: Primary radar destroyed
+OBJECTIVE: Destroy all remaining SAM site vehicles.
+SITE LOCATION:
+LL DDM 034° 40.000'N   037° 55.000'E
 Site state: SUPPRESSED
 Site remaining vehicles: 3
 Site disposition: IN USE
@@ -368,7 +379,7 @@ Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: DEAD_ACTIVE
 DEAD objective: INCOMPLETE
 ```
 
-After Immediate DEAD completion the assignment remains SEAD and shows `SEAD: RTB_PENDING`, `DEAD objective: COMPLETE` and the original SEAD briefing.
+After Immediate DEAD completion the assignment remains SEAD and shows `SEAD: RTB_PENDING`, `DEAD objective: COMPLETE`, the original SEAD briefing and the exact DEAD site location. The DEAD section appears only after Continue as DEAD; preserving the site alone keeps SEAD information restrictions. SITE LOCATION is the site's placement reference, not individual vehicle coordinates. Continue's automatic notification also includes SITE LOCATION once.
 
 ### Follow-on DEAD ACTIVE — 60 seconds
 

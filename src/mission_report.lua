@@ -44,6 +44,7 @@ function MissionReport.Status(records, time)
             if record.state == "PLANNING" then
                 text = text .. "\nSite checks: " .. record.selection.totalAttempts
             end
+            if record.deadTargets then text = text .. "\n" .. DEAD.Briefing(record.site) end
         end
         if record.category == "CAP" then text = text .. "\n" .. CAP.Status(record.capPlan, record.spawn) end
         if record.site then

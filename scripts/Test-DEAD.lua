@@ -131,18 +131,46 @@ test("a preserved site stays reserved until every original SEAD participant fini
 end)
 
 test("immediate DEAD uses the same record, ID, group, plan, life and radar without spawn or draws", function()
-    local s, r, site, g = ready(1, true)
-    local id, assignment, plan, draws = r.id, r.assignmentID, r.plan, #s.randomCalls
-    s.env.SPAWN.NewWithAlias = function() error("DEAD must not spawn") end
-    s.env.math.random = function() error("DEAD must not draw") end
-    s:command("Continue as DEAD")
-    assert(s:mission() == r and r.id == id and r.assignmentID == assignment and r.category == "SEAD")
-    assert(r.spawn.group == g and r.plan == plan and site.spawn == r.spawn and #s.spawns == 1)
-    assert(#s.randomCalls == draws and g.units[1].life == 99 and not g.units[1].radarEmitting)
-    assert(r.primaryResult == "SUPPRESSED" and r.primaryCompletedAt and r.deadStartedAt)
-    assert(r.state == "DEAD_ACTIVE" and not has(s, "Continue as DEAD") and not has(s, "Preserve Site for DEAD"))
-    s:command("Mission Status"); s:lastMessageContains("SEAD: COMPLETE\nFollow-on: DEAD ACTIVE")
-    s:lastMessageContains("Remaining targets: 4"); s:assertClean()
+    for _, mode in ipairs({ "TOO", "PB" }) do
+        local s = setup()
+        module(s, "Config").sead.modes = { mode, mode == "TOO" and "PB" or "TOO" }
+        module(s, "Config").coordinateBriefingSeconds = 90
+        s.env.COORDINATE.ToStringLLDMS = function() error("Immediate DEAD must display DDM") end
+        local r = begin(s, 1); primary(s, r, true)
+        local site, g = r.site, r.spawn.group
+        local location = s.env.COORDINATE:NewFromVec2(r.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
+        local estimate = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
+        assert(location ~= estimate and r.plan.attackMode == mode)
+        s:command("Mission Status"); s:lastMessageContains(estimate)
+        assert(not string.find(s.messages[#s.messages].text, location, 1, true))
+        s:command("Preserve Site for DEAD"); s:command("Mission Status")
+        assert(not string.find(s.messages[#s.messages].text, "SITE LOCATION", 1, true))
+        local id, assignment, plan, draws = r.id, r.assignmentID, r.plan, #s.randomCalls
+        s.env.SPAWN.NewWithAlias = function() error("DEAD must not spawn") end
+        s.env.math.random = function() error("DEAD must not draw") end
+        s:command("Continue as DEAD")
+        local started = s.messages[#s.messages]
+        assert(started.text == "Immediate DEAD started.\nDestroy all remaining SAM site vehicles.\nRemaining targets: 4\n" ..
+            "Additional DEAD reward per pilot: 150 points.\nSEAD reward also retained.\nSITE LOCATION:\n" .. location)
+        assert(started.seconds == 90)
+        s:tick(s.time + 1)
+        assert(s.messages[#s.messages] == started, "Immediate DEAD acceptance must not repeat")
+        assert(s:mission() == r and r.id == id and r.assignmentID == assignment and r.category == "SEAD")
+        assert(r.spawn.group == g and r.plan == plan and site.spawn == r.spawn and #s.spawns == 1)
+        assert(#s.randomCalls == draws and g.units[1].life == 99 and not g.units[1].radarEmitting)
+        assert(r.primaryResult == "SUPPRESSED" and r.primaryCompletedAt and r.deadStartedAt)
+        assert(r.state == "DEAD_ACTIVE" and not has(s, "Continue as DEAD") and not has(s, "Preserve Site for DEAD"))
+        s:command("Mission Status"); s:lastMessageContains("SEAD: COMPLETE\nFollow-on: DEAD ACTIVE")
+        s:lastMessageContains("Remaining targets: 4")
+        s:lastMessageContains("SITE LOCATION:\n" .. location); s:lastMessageContains("TARGET SITE: SA-6")
+        s:lastMessageContains(estimate)
+        assert(s.messages[#s.messages].seconds == 90 and not string.find(s.messages[#s.messages].text, g.name, 1, true))
+        finish(s, r); s:command("Mission Status")
+        s:lastMessageContains("SEAD: RTB_PENDING"); s:lastMessageContains("DEAD objective: COMPLETE")
+        s:lastMessageContains("SITE LOCATION:\n" .. location)
+        assert(s.messages[#s.messages].seconds == 90)
+        s:assertClean()
+    end
 end)
 
 test("immediate target snapshot excludes vehicles already destroyed during SEAD", function()
@@ -895,10 +923,13 @@ test("Immediate DEAD voluntary Abort after both objectives pays neither and coun
     assert(r.site.cleaned); s:assertClean()
 end)
 
-test("invalid Immediate DEAD reward leaves SEAD recovery and site disposition intact", function()
-    for _, reward in ipairs({ -1, math.huge, 0/0, 1.5, "150" }) do
+test("Immediate DEAD reward or coordinate preparation failure leaves SEAD recovery and site disposition intact", function()
+    for _, reward in ipairs({ -1, math.huge, 0/0, 1.5, "150", "coordinate failure" }) do
         local s, r, site = ready(1, false); local config = module(s, "Config")
-        config.dead.fullReward = reward; s:command("Continue as DEAD")
+        if reward == "coordinate failure" then
+            s.env.COORDINATE.ToStringLLDDM = function() error("Injected Immediate DEAD coordinate failure") end
+        else config.dead.fullReward = reward end
+        s:command("Continue as DEAD")
         assert(r.state == "RTB_PENDING" and not r.deadScoringID and not r.deadStartedAt)
         assert(not r.participants[1].deadScoring and site.disposition == "CLEANUP" and #s.errors == 1)
         recover(s); s:score(150); s:categoryScores({ deadScore = 0 }); assert(site.cleaned)

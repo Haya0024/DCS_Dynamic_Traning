@@ -180,7 +180,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - Follow-on DEADの表示もSEAD型とし、短い受注通知10秒→受注時座標ブリーフィング60秒設定を1回→座標なし開始通知25秒にする。地上からの離陸後に座標を自動再掲しない。予約待ち・開始時の残数等はDEBUGに残し、Mission Statusで座標・残数を任意確認できる。
 - DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
 - Site/DEAD対象のIsAliveはtrue=生存、false=死亡、nil=観測不能とする。未確認対象のnil・例外・不正値・ID不一致を全滅根拠にせず、Site残数は不明・継続候補から除外、DEADは残存側に数える。観測不能ログは移行時だけ記録する。明示死亡のlostを優先し、Group一覧欠落だけでも既知対象を全滅扱いしない。
-- Follow-on DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Estimated表現は使わず、SEAD TOO/PBの推定点と秘匿表示は維持する。
+- DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Follow-onは受注時とMission Status、ImmediateはContinue直後の通知とMission Status（達成後の帰還待ちも含む）で表示する。Continue通知はcoordinateBriefingSeconds（初期60秒）で1回。座標は移行前に取得・整形し、失敗時は元SEADの帰還評価を維持する。車両ごとの座標ではなくSiteの配置基準点とする。元SEADの推定点は変更せず、Continue前・PreserveのみではTOO/PBの秘匿を維持する。
 - 保持元Wingの `Release Site Reservation` で専用予約を明示解除したSiteだけAVAILABLEへ移し、他WingのTask: DEAD候補にする。元SEAD全員終了までは使用予約を維持し、受注・精算・Wing/UCIDロックを変更しない。複数保持Siteは地域名付きの個別解除メニューにする。古いcallbackはSite・Wing・操縦者を再照合する。
 - AVAILABLEで使用中assignmentがない状態を `unreservedSince` から連続計測し、`dead.unreservedSiteCleanupSeconds = 1800`（ミッション時刻30分）でCleanupする。RETAIN専用予約中・IN_USE（地上ARMED含む）は計測しない。準備失敗のrollbackは元の開始時刻を復元し、期限を延長しない。候補選定・使用予約時にも期限を確認する。AVAILABLEは元保持者の切断Cleanup対象外。観測不能を全滅とは扱わないが未予約timeoutは適用し、削除失敗はSweepで再試行する。
 - 全員終了時にIN_USEならCLEANUPへ倒す。明示保持・開放済みSite以外はCleanupが標準。専用保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。

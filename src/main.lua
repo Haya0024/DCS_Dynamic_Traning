@@ -393,8 +393,9 @@ local function FollowOn(groupName, record, preserve)
         end
         return
     end
-    -- Snapshot before changing phase: an API failure leaves SEAD recovery intact.
+    -- Prepare targets and coordinates before changing phase: an API failure leaves SEAD recovery intact.
     local targets = DEAD.Snapshot(site)
+    local location = DEAD.SiteLocation(site)
     local reward = Config.dead.fullReward
     assert(type(reward) == "number" and reward >= 0 and reward < math.huge and reward == math.floor(reward),
         "Invalid DEAD reward")
@@ -410,7 +411,8 @@ local function FollowOn(groupName, record, preserve)
         end
     end
     Message(group, "Immediate DEAD started.\nDestroy all remaining SAM site vehicles.\nRemaining targets: " ..
-        #targets .. string.format("\nAdditional DEAD reward per pilot: %d points.\nSEAD reward also retained.", reward), 20)
+        #targets .. string.format("\nAdditional DEAD reward per pilot: %d points.\nSEAD reward also retained.", reward) ..
+        "\nSITE LOCATION:\n" .. location, Config.coordinateBriefingSeconds)
     Log(record.id .. " continued as DEAD using original site")
 end
 

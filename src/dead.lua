@@ -64,8 +64,12 @@ function DEAD.RecordLoss(record, event)
     return true
 end
 
+function DEAD.SiteLocation(site)
+    return COORDINATE:NewFromVec2(Point(site)):ToStringLLDDM({ LL_Accuracy = 3 })
+end
+
 function DEAD.Briefing(site)
-    local location = COORDINATE:NewFromVec2(Point(site)):ToStringLLDDM({ LL_Accuracy = 3 })
+    local location = DEAD.SiteLocation(site)
     local status = site.primaryResult == "DESTROYED" and "Primary radar destroyed" or "Previously suppressed"
     return "DEAD MISSION\nAREA: " .. site.plan.areaLabel .. "\nTARGET SITE: " .. site.plan.samType ..
         "\nSTATUS: " .. status .. "\nOBJECTIVE: Destroy all remaining SAM site vehicles.\n" ..

@@ -289,6 +289,7 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 生成後は `Emitter state: ACTIVE / SUPPRESSION PENDING / SUPPRESSED / DESTROYED` と、計測中の継続時間を表示する。
 SEAD ScoreはIntercept Scoreと別に集計・保存する。`Player Statistics` にはカテゴリ別Scoreを表示せず、累計と任務・帰還・喪失統計を表示する（[SCORING.md](SCORING.md)）。
 SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSite dispositionとFollow-on DEAD availableを加える。
+`Continue as DEAD` 直後の通知にはSiteの実配置座標を追加し、共通設定 `coordinateBriefingSeconds`（初期60秒）で1回表示する。Mission StatusにはDEAD情報として実配置座標・SAM種類を追加し、DEAD達成後の帰還待ちも維持する。元のSEAD計画・推定座標は変更しない。Continue前とPreserveのみでは従来のTOO / PB秘匿を維持する。詳細は [DEAD.md](DEAD.md)。
 `Abort Mission` でウィング全体、`Abort Sortie: <名前> [<機体>]` でその参加者だけを中止する。
 今回、F10 地図マーカー・コックピットのウェイポイント設定は追加しない。
 

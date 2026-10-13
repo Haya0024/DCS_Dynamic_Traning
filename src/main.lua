@@ -34,9 +34,8 @@ local function Close(record)
     elseif record.site then
         SEADSites.CloseAssignment(record.site, record.assignmentID)
     elseif record.spawn then
-        if not Intercept.Cleanup(record.spawn.group) then
-            Message(record.group, "ERROR: Enemy cleanup. See DCS log.", 15)
-        end
+        -- Pending deletion is retried by the sweep; diagnostics stay in the log.
+        Intercept.Cleanup(record.spawn.group)
     end
     Log((record.id or ((record.category or "Intercept") .. " reservation")) .. " closed; wing assignment released")
 end

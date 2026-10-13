@@ -2,6 +2,12 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-13 origin/mainとのマージ競合解消
+
+ローカル `4cc137a`（Add Tankers and delete AI2）とリモート `46cd17d`（Fix log）のマージで、main.lua・MESSAGES・TESTING・実.mizが競合した。テキストはCRLF/LFの差を除いて比較し、ローカルのタイトルだけのIntercept開始通知とSOLO/MP2の説明を維持しながら、リモートの敵削除待ち・再試行時の画面ERRORを出さない変更を統合した。INT-19/22の画面非表示検証も維持する。
+
+実.mizはローカル保存済みのME設定・options・給油機入りニーボードを維持して結合済みLuaを同期。競合時のローカル版との比較でDynamicTraining.luaだけが変わり、その他のZIP内容は不変。リモート側の埋め込みMOOSEとの差は改行だけで、採用中のvendorをそのまま使う。Lua全356ケース、BUILD2・SYNC3・INSTALL5・ZONES2が通過し、実.mizのSync/Check・PNG一致・ZIP CRC確認も成功した。競合各版はbuild/merge-conflict-20261013に検査用コピーを残した。DCS内の実動作確認は未実施。
+
 ## 2026-10-13 ニーボードへ給油機追加・ME保存の整合性確認
 
 ニーボードを空港・空母・給油機の3表に更新し、Texaco 1-1（251.10 MHz AM・31Y/TEX）とArco 1-1（251.20 MHz AM・32Y/ARC）を追加。給油機の列は給油機・無線周波数・TACANの3つとし、ユーザー指定により高度・速度を掲載しない。既存の空港値と空母74X/CVN・ICLS 1は維持した。

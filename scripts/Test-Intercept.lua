@@ -351,8 +351,9 @@ test("abort cleanup retries at five seconds while new and parallel wings continu
     local old = s.spawns[1]; old.cleanupFailures = 2
     s:command("Abort Mission")
     assert(not s:mission() and not old.destroyed and pendingCleanup(s)[old])
-    s:lastMessageContains("ERROR: Enemy cleanup. See DCS log.")
-    assert(s.messages[#s.messages].seconds == 15)
+    for _, message in ipairs(s.messages) do
+        assert(not message.text:find("ERROR: Enemy cleanup", 1, true))
+    end
     s.generate(); local current = s:mission()
     local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(1)
     s:command("Task: Intercept", other); local parallel = s:mission(other)
@@ -425,6 +426,9 @@ test("cleanup retries after success or accident never resettle the closed sortie
         end
         local receipt = record.participants[1].receipt
         assert(receipt.result == result and not s:mission() and pendingCleanup(s)[group])
+        for _, message in ipairs(s.messages) do
+            assert(not message.text:find("ERROR: Enemy cleanup", 1, true))
+        end
         s:score(points); s:lastMessageContains("Settled Missions: 1")
         s:tick(closedAt + 4); assert(group.destroyCalls == 1)
         s:tick(closedAt + 5); assert(group.destroyed and not pendingCleanup(s)[group])

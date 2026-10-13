@@ -24,16 +24,17 @@ Intercept、SEAD、DEAD、Strike、CAS、Anti-Ship などの訓練ミッショ�
 
 ## BLUE プレイヤースロット
 
-以下の Client スロットを使用する。
+SOLO（Client ×1）のグループ名は以下。
 
-- `BLUE_HORNET_INCIRLIK_01`
-- `BLUE_HORNET_AKROTIRI_01`
-- `BLUE_HORNET_BEIRUT_01`
-- `BLUE_HORNET_RAMAT_01`
+- `BLUE_HORNET_INCIRLIK_SOLO_01`
+- `BLUE_HORNET_AKROTIRI_SOLO_01`
+- `BLUE_HORNET_BEIRUT_SOLO_01`
+- `BLUE_HORNET_RAMAT_SOLO_01`
+- `BLUE_HORNET_SC_SOLO_01`
 
 プレイヤーは任意の BLUE 空港から出撃できる。
 
-空母スロットと MP2（Client ×2）も使用する。MP2 は INCIRLIK / AKROTIRI / BEIRUT / RAMAT / SC に配置済み。
+MP2（Client ×2）は INCIRLIK / AKROTIRI / BEIRUT / RAMAT / SC に配置済み。5拠点にSOLOとMP2を各1グループ、合計10グループ・15 Clientスロットを置く。
 列挙した名前を検出ロジックの条件にせず、搭乗中の BLUE F/A-18C をグループ単位で取得する。
 
 プレイヤー機の初期パイロン設定は意図的に空とする。
@@ -87,7 +88,7 @@ Intercept ミッションを待機状態にする。
 20秒待ってから、その時点の長機位置・機首方向を基準に Intercept ミッションを開始する。
 全員が受注時から空中なら即生成する。長機は搭乗中の参加者の機体番号が最も小さい機体。
 離陸は2秒間隔で判定するため、全員の実際の離陸から生成までは約20～22秒となる。
-予約したプレイヤー機を保持し、AI 僚機や未参加者の離陸では開始しない。
+予約したプレイヤー機を保持し、未参加者の離陸では開始しない。
 生成前に参加者が着地した場合は離陸待ちに戻し、死亡・離脱・機体変更時は予約全体を解除する。
 
 ### 敵機生成条件
@@ -102,7 +103,7 @@ Intercept ミッションを待機状態にする。
 - 高度は一定範囲からランダム
 - 生成には `intercept.templates` の3候補から各1/3の確率で選んだテンプレートを使用する
 
-Interceptの地上受注通知は人数と全員離陸待ちに絞る。20秒の生成待ち・カウントリセット・Hostiles・PilotsはDCSログの `[DEBUG]` のみに出す。画面の開始通知は `Intercept MISSION START` とRange・Altitude・Aspect: HOTを15秒で1回だけ出し、デバッグにはHostilesとPilotsも残す。通常画面メッセージも同じ本文をDCSログのMESSAGEへ記録し、グローバル初期化通知も対象とする。
+Interceptの地上受注通知は人数と全員離陸待ちに絞る。画面の開始通知は `Intercept MISSION START` だけを15秒で1回表示する。Range・Altitude・Aspect: HOT・Hostiles・Pilots、20秒の生成待ちとカウントリセットはDCSログの `[DEBUG]` のみに出す。通常画面メッセージも同じ本文をDCSログのMESSAGEへ記録し、グローバル初期化通知も対象とする。
 
 将来的には以下を追加する。
 

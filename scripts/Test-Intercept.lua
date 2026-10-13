@@ -239,7 +239,7 @@ test("new assignments redraw templates and concurrent wings remain independent",
     end
 end)
 
-test("solo and MP2 show one range altitude aspect start; hostiles countdown and pilots stay debug-only", function()
+test("solo and MP2 show one title-only start; range altitude aspect hostiles countdown and pilots stay debug-only", function()
   for _, mp2 in ipairs({ false, true }) do
     for _, airborne in ipairs({ false, true }) do
         local s = scenario()
@@ -277,10 +277,10 @@ test("solo and MP2 show one range altitude aspect start; hostiles countdown and 
         else assert(messages("Hostiles will spawn") == 0) end
         s:lastMessageContains("Intercept MISSION START")
         local text, spawn = s.messages[#s.messages].text, s:mission().spawn
-        assert(not string.find(text, "Hostiles:", 1, true))
-        assert(string.find(text, "Range: " .. spawn.distance .. " NM", 1, true))
-        assert(string.find(text, "Altitude: " .. spawn.altitude .. " ft", 1, true))
-        assert(string.find(text, "Aspect: HOT", 1, true) and not string.find(text, "Pilots:", 1, true))
+        assert(text == "Intercept MISSION START")
+        assert(messages("Range:") == 0 and messages("Altitude:") == 0 and messages("Aspect:") == 0)
+        assert(logs("Range: " .. spawn.distance .. " NM") == 1)
+        assert(logs("Altitude: " .. spawn.altitude .. " ft") == 1 and logs("Aspect: HOT") == 1)
         assert(s.messages[#s.messages].seconds == 15)
         s.generate()
         if mp2 then s:command("Task: Intercept", s.wingman) end

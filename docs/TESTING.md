@@ -1,6 +1,6 @@
 # テスト仕様書
 
-更新日: 2026-10-12
+更新日: 2026-10-13
 
 ## 目的と対象
 
@@ -10,6 +10,8 @@
 
 動作の根拠は [Intercept.md](Intercept.md)、[CAP.md](CAP.md)、[SEAD.md](SEAD.md)、[DEAD.md](DEAD.md)、[WING.md](WING.md)、[SCORING.md](SCORING.md)。
 本書はテスト条件と期待結果を記録し、実装済みの自動テストとDCS内で行う手動確認を区別する。
+
+現在の実.mizにはSOLO（Client ×1）とMP2（Client ×2）だけを置き、AI2は削除済み。AI機の離陸・着陸・事故を参加者として扱わない模擬ケースは、搭乗者検出・採点境界の回帰確認として維持する。AI2の配置や連続出撃を保証するケースではない。
 
 ## テストの構成
 
@@ -35,11 +37,15 @@ PowerShellは複数のassertをまとめたPASSグループで、Luaのケース
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-12、`training-8`。Lua全356ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP9＋SEAD10をすべてME円へ統一し、ZONESは全19円の存在・円形・半径18,288 m・可視性・名前/IDの一意性、全出撃Clientから各2〜3候補と全候補の受注・生成・中止を確認する。ME実体の直接参照、Zone欠落時にLua円で補完しないこと、受注失敗後のロック解放・復旧後の再受注も確認。CAP-31は死亡後の再搭乗位置を出撃地点へ戻すfixtureを明示し、GC・イベント受信の期待値を維持する。SEAD-63〜66は全10候補をME境界のfixtureとして与える。
+最新の自動検証: 2026-10-13、`training-8`のIntercept表示更新。Lua全356ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。INT-16は単独/MP2の地上/空中受注で、開始通知が15秒のタイトル1行だけで1回表示され、Range・Altitude・HOTがDEBUGだけへ1回記録されることを確認する。実.mizのSync/Check成功、登録済みDynamicTraining.lua以外のZIP内容不変、給油機・AI2削除・ニーボード維持を確認。実DCSの表示確認は未実施。
+
+2026-10-12の自動検証、`training-8`。Lua全356ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP9＋SEAD10をすべてME円へ統一し、ZONESは全19円の存在・円形・半径18,288 m・可視性・名前/IDの一意性、全出撃Clientから各2〜3候補と全候補の受注・生成・中止を確認する。ME実体の直接参照、Zone欠落時にLua円で補完しないこと、受注失敗後のロック解放・復旧後の再受注も確認。CAP-31は死亡後の再搭乗位置を出撃地点へ戻すfixtureを明示し、GC・イベント受信の期待値を維持する。SEAD-63〜66は全10候補をME境界のfixtureとして与える。
 
 実.mizのSync/Check成功。移行前のユーザー保存済みファイルとの照合で、追加11円の名前・中心・半径が旧Lua定義と一致し、既存8円・AWACS燃料無限先頭・空母往復・その他のmissionフィールドが不変。ZIP変更はmissionのZone追加と登録済みDynamicTraining.luaだけで、options・MOOSE・resource mapping等を維持。配置診断の地域指定ビルドも成功した。ME画面での表示、実DCSの受注・交戦は今回未確認。
 
 2026-10-09の自動検証（`training-7`）:Test-AllでLua全356ケース、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP-32〜34は40/100 NM境界、候補なしの通常拒否・ロック解放、受注時長機位置と観測例外を確認。ZONESは4空港と空母の全出撃用Client位置で各2〜3候補と、各地点の全候補の受注・SEAD生成・中止を確認。既定先の実ミッションSync/Checkも成功。新地域を含む全10地域・両SAM各50点の実地形配置診断はMAN-57で実施済み（適合350/1,000、Islahiyeは両方0/50、追加地域半径5 NM時の記録）。training-7では追加6地域をMEと同じ18,288 mへ拡大し、4地域の中心を調整した。最終設定に一致する各地域の検査記録（複数実行）を合算して全20組合せ各50点、適合352/1,000・観測エラー0、全地域・両SAMで適合点を発見。全Client駐機位置の2〜3候補も維持する。実Spawn・交戦と追加CAP空域の確認は未実施。
+
+2026-10-13、AI2削除後の実.mizを照合し、SOLO5・MP2 5・Client15、AI2およびBLUEのAI Hornetなし、敵の5テンプレート維持を確認。Test-ZoneCoverageの2確認グループが通過し、全15 Client出撃位置のCAP / SEAD各2〜3候補と、全5拠点の候補受注・生成・中止を維持した。Sync-Mission -Check成功、同梱ニーボード維持、ZIP CRC正常。今回は仕様書の変更で、Lua全9スイートの再実行やDCS内の出撃確認は行っていない。
 
 ### 自動テストの前提と限界
 
@@ -151,7 +157,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | INT-01 | 地上受注、離陸、待機中の移動・機首変更、重複受注 | 全員の離陸検出後20秒で、その時点の位置・機首を使って1回だけ生成 |
 | INT-02 | 20秒待機中に着地、再離陸 | 離陸待ちへ戻り、20秒を最初から数える |
 | INT-03 | 生成前に死亡・退出・機体交換・操縦者変更 | 予約を解除し、後から敵を生成しない |
-| INT-04 | プレイヤー列挙順変更、AI僚機だけの離陸 | 元の参加者を維持し、AIで開始条件を満たさない |
+| INT-04 | プレイヤー列挙順変更、AI機だけの離陸 | 元の参加者を維持し、AIで開始条件を満たさない |
 | INT-05 | 空中受注、達成後の再受注 | 空中なら即生成、帰還待ち中は二重受注を拒否 |
 | INT-06 | Spawn・編隊設定・経路設定が失敗 | 生成済み敵を片付け、予約解除と再受注が可能 |
 | INT-07 | 無人グループ、2人搭乗したMP2 | 無人では予約せず、MP2は1ウィングとして登録 |
@@ -163,7 +169,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | INT-13 | 2機編成の1機だけを破壊 | 残り1機が生存する間は未達成 |
 | INT-14 | 選ばれたテンプレートが見つからない | 予約解除後に別の受注を開始可能 |
 | INT-15 | 再受注と複数ウィングの受注 | 任務ごとにテンプレートを選び、他任務の抽選・敵に影響しない |
-| INT-16 | 単独・MP2の地上／空中受注、両者の連打、離陸イベント、カウントダウンリセット、定期監視 | 画面の開始はRange・Altitude・HOTの1回。Hostiles・Pilots・20秒待ち・リセットはDEBUGのみ。通常通知もMESSAGEへ記録。敵は1回生成、開始15秒・Status20秒を維持 |
+| INT-16 | 単独・MP2の地上／空中受注、両者の連打、離陸イベント、カウントダウンリセット、定期監視 | 画面の開始はIntercept MISSION STARTだけを1回。Range・Altitude・HOT・Hostiles・Pilots・20秒待ち・リセットはDEBUGのみ。通常通知もMESSAGEへ記録。敵は1回生成、開始15秒・Status20秒を維持 |
 | INT-17 | IsAlive=nil/不正値/例外、生存・死亡wrapperの別ID、復旧後false＋IDなし | 不明観測中はACTIVE・未達成を維持、復旧後の明示死亡でRTB_PENDING。観測例外で他の処理を止めない |
 | INT-18 | IsAlive=nil・IDなしでも元のDCS実体の死亡イベントを順に受信 | 既知対象のlossを優先し、全対象の明示loss後だけ達成。pollingで達成を取り消さない |
 | INT-19 | Abort後のDestroyが2回例外、新任務と別Wingを開始、旧Destroyが死亡イベントを発生 | 参照・削除待ちを保持し5秒・10秒に再試行。任務ロックは即解放、新任務・他WingはACTIVE/0点のまま。成功後に待ち参照を解放し再削除なし、失敗・回復ログ各1回 |
@@ -227,7 +233,7 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | SCORE-08 | 移動中のBLUE空母へ着艦 | 艦との相対速度で停止判定 |
 | SCORE-09 | RED・中立・FARP・不明地点・未対応艦へ着陸 | 満額を付与しない |
 | SCORE-10 | 停止確認中に飛行場外へ移動、BLUE所有権喪失 | 帰還確認を解除 |
-| SCORE-11 | AI僚機や他プレイヤーの着陸・事故 | 元の参加者の出撃を精算しない |
+| SCORE-11 | AI機や他プレイヤーの着陸・事故 | 元の参加者の出撃を精算しない |
 | SCORE-12 | 他プレイヤーが列挙順の先頭、メニューから受注 | 操作したグループの参加者へ任務・報酬を紐付ける |
 | SCORE-13 | 同じ表示名、異なるスロットとUCID | 成績を混同しない |
 | SCORE-14 | 同じUCIDで名前・スロットを変更 | セッション内累計を維持 |
@@ -597,7 +603,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 |---|---|---|
 | MAN-01 | 各基地・SCのHornetへ搭乗し、F10とStatisticsを開く | 自グループにメニューが現れ、マルチプレイでUCIDが照合される。全搭乗者の名前・機体名・Total/Career・精算/目標/帰還/喪失件数と末尾1回の保存状態を25秒表示、カテゴリ別Scoreは非表示。初期は0、採点なしならその理由を調査 |
 | MAN-02 | Interceptを地上受注、離陸、別試行で待機中に着地、空中受注 | 地上は離陸検出後約20〜22秒、着地でリセット、空中は即生成 |
-| MAN-03 | Interceptを繰り返し、3テンプレート・5編隊を確認 | 距離60〜80 NM、左右60°内、HOT、高度15,000〜30,000 ft。DEBUG開始ログの機種・機数が実体と一致、画面はRange／Altitude／HOTのみ、AIが指定編隊へ移行 |
+| MAN-03 | Interceptを繰り返し、3テンプレート・5編隊を確認 | 距離60〜80 NM、左右60°内、HOT、高度15,000〜30,000 ft。DEBUG開始ログの機種・機数・距離・高度・Aspectが実体と一致、画面の開始はIntercept MISSION STARTのみ、AIが指定編隊へ移行 |
 | MAN-04 | Interceptの2機編成を1機だけ破壊し、その後全滅 | 1機生存中は未達成、全滅で帰還指示 |
 | MAN-05 | SEADを地上受注して計画を確認し、移動して全員離陸 | 離陸前はSAM実体なし。全員離陸後に同じ計画で生成。方式・表示座標・コードを再抽選しない |
 | MAN-06 | SA-6/SA-8を10Zoneでそれぞれ生成し、観戦・ME等で実位置を確認 | 地面へ配置、全車両がZone内、建物等との離隔、ME相対配置、Radarの発信・交戦を確認。20組合せを個別記録。追加6地域の安全配置成功率・拒否理由も記録 |
@@ -641,7 +647,7 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-44 | Preserve→SEAD全員RTB→再武装中に別WingがTask: DEAD、その後元Wingで受注 | SEAD精算後も他Wingは候補なし。元Wingは同じ残存・損傷Groupを取得し、地上受注後の離陸でACTIVE。旧SEAD任務ロックは残らない |
 | MAN-45 | 元WingがRelease Site Reservation、別WingでTask: DEAD。別試行ではMP2精算前に開放 | 同じ残存Groupを別Wingが取得、二重受注なし。元SEAD全員終了までは別Wingを拒否、採点・任務ロック維持 |
 | MAN-46 | 開放したSiteを未予約で30分放置。専用保持・地上DEAD受注も別試行 | 共有未予約30分でCleanup。専用保持中・ARMED使用予約中は削除なし。元保持者切断は共有Siteに影響しない |
-| MAN-47 | Intercept／SEAD／Follow-on DEADを地上・空中受注し、待機中着地・再離陸、StatusとDCSログを確認 | 指定した詳細はDEBUGのみ、Intercept画面はRange／Altitude／HOT。SEAD受注にMODEなし、計画に生成待ち説明なし、開始にPilotsなし。DEADも受注→座標1回→短い開始で自動再掲なし。Statusで座標を再確認可能 |
+| MAN-47 | Intercept／SEAD／Follow-on DEADを地上・空中受注し、待機中着地・再離陸、StatusとDCSログを確認 | 指定した詳細はDEBUGのみ、Intercept画面の開始はIntercept MISSION STARTだけ。SEAD受注にMODEなし、計画に生成待ち説明なし、開始にPilotsなし。DEADも受注→座標1回→短い開始で自動再掲なし。Statusで座標を再確認可能 |
 | MAN-48 | 同期済み実ミッションを開き直して開始。BLUE/REDでF10確認、ズーム・地図回転・通常Marker入力・任務メニューを操作 | 現在BLUEのAkrotiri/Beirut-Rafic Hariri/Incirlik/Ramat Davidに薄青Circleと青文字1枚の基地名。RED/Neutral/Ship/FARPは追加Drawingなし、BLUE側だけ表示。readOnly、南オフセットで文字可読、黒い複製文字なし。Marker入力・任務・帰還・採点が従来どおり。Allies Only/Fog of War維持。ログの描画数4を確認 |
 | MAN-49 | テスト用コピーをMEでTiyas BLUEへ変更して再開始。Luaの空港名リストは編集しない | Tiyasが自動追加され、Circle/Textが他基地と独立。元4基地も引き続き表示。結果を標準設定と区別して記録 |
 | MAN-50 | 更新したHookでDCSを再起動し同期済み実ミッションをホスト。slot未選択・Statistics未操作で10秒待つ | Startupはinitialization pending。ログでMissionLoadEnd→BOOTSTRAP_COMMITTED→CONNECTED（storage/ack確認）を確認しscores.datを検証。初期表示だけで失敗とせず、失敗時はphaseとprimary/backup I/O詳細を記録 |

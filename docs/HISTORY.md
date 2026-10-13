@@ -2,6 +2,30 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-13 ニーボードへ給油機追加・ME保存の整合性確認
+
+ニーボードを空港・空母・給油機の3表に更新し、Texaco 1-1（251.10 MHz AM・31Y/TEX）とArco 1-1（251.20 MHz AM・32Y/ARC）を追加。給油機の列は給油機・無線周波数・TACANの3つとし、ユーザー指定により高度・速度を掲載しない。既存の空港値と空母74X/CVN・ICLS 1は維持した。
+
+ユーザーがMEを開いたままにしていたため、画像更新前に保存済み.mizの整合性を確認。最新のタイトルだけのIntercept開始通知とLua同期、SOLO5/MP2 5/Client15・AI2なし、全19訓練Zone、5敵テンプレートのLate Activation、機体IDとビーコン対象、空母の往復、全リソース参照、同梱PNG一致、ZIP CRCが正常だった。Test-ZoneCoverageの2確認グループも通過し、全出撃位置でCAP / SEAD各2〜3候補を維持する。
+
+画像更新直前を `.miz.kneeboard-update.bak` に保存し、同梱PNGだけを差し替えた。更新前後でmission・Lua・resource mapping等の他ZIPエントリはすべて不変、編集元PNGと同梱版が一致、Sync-Mission -Check成功。保存済みAWACSのOrbitは28,000 ftであり、現在の前提をIntercept仕様にも合わせた。DCS内の実表示・MEに読み込まれたメモリ内状態は確認していないため、次の保存前に更新版を開き直す。
+
+## 2026-10-13 Intercept開始通知の簡略化
+
+ユーザー依頼でIntercept開始時の画面表示を `Intercept MISSION START` の1行だけに変更。表示は従来どおり15秒・生成成功時に1回。Range・Altitude・Aspect: HOTはHostiles・PilotsとともにDEBUG開始ログだけへ残し、MESSAGEログは画面と同じ1行にする。受注・生成条件・手動Status・採点は変更しない。
+
+INT-16を更新し、単独/MP2と地上/空中受注の全組合せで、開始通知の本文・表示時間・重複防止、詳細の画面非表示とDEBUG記録を確認。Lua全356ケースとBUILD2・SYNC3・INSTALL5・ZONES2が通過。初回の統合検証はWindowsのsandbox内の一時ファイル置換制約で止まったが、同じテストを通常権限で再実行して通過した。
+
+実.mizのSync/Check成功。同期前backupとのZIP比較で登録済みDynamicTraining.luaだけが変わり、ユーザーがMEで保存した給油機・AI2削除・その他設定と同梱ニーボードが不変なことを確認した。DCS内の実表示は確認待ち。
+
+## 2026-10-13 AI2削除後の構成・仕様書更新
+
+ユーザーがMEで5拠点のAI2グループを削除。実.mizを照合し、SOLOが5グループ・各Client ×1、MP2が5グループ・各Client ×2、合計10グループ・15 Clientスロットで、AI2グループとBLUEのAI Hornetが残っていないことを確認した。敵のIntercept3テンプレート・SEAD2テンプレートとミッション同梱ニーボードも維持されている。
+
+README・AGENTS・Intercept・WING・SCORING・ARCHITECTURE・TESTINGの現在の配置説明をSOLO/MP2へ合わせ、MESSAGESの旧グループ名の例を実在するMP2名へ更新。AIを参加者・精算対象に含めない判定と回帰テストは維持し、過去のAI2を使った実測ログは当時の履歴として残す。関連する記述で古いStennis表記も実.mizのCVN_71へ訂正した。
+
+実.mizの全15 Client出撃位置でCAP / SEADが各2〜3候補となり、Test-ZoneCoverageの2確認グループが通過。Sync-Mission -CheckとZIP CRC確認も成功した。今回の作業は仕様書の更新であり、Luaやユーザー保存済み.mizは変更していない。削除後の実DCS出撃は確認待ち。
+
 ## 2026-10-12 空港・空母ニーボードを同梱
 
 BLUEの4空港の座標・ATC VHF/UHF・TACAN・VORと、CVN-71の無線・TACAN・ICLSを別表にしたPNGを実.mizの `KNEEBOARD/IMAGES/01_BLUE_AIRFIELDS_AND_CARRIER_SYRIA.png` へ追加。ユーザーがMEで変更した空母74Xの識別コードCVNを確認し、画像もCVNへ更新した。空母座標・LINK 4・下部説明文は掲載しない。

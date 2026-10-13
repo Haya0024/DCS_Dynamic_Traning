@@ -223,7 +223,7 @@ local function Start(record)
         spawn.distance, spawn.altitude)
     DebugLog(record, "Intercept MISSION START\nHostiles: " .. spawn.composition .. "\n" .. details ..
         "\nPilots: " .. table.concat(pilots, ", "))
-    Message(record.group, "Intercept MISSION START\n" .. details, 15)
+    Message(record.group, "Intercept MISSION START", 15)
     Log(record.id .. " started; registered pilots=" .. tostring(#pilots) ..
         " template=" .. spawn.template ..
         " formation=" .. spawn.formation .. "/" .. spawn.formationSpacing)

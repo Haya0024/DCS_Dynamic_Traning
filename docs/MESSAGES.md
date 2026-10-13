@@ -1,6 +1,6 @@
 # Mission messages and DCS logs
 
-Updated: 2026-10-09
+Updated: 2026-10-13
 
 The separate placement-only diagnostic mission logs `[SEADPlacementCheck] START`, one `RESULT zone=<name> template=<name> checked=50 passed=<n> firstSuccess=<n|NONE> errors=<n> rejected=<counts>` for each of 20 pairs, and `COMPLETE pairs=20 checked=1000 passed=<n> errors=<n>`. Accepted diagnostic points use `VALID_POINT zone=<name> template=<name> sample=<n> x=<northing> y=<easting>`; exact coordinates appear only in the diagnostic log, not normal mission messages. Setup/observation exceptions use `SETUP_ERROR` / `OBSERVATION_ERROR` and are distinct from terrain rejection. These messages have no screen output and are absent from the normal training mission. See [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md) for the procedure and measured results.
 
@@ -13,7 +13,7 @@ The four F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, and
 | Channel | Delivery |
 |---|---|
 | Screen | Mission Group, including all wing members for individual settlement |
-| DCS message log | Same body as the screen message, prefixed with `[DynamicTraining] MESSAGE [BLUE_HORNET_INCIRLIK_01]` |
+| DCS message log | Same body as the screen message, prefixed with `[DynamicTraining] MESSAGE [BLUE_HORNET_INCIRLIK_MP2_01]` |
 | Global screen/message log | Startup messages; log prefix `[DynamicTraining] MESSAGE [ALL]` |
 | DCS debug log | `[DynamicTraining] [DEBUG]`; countdowns, Intercept start information plus Pilots, SEAD HARM instructions |
 | Other DCS logs | Assignment, objective, observation, cleanup and persistence events |
@@ -39,10 +39,9 @@ For airborne acceptance this is immediate. For ground acceptance it follows the 
 
 ```text
 Intercept MISSION START
-Range: 70 NM
-Altitude: 20000 ft
-Aspect: HOT
 ```
+
+Range, Altitude, Aspect, Hostiles and Pilots are recorded only in the debug start log.
 
 ### All hostile aircraft destroyed — 20 seconds, once
 
@@ -317,17 +316,17 @@ DEAD: Idle.
 
 ```text
 Intercept: ACTIVE
-Wing: BLUE_HORNET_INCIRLIK_01
+Wing: BLUE_HORNET_INCIRLIK_MP2_01
 Lead reference: Hawk 1
-Hawk 1 [BLUE_HORNET_INCIRLIK_01-1]: ACTIVE
-Hawk 2 [BLUE_HORNET_INCIRLIK_01-2]: ACTIVE
+Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: ACTIVE
+Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: ACTIVE
 ```
 
 ### SEAD SUPPRESSION_PENDING — 60 seconds
 
 ```text
 SEAD: ACTIVE
-Wing: BLUE_HORNET_INCIRLIK_01
+Wing: BLUE_HORNET_INCIRLIK_MP2_01
 Lead reference: Hawk 1
 SEAD MISSION
 MODE: TOO
@@ -338,8 +337,8 @@ Radar 1 OFF: 35 / 60 seconds
 Site state: ACTIVE
 Site disposition: CLEANUP
 Follow-on DEAD available: NO
-Hawk 1 [BLUE_HORNET_INCIRLIK_01-1]: ACTIVE
-Hawk 2 [BLUE_HORNET_INCIRLIK_01-2]: ACTIVE
+Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: ACTIVE
+Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: ACTIVE
 ```
 
 Planning SEAD uses 20 seconds and `THREAT AREA: Planning in progress`, with `Site checks: 4` instead of emitter/site details.
@@ -352,7 +351,7 @@ SEAD Status never adds the `Spawn in ... seconds.` line during TAKEOFF_DELAY. Sp
 SEAD: COMPLETE
 Follow-on: DEAD ACTIVE
 Remaining targets: 3
-Wing: BLUE_HORNET_INCIRLIK_01
+Wing: BLUE_HORNET_INCIRLIK_MP2_01
 SEAD MISSION
 MODE: TOO
 THREAT AREA: LL DDM 034° 39.420'N   037° 57.180'E
@@ -363,9 +362,9 @@ Site state: SUPPRESSED
 Site remaining vehicles: 3
 Site disposition: IN USE
 Follow-on DEAD available: NO
-Hawk 1 [BLUE_HORNET_INCIRLIK_01-1]: DEAD_ACTIVE
+Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: DEAD_ACTIVE
 DEAD objective: INCOMPLETE
-Hawk 2 [BLUE_HORNET_INCIRLIK_01-2]: DEAD_ACTIVE
+Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: DEAD_ACTIVE
 DEAD objective: INCOMPLETE
 ```
 
@@ -388,8 +387,8 @@ Site state: SUPPRESSED
 Site remaining vehicles: 3
 Site disposition: IN USE
 Follow-on DEAD available: NO
-Hawk 1 [BLUE_HORNET_INCIRLIK_01-1]: ACTIVE
-Hawk 2 [BLUE_HORNET_INCIRLIK_01-2]: ACTIVE
+Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: ACTIVE
+Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: ACTIVE
 ```
 
 Other states appear literally, for example `DEAD: ARMED` and `DEAD: RTB PENDING`.
@@ -443,7 +442,7 @@ When no CAP center is within the configured acceptance distance, show the reques
 ## Screen: Player Statistics — 25 seconds, requested manually
 
 ```text
-PLAYER STATISTICS: Hawk 1 [BLUE_HORNET_INCIRLIK_01-1]
+PLAYER STATISTICS: Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]
 Total Score: 450
 Career Points: 450
 Settled Missions: 2
@@ -549,11 +548,8 @@ Select 'Task: SEAD' to retry.
 Example of the exact body recorded for a screen notification:
 
 ```text
-[DynamicTraining] MESSAGE [BLUE_HORNET_INCIRLIK_01]
+[DynamicTraining] MESSAGE [BLUE_HORNET_INCIRLIK_MP2_01]
 Intercept MISSION START
-Range: 70 NM
-Altitude: 20000 ft
-Aspect: HOT
 ```
 
 Global example:
@@ -596,7 +592,7 @@ Intercept countdown reset. Waiting for all registered pilots to take off.
 SEAD countdown reset. Waiting for all registered pilots to take off.
 ```
 
-### Intercept start details — once per successful spawn, Hostiles and Pilots only in debug
+### Intercept start details — once per successful spawn, all details only in debug
 
 ```text
 [DynamicTraining] [DEBUG] run7:Intercept:1
@@ -608,7 +604,7 @@ Aspect: HOT
 Pilots: Hawk 1 (reward: 150), Hawk 2 (reward: 150)
 ```
 
-Hostiles and Pilots are debug-only; Range, Altitude and Aspect also appear on screen.
+Range, Altitude, Aspect, Hostiles and Pilots are debug-only. The screen and MESSAGE mirror contain only `Intercept MISSION START`.
 
 ### SEAD acceptance MODE — once at acceptance
 

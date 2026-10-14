@@ -2,6 +2,12 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-14 Interceptの生成距離を90〜110 NMへ変更
+
+ユーザーのレーダー索敵時間を増やす依頼で、Interceptの水平生成距離を60〜80から90〜110 NMへ変更。地上受注の全員離陸後20秒待ち、空中受注の即時生成、機首方向±60°、HOT、テンプレート・編隊・高度・速度・採点は維持した。README・Intercept・AGENTS・日英BRIEFING・MESSAGESのDEBUG例とTESTINGを合わせた。
+
+INT-08は90/100/110 NMの距離と全方位・偏角境界で配置・HOT・経路を検証し、抽選APIの上下限90/110も確認。既存の明示抽選fixtureとWingの長機基準の位置期待値を更新した。Lua全359ケースとBUILD2・SYNC3・INSTALL5・ZONES3が通過。実.mizをSync/Checkし、登録済みDynamicTraining.lua以外のZIP内容とME設定・Zone・ニーボードが不変、ZIP CRC正常を確認。新距離での実レーダー検出タイミングは実飛行確認待ち。
+
 ## 2026-10-14 Zone地域名・CAP/SAM離隔・SEAD実生成確認
 
 ユーザーがMEでSEAD4円の中心を移動し、名称の整合と生成可否の検査を依頼。最新保存座標を基準に、Osmaniye→Turkoglu、Islahiye→Hassa、Morphou East→Morphou North、Nicosia North/East→Gecitkale EastへZone参照名と画面地域名を合わせた。ユーザー回答に従いSEAD中心・半径を維持し、BeirutのSEAD4候補を許容する。

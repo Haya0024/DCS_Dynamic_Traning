@@ -18,11 +18,11 @@ test("takeoff delay, latest position/heading, duplicate requests", function()
     s.generate(); s:lastMessageContains("already armed")
     for t = 6, 22, 2 do s:tick(t); assert(#s.spawns == 0) end
     s.player.position = { x = 5000, y = 1000, z = 8000 }; s.player.heading = 90
-    s.randomValues = { 80, 30000, 60 }; s:tick(24)
+    s.randomValues = { 110, 30000, 60 }; s:tick(24)
     assert(#s.spawns == 1)
     local g = s.spawns[1]
-    near(g.position.x, 5000 + math.cos(math.rad(150)) * 80 * 1852)
-    near(g.position.z, 8000 + math.sin(math.rad(150)) * 80 * 1852)
+    near(g.position.x, 5000 + math.cos(math.rad(150)) * 110 * 1852)
+    near(g.position.z, 8000 + math.sin(math.rad(150)) * 110 * 1852)
     near(g.position.y, 30000 * 0.3048); nearHeading(g.heading, 330)
     assert(g.openFire and g.route[1].tasks[1].id == "EngageTargets")
     near(g.route[1].speed, 828); assert(g.route[1].altitudeType == "BARO")
@@ -97,10 +97,11 @@ end)
 test("range, forward sector, HOT and through route across boundaries", function()
     for _, heading in ipairs({ 0, 45, 90, 180, 270, 359 }) do
         for _, offset in ipairs({ -60, 0, 60 }) do
-            for _, distance in ipairs({ 60, 70, 80 }) do
+            for _, distance in ipairs({ 90, 100, 110 }) do
                 local s = scenario()
                 s.player.airborne = true; s.player.heading = heading
                 s.randomValues = { distance, 15000, offset }; s.generate()
+                assert(s.randomCalls[1].minimum == 90 and s.randomCalls[1].maximum == 110)
                 local g, p = s.spawns[1], s.player.position
                 local dx, dz = g.position.x - p.x, g.position.z - p.z
                 near(math.sqrt(dx * dx + dz * dz), distance * 1852)
@@ -123,7 +124,7 @@ test("all five formation draws set the controller and delayed route consistently
     }
     for index, choice in ipairs(choices) do
         local s = scenario(); s.player.airborne = true
-        s.randomValues = { 60, 15000, 0, index }; s.generate()
+        s.randomValues = { 90, 15000, 0, index }; s.generate()
         local g = assert(s.spawns[1])
         assert(g.formation == choice[2])
         local task = g.route[1].tasks[2]
@@ -133,7 +134,7 @@ test("all five formation draws set the controller and delayed route consistently
         assert(action.params.value == choice[2])
         assert(g.route[1].tasks[1].id == "EngageTargets" and g.openFire)
         assert(string.find(s.logs[#s.logs], "formation=" .. choice[1] .. "/Open", 1, true))
-        s.randomValues = { 80, 30000, 60, 5 }; s.generate()
+        s.randomValues = { 110, 30000, 60, 5 }; s.generate()
         assert(#s.spawns == 1 and g.formation == choice[2] and #s.randomValues == 4)
         s:assertClean()
     end
@@ -142,8 +143,8 @@ end)
 test("concurrent wing formations are selected independently", function()
     local s = scenario(); s.player.airborne = true
     local other = s:addPilot("Other", "ucid-other", 20); other.airborne = true; s:tick(2)
-    s.randomValues = { 60, 15000, 0, 2 }; s.generate()
-    s.randomValues = { 80, 30000, 60, 5 }; s:command("Task: Intercept", other)
+    s.randomValues = { 90, 15000, 0, 2 }; s.generate()
+    s.randomValues = { 110, 30000, 60, 5 }; s:command("Task: Intercept", other)
     assert(#s.spawns == 2)
     assert(s.spawns[1].formation == 65538 and s.spawns[2].formation == 262146)
     assert(s.spawns[1].name ~= s.spawns[2].name)
@@ -159,7 +160,7 @@ test("three template draws preserve ME composition and display the actual enemy"
     for index, choice in ipairs(choices) do
         for formation = 1, 5 do
             local s = scenario(); s.player.airborne = true
-            s.randomValues = { 70, 20000, -30, formation, index }; s.generate()
+            s.randomValues = { 100, 20000, -30, formation, index }; s.generate()
             local g = assert(s.spawns[1])
             assert(g.template == choice[1] and #g.units == choice[3])
             for _, unit in ipairs(g.units) do assert(unit:GetTypeName() == choice[2]) end
@@ -172,7 +173,7 @@ test("three template draws preserve ME composition and display the actual enemy"
             assert(found)
             assert(string.find(s.logs[#s.logs], "template=" .. choice[1], 1, true))
             assert(g.route and g.formation and g.openFire and #s.randomValues == 0)
-            s.randomValues = { 80, 30000, 60, 5, 3 }; s.generate()
+            s.randomValues = { 110, 30000, 60, 5, 3 }; s.generate()
             assert(#s.spawns == 1 and #s.randomValues == 5 and g.template == choice[1])
             s:assertClean()
         end
@@ -183,7 +184,7 @@ test("single-aircraft objectives complete by event or polling and retain RTB sco
     for _, index in ipairs({ 2, 3 }) do
         for _, byEvent in ipairs({ true, false }) do
             local s = scenario(); s.player.airborne = true
-            s.randomValues = { 60, 15000, 0, 1, index }; s.generate()
+            s.randomValues = { 90, 15000, 0, 1, index }; s.generate()
             local enemy = s.spawns[1].units[1]
             enemy.alive = false
             if byEvent then s:event("Dead", enemy) else s:tick(1) end
@@ -199,7 +200,7 @@ end)
 
 test("two-aircraft template cannot complete while its second enemy is alive", function()
     local s = scenario(); s.player.airborne = true
-    s.randomValues = { 60, 15000, 0, 1, 1 }; s.generate()
+    s.randomValues = { 90, 15000, 0, 1, 1 }; s.generate()
     local g = s.spawns[1]
     g.units[1].alive = false; s:event("Dead", g.units[1]); s:tick(1)
     s:command("Mission Status"); s:lastMessageContains("Intercept: ACTIVE")
@@ -210,11 +211,11 @@ end)
 test("missing selected template releases the reservation and permits a fresh draw", function()
     for index, template in ipairs({ "TPL_INT_MIG29A_2", "TPL_INT_SU27_1", "TPL_INT_MIG29A_1" }) do
         local s = scenario(); s.player.airborne = true; s.missingTemplate = template
-        s.randomValues = { 60, 15000, 0, 1, index }; s.generate()
+        s.randomValues = { 90, 15000, 0, 1, index }; s.generate()
         s:lastMessageContains("spawn failed"); assert(#s.spawns == 0 and #s.errors == 1)
         assert(string.find(s.errors[1], template, 1, true))
         s.missingTemplate = nil
-        s.randomValues = { 60, 15000, 0, 1, index }; s.generate()
+        s.randomValues = { 90, 15000, 0, 1, index }; s.generate()
         assert(#s.spawns == 1 and s.spawns[1].template == template)
     end
 end)
@@ -223,8 +224,8 @@ test("new assignments redraw templates and concurrent wings remain independent",
     for _, otherIndex in ipairs({ 1, 2, 3 }) do
         local s = scenario(); s.player.airborne = true
         local other = s:addPilot("Other", "ucid-other", 20); other.airborne = true; s:tick(2)
-        s.randomValues = { 60, 15000, 0, 1, 1 }; s.generate()
-        s.randomValues = { 60, 15000, 0, 1, otherIndex }; s:command("Task: Intercept", other)
+        s.randomValues = { 90, 15000, 0, 1, 1 }; s.generate()
+        s.randomValues = { 90, 15000, 0, 1, otherIndex }; s:command("Task: Intercept", other)
         local a, b = s.spawns[1], s.spawns[2]
         assert(a.name ~= b.name)
         s:complete(b)
@@ -232,7 +233,7 @@ test("new assignments redraw templates and concurrent wings remain independent",
         s:command("Mission Status"); s:lastMessageContains("Intercept: ACTIVE")
         s:command("Abort Mission")
         assert(a.destroyed and not b.destroyed)
-        s.randomValues = { 60, 15000, 0, 1, 3 }; s.generate()
+        s.randomValues = { 90, 15000, 0, 1, 3 }; s.generate()
         assert(#s.spawns == 3 and s.spawns[3].template == "TPL_INT_MIG29A_1")
         assert(s.spawns[3].name ~= a.name and s.spawns[3].name ~= b.name)
         s:assertClean()

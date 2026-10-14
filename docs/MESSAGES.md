@@ -608,7 +608,7 @@ SEAD countdown reset. Waiting for all registered pilots to take off.
 [DynamicTraining] [DEBUG] run7:Intercept:1
 Intercept MISSION START
 Hostiles: 2 x MiG-29A
-Range: 70 NM
+Range: 100 NM
 Altitude: 20000 ft
 Aspect: HOT
 Pilots: Hawk 1 (reward: 150), Hawk 2 (reward: 150)

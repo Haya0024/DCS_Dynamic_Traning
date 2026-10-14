@@ -16,7 +16,7 @@ Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨�
 
 ### Intercept — 迎撃
 
-長機の位置と機首方向を基準に出現する敵戦闘機を迎撃し、今回の任務で生成された敵航空機をすべて撃墜してください。敵は前方の60〜80 NMに出現し、機種、機数、高度、方位、編隊は受注ごとに変化します。地上で受注した場合は、登録参加者全員の離陸検出から20秒後に敵を生成します。全員が空中で受注した場合は即座に開始します。敵全滅後はBLUE側の基地または空母へ帰還してください。
+長機の位置と機首方向を基準に出現する敵戦闘機を迎撃し、今回の任務で生成された敵航空機をすべて撃墜してください。敵は前方の90〜110 NMに出現し、機種、機数、高度、方位、編隊は受注ごとに変化します。地上で受注した場合は、登録参加者全員の離陸検出から20秒後に敵を生成します。全員が空中で受注した場合は即座に開始します。敵全滅後はBLUE側の基地または空母へ帰還してください。
 
 ### CAP — 戦闘空中哨戒
 
@@ -54,7 +54,7 @@ Player aircraft start without weapons. Request rearming on the ground and choose
 
 ### Intercept
 
-Intercept the enemy fighters generated relative to the flight leader's position and heading, and destroy every enemy aircraft assigned to this mission. Hostiles appear 60–80 NM ahead, with aircraft type, numbers, altitude, bearing, and formation varying between missions. If accepted on the ground, enemies spawn 20 seconds after all registered participants are detected airborne. If everyone is already airborne at acceptance, the mission starts immediately. Once all hostiles are destroyed, recover at a BLUE airfield or carrier.
+Intercept the enemy fighters generated relative to the flight leader's position and heading, and destroy every enemy aircraft assigned to this mission. Hostiles appear 90–110 NM ahead, with aircraft type, numbers, altitude, bearing, and formation varying between missions. If accepted on the ground, enemies spawn 20 seconds after all registered participants are detected airborne. If everyone is already airborne at acceptance, the mission starts immediately. Once all hostiles are destroyed, recover at a BLUE airfield or carrier.
 
 ### CAP — Combat Air Patrol
 

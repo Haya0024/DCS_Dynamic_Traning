@@ -42,7 +42,7 @@ test("leader reference follows flight number even if unit and player lists are r
     s.wingman.position = { x = 90000, y = 500, z = 80000 }
     s:command("Task: Intercept", s.wingman)
     assert(#s.spawns == 1)
-    assert(math.abs(s.spawns[1].position.x - (1000 + 60 * 1852 * math.cos(math.rad(-60)))) < 0.001)
+    assert(math.abs(s.spawns[1].position.x - (1000 + 90 * 1852 * math.cos(math.rad(-60)))) < 0.001)
     s:assertClean()
 end)
 

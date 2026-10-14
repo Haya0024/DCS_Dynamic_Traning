@@ -138,7 +138,7 @@ BLUE 空港への RTB を追加評価対象とする。
 ## SEAD 訓練ミッション（実装済み・ゲーム内確認待ち）
 
 - `TPL_SEAD_SA6`（レーダー＋発射機3両）と `TPL_SEAD_SA8`（1両）を等確率で選ぶ。
-- ZoneはすべてMEに登録した計10候補。追加はOSMANIYE / ISLAHIYE / KILIS / MORPHOU / NICOSIA_NORTH / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、全円の中心・半径は実.mizのME Trigger Zoneだけに置く。Luaの代替定義は持たない。追加6地域の半径は既存MEと同じ18,288 m（約9.9 NM）。
+- ZoneはすべてMEに登録した計10候補。追加6地域は現在TURKOGLU / HASSA / KILIS / MORPHOU_NORTH / GECITKALE_EAST / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、全円の中心・半径は実.mizのME Trigger Zoneだけに置く。Luaの代替定義は持たない。追加6地域の半径は既存MEと同じ18,288 m（約9.9 NM）。
 - `Task: SEAD` の受注時に TOO / PB を等確率で抽選し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
 - 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
 - TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。
@@ -365,14 +365,14 @@ CAS: 720
 
 ## CAP 訓練任務（実装済み・DCS内確認待ち）
 
-- `src/config.lua` のcap.zonesにあるMEに登録した9円形Zoneから、受注時の長機位置から中心まで40〜100 NMの候補を等確率で1つ固定する。4出撃空港と空母の初期位置で両任務とも2〜3候補を確保。全円の中心・半径はMEに置き、ZONE:FindByNameで直接参照する。候補なしは通常通知20秒・採点なしでロックを解除する。受注時に `CAP AREA: <中心DDM>`（分の小数3桁）を案内する。半径・PATROL CENTER行は表示せず、進入通知は `CAP on station.` のみ。
+- `src/config.lua` のcap.zonesにあるMEに登録した9円形Zoneから、受注時の長機位置から中心まで40〜100 NMの候補を等確率で1つ固定する。4出撃空港と空母の初期位置でCAPは2〜3候補、SEADは2〜4候補（Beirutは4）を確保。全円の中心・半径はMEに置き、ZONE:FindByNameで直接参照する。候補なしは通常通知20秒・採点なしでロックを解除する。受注時に `CAP AREA: <中心DDM>`（分の小数3桁）を案内する。半径・PATROL CENTER行は表示せず、進入通知は `CAP on station.` のみ。
 - 未精算・操作中・空中の登録参加者の誰かがZone内なら120秒を積算する。全員Zone外/観測不能なら停止、再進入で再開。AI・途中参加者・個人中止者は数えない。
 - 20/40/60/80/100%を各1回通知。120秒と今回の敵全滅の両方でPrimary達成。100%でも敵が残ればACTIVE。
 - 同じ累計時間30〜120秒から出現時刻を受注時に固定し、Config.intercept.templatesの3候補を暫定使用して1編隊だけ生成する。Zone外周から15〜25NM、15,000〜30,000ft、230m/sで空域へ進入・哨戒する。DT_CAP_<assignmentID>で他任務の敵と分離する。
 - 地上受注でも即ACTIVEで空域への到達待ち。CAPにInterceptの離陸待ち・20秒Spawn待ちを適用しない。個人中止でCAPをARMEDへ戻さない。
 - 既存Wing/UCIDロックと個別帰還を使い、満額150・達成後事故90・未達成事故/Abort0をCAP Scoreへ独立加算。全参加者終了で敵をCleanupし失敗を再試行する。
 - 保存schema2はcapScoreを追加し、schema1の従来成績をCAP=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
-- 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（34ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。全SEAD地域・両SAM各50点の実地形配置診断は2026-10-09実施済み。全追加SEAD円をMEと同じ18,288 mへ拡大し、Islahiye / Akkar / Morphou / Nicosiaの中心を調整。調整後の全10地域・両SAM各50点で適合点を発見し、観測エラー0。詳細はdocs/SEAD_PLACEMENT_CHECK.md。実Spawn・交戦はDCS内確認待ち。
+- 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（34ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。CAPとSEADの全90組で円外縁の間隔を最大planningRangeNM（SA-6:15 / SA-8:8 NM）＋cap.samSafetyBufferNM（5 NM）以上とする。配置・飛行経路が円外へ出た場合の安全は保証しない。2026-10-09の旧中心の地形検査は履歴として保持。2026-10-14のユーザー移動後は全10地域・両SAM各50点を単一実行し、適合396/1,000・観測エラー0、全20組の実生成と削除を確認した。Morphou NorthのSA-8は適合1/50・初回43回目で不安定な候補。詳細はdocs/SEAD_PLACEMENT_CHECK.md。HARM交戦・抑制・精算と追加CAP哨戒はDCS内確認待ち。
 
 ---
 
@@ -436,7 +436,7 @@ Dynamic Training
 - 同一ミッションを二重生成しない
 - Debug 用メッセージを明確にする
 - エラー時にはゲームを止めず、可能な限りログと画面表示を残す
-- `.miz` のミッション設定・トリガー・リソース対応表を直接編集しない。例外として、登録済みの埋め込み Lua は `scripts/Sync-Mission.ps1` による同期を許可する。2026-10-12のユーザー明示依頼による移行では、Lua定義のCAP5＋SEAD6円を同じ名前・中心・半径でME Trigger Zoneへ登録する変更だけを許可し、既存Zone・機体・経路・トリガー動作・リソース対応表を維持する
+- `.miz` のミッション設定・トリガー・リソース対応表を直接編集しない。例外として、登録済みの埋め込み Lua は `scripts/Sync-Mission.ps1` による同期を許可する。2026-10-12のユーザー明示依頼による移行では、Lua定義のCAP5＋SEAD6円を同じ名前・中心・半径でME Trigger Zoneへ登録する変更だけを許可し、既存Zone・機体・経路・トリガー動作・リソース対応表を維持する。2026-10-14のユーザー明示依頼では、移動済みSEAD4円の地域名修正、CAP3円の中心と地域名修正を許可する。SEADの中心・全半径・Zone ID・その他ME設定は維持する
 - Mission Editor で設定したテンプレート名を勝手に変更しない
 - MOOSE の API を優先して使用する
 - DCS 標準 Lua API と MOOSE API を混在させる場合は理由をコメントする

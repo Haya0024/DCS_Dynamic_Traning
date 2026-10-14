@@ -1,6 +1,8 @@
 # SEAD 訓練ミッション仕様
 
-更新日: 2026-10-13
+更新日: 2026-10-14
+
+2026-10-14のME保存で移動した4円は、その中心・半径を維持して地域名をTurkoglu / Hassa / Morphou North / Gecitkale Eastへ合わせる。CAPはSAMの計画射程と安全余裕を含めて離す。BeirutのSEADはユーザー指定で4候補を許容し、受注時40〜130 NM内の全候補を等確率で選ぶ。状態遷移・50回の安全配置条件・終了方針は変更しない。
 
 ## 今回の実装範囲
 
@@ -11,7 +13,7 @@ F10 の `Dynamic Training → Task: SEAD` で、SA-6 または SA-8 を1グル�
 配置・方式別の情報表示・主要レーダーの状態遷移による成功判定・個別帰還採点・中止を実装する。
 SEAD完了後の残存Siteは、標準のCleanup、即時のDEAD継続、明示保持後の別SortieのDEADに対応する。
 Follow-onの境界・採点・予約は [DEAD.md](DEAD.md) を参照する。SEADの受注計画・配置・目標条件は維持する。
-コードと模擬テストは実装済み。全10地域・両SAM各50点の地形・建物判定診断は2026-10-09に実DCSで実施済み（詳細はSEAD_PLACEMENT_CHECK）。実Spawn、SAMの交戦、TOO / PBの攻撃、レーダー破壊と採点の確認は未実施。
+コードと模擬テストは実装済み。2026-10-14の現在位置で全10地域・両SAM各50点の地形・建物判定と全20組の初期実Spawn・削除をDCSで確認した（詳細はSEAD_PLACEMENT_CHECK）。Morphou NorthのSA-8は適合1/50で不安定な候補。SAMの交戦、TOO / PBの攻撃、レーダー破壊と採点の通し確認は未実施。
 
 ## 受注計画と攻撃方式
 
@@ -187,8 +189,8 @@ Site stateの残存判定はSEADエミッターの終端状態と別に監視す
 - `SEAD_ZONE_DUMAYR`
 - `SEAD_ZONE_TABQA`
 
-追加は `SEAD_ZONE_OSMANIYE` / `SEAD_ZONE_ISLAHIYE` / `SEAD_ZONE_KILIS` / `SEAD_ZONE_MORPHOU` / `SEAD_ZONE_NICOSIA_NORTH` / `SEAD_ZONE_AKKAR` の6円、各半径18,288 m（約9.9 NM、既存ME4地域と同じ）。中心・半径はすべてME Trigger Zoneに置き、MOOSEのZONE:FindByNameで直接取得する。2026-10-12に追加6円を座標・半径不変でMEへ移行し、Luaの代替定義を削除した。受注時の40〜130 NM判定、選定後の50回検査、安全配置条件は同じ。
-全候補の座標と各出撃地点からの2〜3候補は [TRAINING_AREAS.md](TRAINING_AREAS.md)。実ミッションの全Client駐機位置と各地点の全候補の計画・生成・解除をTest-ZoneCoverageで模擬検証済み。新地域を含む全10地域の配置条件は2026-10-09に実DCSで両SAM各50点を検査。全追加SEAD円をMEと同じ18,288 mへ拡大し、Islahiye / Akkar / Morphou / Nicosiaの中心を調整。調整後の全10地域・両SAM各50点で適合点を発見し、観測エラー0。詳細はSEAD_PLACEMENT_CHECKを参照。実Spawn・交戦は確認待ち。
+追加は `SEAD_ZONE_TURKOGLU` / `SEAD_ZONE_HASSA` / `SEAD_ZONE_KILIS` / `SEAD_ZONE_MORPHOU_NORTH` / `SEAD_ZONE_GECITKALE_EAST` / `SEAD_ZONE_AKKAR` の6円、各半径18,288 m（約9.9 NM、既存ME4地域と同じ）。中心・半径はすべてME Trigger Zoneに置き、MOOSEのZONE:FindByNameで直接取得する。2026-10-12に追加6円を座標・半径不変でMEへ移行し、Luaの代替定義を削除した。受注時の40〜130 NM判定、選定後の50回検査、安全配置条件は同じ。
+全候補の座標と各出撃地点からの2〜4候補（Beirutは4）は [TRAINING_AREAS.md](TRAINING_AREAS.md)。全Client駐機位置と各地点の全候補の計画・生成・解除をTest-ZoneCoverageで模擬検証済み。2026-10-09の地形標本は当時の中心位置の結果として保持し、今回ユーザーが移動した4円へ流用しない。現在の実地形抽選・初期Spawn/削除の結果は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。HARM交戦・抑制・精算は別の確認項目とする。
 
 名前と判定値は [src/config.lua](../src/config.lua) の `sead` に集約する。
 ME で名前を変更したら設定・仕様書・テストの対応も更新する。
@@ -305,7 +307,7 @@ SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSi
   状態遷移、60秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
 
 `scripts/Test-All.ps1`で両bundleを結合後、Lua全9スイートとBuild/Sync/Installテストを実行する。
-SEAD66件・DEAD103件を含む対応表と現在の全件数は [TESTING.md](TESTING.md) を参照する。
+SEAD69件・DEAD103件を含む対応表と現在の全件数は [TESTING.md](TESTING.md) を参照する。
 実際のDCSでのRadar状態・損傷Life・イベント順序・残存SAMのCleanupはゲーム内確認待ち。
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。

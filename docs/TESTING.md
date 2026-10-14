@@ -22,22 +22,22 @@
 | SCORE | [Test-Scoring.lua](../scripts/Test-Scoring.lua) | 26 | UCID、帰還、事故、重複防止、累計 |
 | WING | [Test-Wing.lua](../scripts/Test-Wing.lua) | 27 | MP2、参加者固定、共有目標、個別精算、排他 |
 | PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 16 | 複数ウィングの並行処理と独立性 |
-| SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 66 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止、全地域50点の診断制御 |
+| SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 69 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止、全地域50点の診断制御 |
 | DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 103 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
 | PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 44 | schema1→2移行・CAP保存復元・未知schema保護、保存確認、再起動・遅延復元、native I/O、backup、run、Hook/manager/SSE分離、callback寿命、スロット未選択 |
 | MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
-| ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 2確認グループ | 実.mizの全Client駐機位置でCAP/SEAD各2〜3候補、全19円のME登録・可視性・半径・名前/IDの一意性、全候補の受注・SEAD生成・解除、MEのみの参照・欠落時解除・再受注 |
+| ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 3確認グループ | 実.mizの全Client駐機位置でCAP2〜3・SEAD2〜4候補、全19円のME登録・可視性・半径・名前/IDの一意性、全候補の受注・SEAD生成・解除、MEのみの参照・欠落時解除・再受注、CAP/SEAD全90組でSAM計画射程＋安全余裕の離隔 |
 
-Luaは合計356ケース（INT22＋CAP34＋SCORE26＋WING27＋PAR16＋SEAD66＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。Test-ZoneCoverage.luaはZONESが実.mizのmissionデータを前置して実行する結合検証で、356ケースとは別の2確認グループとして数える。
+Luaは合計359ケース（INT22＋CAP34＋SCORE26＋WING27＋PAR16＋SEAD69＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。Test-ZoneCoverage.luaはZONESが実.mizのmissionデータを前置して実行する結合検証で、359ケースとは別の3確認グループとして数える。
 
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-13、`training-8`のIntercept表示更新。Lua全356ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。INT-16は単独/MP2の地上/空中受注で、開始通知が15秒のタイトル1行だけで1回表示され、Range・Altitude・HOTがDEBUGだけへ1回記録されることを確認する。実.mizのSync/Check成功、登録済みDynamicTraining.lua以外のZIP内容不変、給油機・AI2削除・ニーボード維持を確認。実DCSの表示確認は未実施。
+最新の自動検証: 2026-10-14。Lua全359ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES3が通過。SEADの任意実生成診断をSEAD-67〜69で確認し、実.mizの全15 ClientでCAP2〜3・SEAD2〜4候補と全90組のSAM離隔を確認。実地形の50点抽選・SAM実生成結果は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。
 
 2026-10-12の自動検証、`training-8`。Lua全356ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP9＋SEAD10をすべてME円へ統一し、ZONESは全19円の存在・円形・半径18,288 m・可視性・名前/IDの一意性、全出撃Clientから各2〜3候補と全候補の受注・生成・中止を確認する。ME実体の直接参照、Zone欠落時にLua円で補完しないこと、受注失敗後のロック解放・復旧後の再受注も確認。CAP-31は死亡後の再搭乗位置を出撃地点へ戻すfixtureを明示し、GC・イベント受信の期待値を維持する。SEAD-63〜66は全10候補をME境界のfixtureとして与える。
 
@@ -68,7 +68,7 @@ MOOSE本体や実際のSyria地形・SAM AI・DCSのイベント配信・サー�
 すべてリポジトリのルートから実行する。Lua 5.1互換の実行環境とWindows PowerShellを使用する。
 最初に結合を行い、古い `build/DynamicTraining.lua` をテストしない。
 
-一括実行は次を使う。両bundleの結合、Lua全9スイート、BUILD2、SYNC3、INSTALL5、ZONES2の順に実行し、失敗した段階で停止する。実ミッションへの同期は別途行う。`-LuaPath`はINSTALL内の別プロセス検証とZONESにも引き継ぐ。
+一括実行は次を使う。両bundleの結合、Lua全9スイート、BUILD2、SYNC3、INSTALL5、ZONES3の順に実行し、失敗した段階で停止する。実ミッションへの同期は別途行う。`-LuaPath`はINSTALL内の別プロセス検証とZONESにも引き継ぐ。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1
@@ -388,6 +388,9 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | SEAD-64 | 全診断点をnon-LANDで拒否 | 各50点・計1,000点を検査しpassed=0、拒否理由に50件、エラーと区別 |
 | SEAD-65 | SA-6テンプレート欠落、SA-8は正常 | 10組合せはSETUP_ERROR/checked=0、残り500点は検査。欠落を地形失敗や成功に置換しない |
 | SEAD-66 | 全診断点の地形APIが例外 | 各50点を観測エラーとして集計し、passed=0・errors=1,000。実地形不適合と混ぜない |
+| SEAD-67 | 任意SpawnCheckで全10地域・両SAMを生成、削除後2秒は生存表示を返す | 各組50点の検査後に計20 Groupを配置点・構成確認して削除。削除反映を待ち、通常任務・採点を初期化しない |
+| SEAD-68 | SpawnCheckで全地点不適合、またはSpawn APIがnil | 不適合はSPAWN_SKIPPED、生成失敗はspawnErrors=20。地形適合と実生成成功を混同しない |
+| SEAD-69 | 診断SAMのDestroyが例外 | 50点・1生成で診断停止、cleanupErrors=1・complete=false。残った診断Groupで後続抽選を汚染しない |
 
 ### DEAD follow-on（DEAD）
 
@@ -656,8 +659,9 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-53 | CAPで時間先行／敵全滅先行、達成後の帰還／事故を別任務で確認。Intercept後に同Slot再搭乗し、長時間飛行したCAPの途中脱出も確認 | 120秒＋敵全滅の両方で達成。時間達成後は空域外撃墜も有効。帰還150、達成後事故90、未達成死亡FAILED/0、任意中止ABORT/0。SOLO死亡後はACTIVE・Wing/UCIDロックを残さない。起動ログversion=training-8、Registered aircraft → Failure event received → Failure event matched → FAILED/0 → closedの記録を確認 |
 | MAN-54 | MP2で片方だけ進入、両者退出、1人個人中止。別Wingでも並行受注 | 元の未精算参加者の誰か1人が内側なら進み、全員外なら停止。中止者0、僚機継続。別Wingの時計・敵・ロックは独立 |
 | MAN-55 | 新Hook導入後DCS再起動、旧schemaの成績でホスト。CAP精算保存後に閉じ再ホスト | schema1をCAP=0で移行し既存得点保持。CAP ScoreとTotal/Careerを保存確認後、次セッションで復元。実成績をfixtureで書き換えない |
-| MAN-56 | training-8で4空港と空母からCAP/SEADを受注。全候補を個別確認し、範囲外位置でCAPを受注して戻る | TRAINING_AREASの各2〜3候補から選定。CAP中心40〜100 NM、SEAD中心40〜130 NM。CAP候補なしの通知20秒とロック解放、戻った後の再受注。SEAD追加6地域の実地形・障害物・SAM交戦もMAN-06で確認 |
+| MAN-56 | training-8で4空港と空母からCAP/SEADを受注。全候補を個別確認し、範囲外位置でCAPを受注して戻る | TRAINING_AREASのCAP2〜3・SEAD2〜4候補から選定。CAP中心40〜100 NM、SEAD中心40〜130 NM。CAP候補なしの通知20秒とロック解放、戻った後の再受注。SEAD追加6地域の実地形・障害物・SAM交戦もMAN-06で確認 |
 | MAN-57 | 配置検査専用ミッションを開始して一時停止せず完了まで待つ | 全10地域×SA-6/SA-8で各checked=50、20 RESULT、COMPLETE checked=1,000/errors=0。成功数・初回成功回・拒否理由を記録。SAM生成・精算・保存なし。2026-10-09実施済み：20組合せ各50点、初期5 NMは適合350/1,000、Islahiye両方0/50。半径統一・中心調整後は各地域の最終設定に一致する複数実行を合算して適合352/1,000、観測エラー0、全地域で両SAMの適合点を発見。地域指定の再検査では対象地域数×2×50点を確認。結果はSEAD_PLACEMENT_CHECKとHISTORYを参照 |
+| MAN-58 | `Build-SEADPlacementMission.ps1 -SpawnCheck`で検査用ミッションを作成し、隔離プロファイルで完了まで待つ | 全20組合せ各50点、checked=1,000・errors=0、20件の実生成と削除確認、spawned=20・spawnErrors=0・cleanupErrors=0。4両/1両・主要レーダー・配置位置を確認。HARM交戦・精算とは区別する。2026-10-14実施済み、適合396/1,000・観測エラー0・実生成20・削除確認20 |
 
 
 MAN-10〜14は、実際にLife減少とRadar ON/OFFの前提を確認できたときに実施済みとする。
@@ -671,7 +675,7 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | 変更箇所 | 最初に確認するスイート | 追加確認 |
 |---|---|---|
 | Interceptの配置・編隊・テンプレート | INT | WING/PARで共有・独立性、MAN-02〜04 |
-| CAPの空域・時計・敵・達成 | CAP全34件、ZONES2 | MAN-52〜56、INT/WING/PAR回帰、全候補のME登録、テンプレート確認 |
+| CAPの空域・時計・敵・達成 | CAP全34件、ZONES3 | MAN-52〜56、INT/WING/PAR回帰、全候補のME登録、テンプレート確認 |
 | SEAD計画・Zone・地形・情報表示 | SEAD | MAN-05〜08、MEの実設定とfixtureの整合 |
 | 座標表示時間・開始通知 | INT-16 / SEAD-62 / DEAD-08/16/17 | MAN-02/07/08/25/28、SEADの計画ブリーフィングと座標付きStatusが初期60秒で表示されること |
 | SEADの状態機械・Life/Radar | SEAD-45〜59 | MAN-09〜14 |

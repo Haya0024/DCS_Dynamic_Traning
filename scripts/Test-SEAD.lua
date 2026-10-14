@@ -1083,7 +1083,7 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
   end
 end)
 
-local function placementDiagnostic(s)
+local function placementDiagnostic(s, options)
     local cfg = dofile("src/config.lua")
     local function loadModule(path)
         local chunk = assert(loadfile(path)); setfenv(chunk, s.env); return chunk()
@@ -1103,11 +1103,12 @@ local function placementDiagnostic(s)
     local diagnostic = dofile("scripts/SEAD-PlacementCheck.lua")
     local output = {}
     local results = diagnostic.Start(cfg, sead, s.env.ZONE, s.env.timer,
-        function(text) output[#output + 1] = text end)
-    for time = 1, 501 do s:tick(time) end
-    assert(results.complete and #results.rows == 20 and #s.spawns == 0 and not s:mission())
+        function(text) output[#output + 1] = text end, options)
+    for time = 1, 601 do s:tick(time) end
+    assert(results.complete == not results.aborted and #results.rows == 20 and not s:mission())
+    if not options or not options.spawnCheck then assert(#s.spawns == 0) end
     assert(#cfg.sead.zones == 10 and #cfg.sead.templates == 2)
-    assert(output[#output]:find("COMPLETE pairs=20", 1, true))
+    assert(output[#output]:find(results.aborted and "ABORTED" or "COMPLETE pairs=20", 1, true))
     return results
 end
 
@@ -1139,6 +1140,57 @@ test("placement diagnostic counts observation exceptions separately instead of t
     local results = placementDiagnostic(s)
     assert(results.checked == 1000 and results.passed == 0 and results.errors == 1000)
     for _, row in ipairs(results.rows) do assert(row.errors == 50 and row.rejections["observation error"] == 50) end
+end)
+
+test("optional placement spawn check creates and removes both SAM types in every zone without initializing missions", function()
+    local s = setup()
+    local originalSpawn = s.env.SPAWN.SpawnFromVec2
+    s.env.SPAWN.SpawnFromVec2 = function(self, point)
+        local g = originalSpawn(self, point)
+        local originalDestroy = g.Destroy
+        g.Destroy = function(self)
+            g.removalTime = s.time
+            return originalDestroy(self)
+        end
+        for _, unit in ipairs(g.units) do
+            local originalAlive = unit.IsAlive
+            unit.IsAlive = function(self)
+                if g.removalTime and s.time < g.removalTime + 2 then return true end
+                return originalAlive(self)
+            end
+        end
+        return g
+    end
+    local results = placementDiagnostic(s, { spawnCheck = true })
+    assert(results.checked == 1000 and results.passed == 1000 and results.errors == 0)
+    assert(results.spawned == 20 and results.spawnErrors == 0 and results.cleanupErrors == 0 and #s.spawns == 20)
+    for _, row in ipairs(results.rows) do assert(row.spawned and row.firstPoint and not row.spawnError) end
+    for _, g in ipairs(s.spawns) do assert(g.destroyed and g.stopped and g.alarmRed and g.openFire) end
+    s:assertClean()
+end)
+
+test("optional placement spawn check distinguishes rejected terrain and failed spawn from successful generation", function()
+    for _, problem in ipairs({ "terrain", "spawn" }) do
+        local s = setup()
+        if problem == "terrain" then s.surfaceLand = function() return false end else s.failSpawn = true end
+        local results = placementDiagnostic(s, { spawnCheck = true })
+        assert(results.spawned == 0 and results.errors == 0 and results.cleanupErrors == 0)
+        assert(results.spawnErrors == (problem == "spawn" and 20 or 0) and #s.spawns == 0)
+        for _, row in ipairs(results.rows) do
+            if problem == "terrain" then assert(row.spawnSkipped and row.passed == 0)
+            else assert(row.spawnError and row.passed == 50) end
+        end
+        s:assertClean()
+    end
+end)
+
+test("optional placement spawn check stops sampling if the diagnostic SAM cannot be removed", function()
+    local s = setup(); s.spawnCleanupFailures = 1
+    local results = placementDiagnostic(s, { spawnCheck = true })
+    assert(results.aborted and not results.complete and results.checked == 50)
+    assert(results.spawned == 1 and results.cleanupErrors == 1 and results.spawnErrors == 0)
+    assert(#s.spawns == 1 and not s.spawns[1].destroyed)
+    s:assertClean()
 end)
 
 print(string.format("All %d SEAD tests passed (simulated DCS/MOOSE).", count))

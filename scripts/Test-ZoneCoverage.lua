@@ -50,7 +50,8 @@ for _, country in pairs(mission.coalition.blue.country) do
                 origins[key] = origins[key] or origin
                 for _, category in ipairs({ "cap", "sead" }) do
                     local n = #eligible(category, origin)
-                    assert(n >= 2 and n <= 3, unit.name .. ": " .. category .. " candidates=" .. n)
+                    local maximum = category == "cap" and 3 or 4
+                    assert(n >= 2 and n <= maximum, unit.name .. ": " .. category .. " candidates=" .. n)
                 end
                 slots = slots + 1
             end
@@ -89,7 +90,7 @@ for key, origin in pairs(origins) do
     print("Coverage " .. key .. ": CAP=" .. #eligible("cap", origin) .. ", SEAD=" .. #eligible("sead", origin))
 end
 assert(bases == 5 and slots >= 5, "All four airfields and carrier slots must be covered")
-print("PASS: actual .miz departure slots have 2-3 CAP/SEAD areas; every candidate accepts and spawns in simulation")
+print("PASS: actual .miz slots have 2-3 CAP and 2-4 SEAD areas; every candidate accepts and spawns in simulation")
 
 local s = scenario()
 local actual = {}
@@ -119,3 +120,24 @@ assert(s.zones[record.plan.zoneName]:IsVec2InZone(record.plan.actualSpawnPoint))
 s:command("Abort Mission")
 assert(not s:mission())
 print("PASS: ME is the only zone source; missing zones fail safely and release locks for retry")
+
+local maximumRange = 0
+for _, template in ipairs(config.sead.templates) do
+    local range = template.planningRangeNM
+    assert(type(range) == "number" and range > 0 and range < math.huge, "SAM planning range required")
+    maximumRange = math.max(maximumRange, range)
+end
+local buffer = config.cap.samSafetyBufferNM
+assert(type(buffer) == "number" and buffer >= 0 and buffer < math.huge, "CAP SAM safety buffer required")
+local closest, pairsChecked = math.huge, 0
+for _, capName in ipairs(config.cap.zones) do
+    for _, seadName in ipairs(config.sead.zones) do
+        local cap, sead = me[capName], me[seadName]
+        local gap = (math.sqrt((cap.x - sead.x)^2 + (cap.y - sead.y)^2) - cap.radius - sead.radius) / 1852
+        assert(gap >= maximumRange + buffer, capName .. " near " .. seadName .. ": edge gap=" .. gap .. " NM")
+        closest, pairsChecked = math.min(closest, gap), pairsChecked + 1
+    end
+end
+assert(pairsChecked == 90)
+print(string.format("PASS: all 90 CAP/SEAD pairs clear the %g NM SAM envelope plus %g NM buffer; minimum edge gap=%.1f NM",
+    maximumRange, buffer, closest))

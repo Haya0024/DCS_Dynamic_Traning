@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$ZoneNames)
+param([string]$ZoneNames, [switch]$SpawnCheck)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $testRoot = Join-Path $projectRoot 'build/sead-placement-project'
@@ -25,8 +25,10 @@ if ($ZoneNames) {
 $entry = "-- Placement diagnostic only. Normal runtime and persistence are not initialized.`n" + $selection + "local PlacementCheck = (function()`n" + $controller + "`nend)()`n" + @'
 SEADPlacementCheckResults = PlacementCheck.Start(Config, SEAD, ZONE, timer, function(text)
     env.info("[SEADPlacementCheck] " .. text)
-end)
+end, { spawnCheck = __SPAWN_CHECK__ })
 '@
+$spawnFlag = if ($SpawnCheck) { 'true' } else { 'false' }
+$entry = $entry.Replace('__SPAWN_CHECK__', $spawnFlag)
 [System.IO.File]::WriteAllText((Join-Path $testRoot 'src/main.lua'), $entry, [System.Text.UTF8Encoding]::new($false))
 & (Join-Path $testRoot 'scripts/Sync-Mission.ps1')
 & (Join-Path $testRoot 'scripts/Sync-Mission.ps1') -Check

@@ -306,7 +306,7 @@ test("acceptance distance includes forty and one hundred NM and excludes both ou
     for draw = 1, 2 do
         local s = new()
         s.player.position = { x = -1000000, y = 0, z = 0 }
-        for i, name in ipairs({ "CAP_ZONE_CENTRAL_COAST", "CAP_ZONE_GOLAN", "CAP_ZONE_NORTH_COAST", "CAP_ZONE_HOMS_WEST" }) do
+        for i, name in ipairs({ "CAP_ZONE_CENTRAL_COAST", "CAP_ZONE_GOLAN", "CAP_ZONE_NORTH_COAST", "CAP_ZONE_LATAKIA_SOUTH" }) do
             local nm = ({ 39.999, 40, 100, 100.001 })[i]
             s.zones[name].center = { x = s.player.position.x + nm * 1852, y = 0 }
         end

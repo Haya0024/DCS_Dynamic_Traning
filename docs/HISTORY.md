@@ -2,6 +2,20 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-14 Zone地域名・CAP/SAM離隔・SEAD実生成確認
+
+ユーザーがMEでSEAD4円の中心を移動し、名称の整合と生成可否の検査を依頼。最新保存座標を基準に、Osmaniye→Turkoglu、Islahiye→Hassa、Morphou East→Morphou North、Nicosia North/East→Gecitkale EastへZone参照名と画面地域名を合わせた。ユーザー回答に従いSEAD中心・半径を維持し、BeirutのSEAD4候補を許容する。
+
+CAPは引き続きSAM射程外へ移す依頼があり、Homs West→Latakia South、Iskenderun→Hatay South、Osmaniye→Mersin Southの3円を移動・改名。全CAP9×SEAD10の90組で円外縁間隔を、最大SAM計画射程15 NM＋安全余裕5 NM以上とし、最短23.8 NM。全15 ClientのCAP2〜3・SEAD2〜4候補を検証した。計画射程はSA-6:15/SA-8:8 NM、余裕5 NMをConfigに置き、Test-ZoneCoverageの第3確認グループで継続検査する。CAP円外への進入・追撃やCAP敵機の円外経路まで隔離するものではない。
+
+変更前を.miz.cap-sead-20261014.bakへ保存。mission全体の意味比較で7円の名前とCAP3中心以外が不変なことを確認し、登録済みLuaをSync/Check。ZIP比較でもmission・DynamicTraining.lua以外の内容、給油機・AWACS・空母・ニーボードを維持した。
+
+任意SpawnCheck診断を追加し、適合した最初の地点へ通常SEAD.Spawnで各SAMを1回生成、構成・主要レーダー・活動状態・実位置を確認して削除する。最初の実行はPalmyraのSA-6を生成できたが、同フレームでの削除確認が早すぎて停止。削除反映を最低3秒待つよう修正し、10秒で確認できなければ停止する方式を模擬テストへ追加した。最初の部分ログは合算しない。
+
+DCS 2.9.30.28738の隔離プロファイルで15:30:58〜15:40:00 JSTに全20組合せ各50点・計1,000点を再実行。適合396点・観測エラー0、実生成20・削除確認20、生成／削除エラー0。全地域で両SAMを生成できた。ただしMorphou NorthのSA-8は1/50、初回43回目であり、配置の安定性には改善余地がある。保存座標を維持する指定に従い追加移動は行わなかった。診断用DCSだけを終了し、通常Config・Hook・成績を変更していない。HARM交戦・抑制FSM・帰還採点の通し確認は未実施。
+
+Lua全359ケース（SEAD69を含む9スイート）、BUILD2・SYNC3・INSTALL5・ZONES3が通過。詳細表・ログ所在はSEAD_PLACEMENT_CHECK、全座標・距離・改名対応はTRAINING_AREAS。MEで開いていた場合は更新版を開き直し、サーバーでは更新した.mizでミッションを再開始する。
+
 ## 2026-10-13 Continue直後の通知にも実配置座標を追加
 
 追加依頼で、Continue as DEADの開始通知末尾へSITE LOCATIONと正確なSite座標を追加。従来の開始・指示・残数・報酬の5行は維持し、DDM・分の小数3桁で1回表示する。座標表示時間は共通のcoordinateBriefingSeconds（初期60秒）へ変更。座標取得・整形は移行前に行い、失敗時は元SEADの帰還評価と採点・Site状態を維持する。Continue前・Preserveのみの秘匿と手動Statusの表示は維持する。

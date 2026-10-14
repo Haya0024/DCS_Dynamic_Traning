@@ -1,76 +1,71 @@
 # 訓練Zoneと出撃地点からの距離
 
-更新日: 2026-10-12 / training-8
+更新日: 2026-10-14 / training-8
 
-CAPは受注時の長機からZone中心まで40〜100 NM、SEADは40〜130 NMを含む候補から等確率で1つ選ぶ。CAPは9候補、SEADは10候補で、すべて実ミッションのME円形Zoneとして登録する。機体位置を動的に使い、空港名による受注条件分岐は設けない。受注後の移動・長機交代で選び直さない。
+CAPは受注時の長機からZone中心まで40〜100 NM、SEADは40〜130 NMを含む候補から等確率で1つ選ぶ。CAP9円・SEAD10円はすべて実ミッションのME円形Zone。空港名で受注条件を分岐せず、受注後の移動・長機交代で再抽選しない。
 
 ## 各出撃地点の候補
 
-以下は4空港のDCS基準点とCVN-71のミッション初期位置からの水平直線距離、単位はNM。各地点で両任務とも2〜3候補になる。実際の受注では駐機位置・空中位置・移動中の空母に応じて候補が変わる。
+4空港の基準点とCVN-71の初期位置からの水平直線距離、単位はNM。CAPは各2〜3候補、SEADはBeirutが4候補、他は各2〜3候補。Beirutの4候補はユーザー指定で許容する。全15 Client駐機位置でも候補数を検証する。実際の受注は機体の現在位置を使う。
 
 | 出撃地点 | CAP候補（40〜100 NM） | SEAD候補（40〜130 NM） |
 |---|---|---|
-| Incirlik | North Coast 44.4 / Iskenderun 61.5 / Osmaniye 58.9 | Osmaniye 58.9 / Islahiye 62.7 / Kilis 83.9 |
-| Akrotiri | Cyprus West 58.7 / Cyprus East 48.1 | Morphou East 41.2 / Nicosia East 41.7 |
-| Beirut | Central Coast 65.3 / Homs West 72.1 / Cyprus East 86.5 | Salamiyah 112.2 / Dumayr 81.2 / Akkar 56.7 |
+| Incirlik | North Coast 44.4 / Hatay South 65.8 / Mersin South 50.8 | Turkoglu 73.8 / Hassa 57.6 / Kilis 83.9 |
+| Akrotiri | Cyprus West 58.7 / Cyprus East 48.1 | Morphou North 41.9 / Gecitkale East 56.6 |
+| Beirut | Central Coast 65.3 / Latakia South 85.4 / Cyprus East 86.5 | Salamiyah 112.2 / Dumayr 81.2 / Akkar 56.7 / Gecitkale East 117.5 |
 | Ramat | Golan 55.9 / Levant South 85.5 | Dumayr 108.9 / Akkar 125.7 |
-| Carrier | Golan 88.1 / Cyprus East 67.8 / Levant South 51.2 | Akkar 124.2 / Morphou East 122.7 / Nicosia East 114.5 |
+| Carrier | Golan 88.1 / Cyprus East 67.8 / Levant South 51.2 | Akkar 124.2 / Morphou North 127.1 / Gecitkale East 111.9 |
 
-空港基準点と緯度経度の換算は[pydcsのSyria空港定義](https://github.com/pydcs/dcs/blob/master/dcs/terrain/syria/airports.py)と[投影定義](https://github.com/pydcs/dcs/blob/master/dcs/terrain/syria/projection.py)を参照。既存Zone中心と空母初期位置はレポ内の実ミッションから取得した。駐機位置からの距離には基準点との差があるが、実ミッションの全出撃用Client位置でも2〜3候補を検証する。
-
-追加SEAD6地域は、既存MEと同じ半径18,288 m（約9.9 NM）に統一する。中心距離で選定するため、半径の拡大だけでは候補数は変わらない。実地形の適合点を根拠にIslahiye / Akkar / Morphou / Nicosiaの中心も調整し、すべての実Client駐機位置で2〜3候補を再検証する。識別子は維持し、地域表示名はMorphou East / Nicosia Eastへ合わせる。
+基準点と緯度経度換算は[pydcsのSyria空港定義](https://github.com/pydcs/dcs/blob/master/dcs/terrain/syria/airports.py)と[投影定義](https://github.com/pydcs/dcs/blob/master/dcs/terrain/syria/projection.py)を参照。Zoneと空母位置は保存済み.mizから取得。駐機位置や移動中の空母からの距離は表と異なる。
 
 ## Zone一覧
 
-| 名前 | 中心DDM | 半径 | 定義元 |
-|---|---|---:|---|
-| `CAP_ZONE_CENTRAL_COAST` | N34°53.691′ E035°14.162′ | 約9.9 NM | ME |
-| `CAP_ZONE_GOLAN` | N33°24.231′ E035°51.718′ | 約9.9 NM | ME |
-| `CAP_ZONE_NORTH_COAST` | N36°15.794′ E035°29.417′ | 約9.9 NM | ME |
-| `CAP_ZONE_HOMS_WEST` | N34°53.223′ E036°09.761′ | 約9.9 NM | ME |
-| `SEAD_ZONE_PALMYRA` | N34°39.320′ E037°58.327′ | 約9.9 NM | ME |
-| `SEAD_ZONE_SALAMIYAH` | N34°53.202′ E037°20.578′ | 約9.9 NM | ME |
-| `SEAD_ZONE_DUMAYR` | N33°33.074′ E037°04.271′ | 約9.9 NM | ME |
-| `SEAD_ZONE_TABQA` | N35°36.486′ E038°42.714′ | 約9.9 NM | ME |
-| `SEAD_ZONE_OSMANIYE` | N37°03.000′ E036°39.000′ | 約9.9 NM | ME |
-| `SEAD_ZONE_ISLAHIYE` | N36°57.835′ E036°43.708′ | 約9.9 NM | ME |
-| `SEAD_ZONE_KILIS` | N36°48.000′ E037°09.000′ | 約9.9 NM | ME |
-| `SEAD_ZONE_AKKAR` | N34°37.056′ E036°06.281′ | 約9.9 NM | ME |
-| `SEAD_ZONE_MORPHOU` | N35°15.725′ E033°09.183′ | 約9.9 NM | ME |
-| `SEAD_ZONE_NICOSIA_NORTH` | N35°11.604′ E033°24.210′ | 約9.9 NM | ME |
-| `CAP_ZONE_CYPRUS_WEST` | N33°57.000′ E032°06.000′ | 約9.9 NM | ME |
-| `CAP_ZONE_CYPRUS_EAST` | N34°30.000′ E033°57.000′ | 約9.9 NM | ME |
-| `CAP_ZONE_LEVANT_SOUTH` | N32°42.000′ E033°30.000′ | 約9.9 NM | ME |
-| `CAP_ZONE_ISKENDERUN` | N36°27.000′ E036°30.000′ | 約9.9 NM | ME |
-| `CAP_ZONE_OSMANIYE` | N37°00.000′ E036°39.000′ | 約9.9 NM | ME |
+| 名前 | 地域表示名 | 中心DDM | 半径 |
+|---|---|---|---:|
+| `CAP_ZONE_NORTH_COAST` | North Coast | N36°15.794′ E035°29.417′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_CENTRAL_COAST` | Central Coast | N34°53.691′ E035°14.162′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_LATAKIA_SOUTH` | Latakia South | N35°15.000′ E035°30.000′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_GOLAN` | Golan | N33°24.231′ E035°51.718′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_CYPRUS_WEST` | Cyprus West | N33°57.000′ E032°06.000′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_CYPRUS_EAST` | Cyprus East | N34°30.000′ E033°57.000′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_LEVANT_SOUTH` | Levant South | N32°42.000′ E033°30.000′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_HATAY_SOUTH` | Hatay South | N36°06.000′ E036°12.000′ | 18,288 m（約9.9 NM） |
+| `CAP_ZONE_MERSIN_SOUTH` | Mersin South | N36°25.000′ E034°40.000′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_PALMYRA` | Palmyra | N34°39.320′ E037°58.327′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_SALAMIYAH` | Salamiyah | N34°53.202′ E037°20.578′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_DUMAYR` | Dumayr | N33°33.074′ E037°04.271′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_TABQA` | Tabqa | N35°36.486′ E038°42.714′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_TURKOGLU` | Turkoglu | N37°22.678′ E036°53.481′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_HASSA` | Hassa | N36°45.451′ E036°34.934′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_KILIS` | Kilis | N36°48.000′ E037°09.000′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_AKKAR` | Akkar | N34°37.056′ E036°06.281′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_MORPHOU_NORTH` | Morphou North | N35°17.237′ E033°00.424′ | 18,288 m（約9.9 NM） |
+| `SEAD_ZONE_GECITKALE_EAST` | Gecitkale East | N35°13.677′ E033°49.815′ | 18,288 m（約9.9 NM） |
 
+## 2026-10-14の改名とCAP移動
 
-## 調整後の追加SEAD中心（DCS Vec2）
+ユーザーがMEで移動したSEAD4円の中心・半径は維持し、実際の地域へ名前を合わせた。CAP3円はSAM射程から離して改名。その他の円・半径・Zone ID・機体・経路・トリガー・リソース対応表は変更しない。
 
-| Zone | x（北方向m） | y（東方向m） | 半径m |
-|---|---:|---:|---:|
-| OSMANIYE | 223136 | 73828 | 18288 |
-| ISLAHIYE | 213414 | 80579 | 18288 |
-| KILIS | 194417 | 117757 | 18288 |
-| MORPHOU | 37949 | -249346 | 18288 |
-| NICOSIA_NORTH | 29000 | -226958 | 18288 |
-| AKKAR | -45416 | 17335 | 18288 |
+| 旧Zone名 | 現在のZone名 | 座標変更 |
+|---|---|---|
+| `SEAD_ZONE_OSMANIYE` | `SEAD_ZONE_TURKOGLU` | ユーザー保存座標を維持 |
+| `SEAD_ZONE_ISLAHIYE` | `SEAD_ZONE_HASSA` | ユーザー保存座標を維持 |
+| `SEAD_ZONE_MORPHOU` | `SEAD_ZONE_MORPHOU_NORTH` | ユーザー保存座標を維持 |
+| `SEAD_ZONE_NICOSIA_NORTH` | `SEAD_ZONE_GECITKALE_EAST` | ユーザー保存座標を維持 |
+| `CAP_ZONE_HOMS_WEST` | `CAP_ZONE_LATAKIA_SOUTH` | CAP中心を移動 |
+| `CAP_ZONE_ISKENDERUN` | `CAP_ZONE_HATAY_SOUTH` | CAP中心を移動 |
+| `CAP_ZONE_OSMANIYE` | `CAP_ZONE_MERSIN_SOUTH` | CAP中心を移動 |
 
-## 定義と変更方法
+## CAPとSAMの離隔
 
-候補名・地域表示名・距離制限は `src/config.lua` の `cap` / `sead`、全Zoneの中心・半径は `mission/Persistent_and_Dynamic_FA-18C_Training.miz` のME Trigger Zoneを唯一の定義元とする。座標はSyriaのDCS Vec2メートル座標（x=北方向、y=東方向）。他マップへ移植するときはMEでZoneを配置し、Configの候補名を一致させる。
+全CAP9円×SEAD10円の90組で、中心距離から両半径を引いた外縁間隔を20 NM以上にする。`sead.templates[].planningRangeNM`はSA-6:15 NM、SA-8:8 NM、`cap.samSafetyBufferNM`は5 NM。全Zoneで両SAMが抽選されるため最大値15＋5を適用する。現在の最短外縁間隔は23.8 NM（Hatay South / Hassa）。
 
-CAP / SEADと配置診断はMOOSEの `ZONE:FindByName` でME Zoneを直接参照する。Config.zoneDefinitionsとtraining_zones.luaは削除し、Luaで代替円を生成しない。追加していた11円は2026-10-12のユーザー依頼で同じ座標・半径のままMEへ移し、名前・座標・半径はMEで確認・編集できる。初回移行では既存8円を維持し、zoneId 312〜322を重複なく追加した。
+計画射程はインストール済みDCSの3M9M Kub / 9M33 Osa定義（D_max:25,000 / 10,300 m）に余裕を取った配置検証値で、AIの発射射程を変更する値ではない。CAP円内と、全車両をSEAD円内へ配置する条件を対象にする。進入・追撃でCAP円外へ出る場合、CAP敵機の円外生成・進入経路、別途MEで配置したSAMまでは安全を保証しない。
 
-Zoneの追加・移動・半径変更はMEで行い、候補名・距離制限の変更はConfigで行う。MEで保存後、Test-ZoneCoverageを実行して候補の存在・円形・距離条件を再確認する。Luaを編集した場合は従来どおりSync/Checkする。ゲーム内反映には更新した.mizでミッションを再開始し、開いているMEではファイルを開き直す。
+## 定義・変更・検証
 
-## 安全配置と確認範囲
+候補名・地域表示名・距離制限は`src/config.lua`、全円の中心・半径はME Trigger Zoneが唯一の定義元。Luaの代替円は持たない。通常の変更はMEで行う。名称変更はConfigと仕様書へ揃え、Lua変更後はSync/Check、MEでは開き直してミッションを再開始する。
 
-追加SEAD地域もLAND、全車両と地形確認点のZone内収容、200m内の高低差20m以内、障害物から200m以上、他Siteとの離隔を検査する。選んだZoneだけを最大50回試し、不合格なら安全に解除する。別Zoneへの変更や配置条件の緩和は行わない。候補数は中心距離の条件を示し、実地形の配置成功率はDCSで確認する。
+`scripts/Test-ZoneCoverage.ps1`は全ClientのCAP2〜3・SEAD2〜4候補、全19円の存在・一意な名前/ID・可視性・半径、全候補の受注・模擬生成・解除、ME欠落時の安全解除・再受注、全90組のSAM離隔を検証し、Test-Allに含める。
 
-`scripts/Test-ZoneCoverage.ps1` は実際の.mizのmissionエントリを読み、すべてのBLUE Hornet Client駐機位置で両任務が2〜3候補になることを検証する。各出撃地点の全候補を本番bundleで受注し、CAP計画・SEADの計画からSpawn・中止・ロック解放まで模擬する。全19円のME登録・名前/ID重複なし・半径18,288 m・可視設定を確認する。別確認グループではME実体の直接参照、Zone欠落時にLuaで補完しないこと、安全な受注解除と復旧後の再受注を確認する。Test-Allに含める。
-
-2026-10-09、半径統一と中心調整後の全10地域・両SAM各50点で適合点を発見。変更しない地域の再検査結果と、変更した地域の最終再検査結果を合算した記録は適合352/1,000、観測エラー0。単一の全地域連続実行ではなく複数の実行の記録で、常時成功の保証とは分ける。実Spawn・交戦、追加CAP空域への到達・哨戒は未確認。手動確認はTESTINGのMAN-06 / MAN-52 / MAN-56を参照する。
-
-
-全地域・両テンプレートで各50点の実地形配置検査は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md) を参照。配置成功率の実測と模擬テストの結果を分けて記録する。
+SEADはLAND、200 m内の高低差20 m以内、全車両と検査点の円内収容、各車両と障害物の200 m離隔を要求する。1 Zoneを最大50回検査し、適合点がなければ安全に受注解除する。候補があることと実地形で安全配置できることは区別する。現在の地形検査・実生成結果は[SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。2026-10-09の結果は当時の中心位置の記録であり、今回移動した4円へ流用しない。

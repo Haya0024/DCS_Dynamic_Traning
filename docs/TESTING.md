@@ -1,6 +1,6 @@
 # テスト仕様書
 
-更新日: 2026-10-13
+更新日: 2026-10-15
 
 ## 目的と対象
 
@@ -17,13 +17,13 @@
 
 | 区分 | 実行ファイル | 現在の件数 | 主な対象 |
 |---|---|---:|---|
-| INT | [Test-Intercept.lua](../scripts/Test-Intercept.lua) | 22 | 離陸待ち、生成位置、編隊、機種、全滅判定、観測不能・ID変更、通知重複防止、削除確認と再試行 |
-| CAP | [Test-CAP.lua](../scripts/Test-CAP.lua) | 34 | 空域抽選・DDM、滞在時間・停止再開・通知、敵生成、120秒＋全滅、MP2・並行任務、精算・失敗Cleanup、GC後の受信者寿命、40/100 NM境界・長機・候補なし |
+| INT | [Test-Intercept.lua](../scripts/Test-Intercept.lua) | 23 | 離陸待ち、生成位置、編隊、機種、全滅判定、観測不能・ID変更、通知重複防止、削除確認と再試行 |
+| CAP | [Test-CAP.lua](../scripts/Test-CAP.lua) | 35 | 空域抽選・DDM、滞在時間・停止再開・通知、敵生成、120秒＋全滅、MP2・並行任務、精算・失敗Cleanup、GC後の受信者寿命、40/100 NM境界・長機・候補なし |
 | SCORE | [Test-Scoring.lua](../scripts/Test-Scoring.lua) | 26 | UCID、帰還、事故、重複防止、累計 |
 | WING | [Test-Wing.lua](../scripts/Test-Wing.lua) | 27 | MP2、参加者固定、共有目標、個別精算、排他 |
-| PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 16 | 複数ウィングの並行処理と独立性 |
-| SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 69 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止、全地域50点の診断制御 |
-| DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 103 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
+| PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 17 | 複数ウィングの並行処理と独立性 |
+| SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 71 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止、全地域50点の診断制御 |
+| DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 105 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
 | PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 44 | schema1→2移行・CAP保存復元・未知schema保護、保存確認、再起動・遅延復元、native I/O、backup、run、Hook/manager/SSE分離、callback寿命、スロット未選択 |
 | MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
@@ -31,13 +31,15 @@
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 | ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 3確認グループ | 実.mizの全Client駐機位置でCAP2〜3・SEAD2〜4候補、全19円のME登録・可視性・半径・名前/IDの一意性、全候補の受注・SEAD生成・解除、MEのみの参照・欠落時解除・再受注、CAP/SEAD全90組でSAM計画射程＋安全余裕の離隔 |
 
-Luaは合計359ケース（INT22＋CAP34＋SCORE26＋WING27＋PAR16＋SEAD69＋DEAD103＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。Test-ZoneCoverage.luaはZONESが実.mizのmissionデータを前置して実行する結合検証で、359ケースとは別の3確認グループとして数える。
+Luaは合計366ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。Test-ZoneCoverage.luaはZONESが実.mizのmissionデータを前置して実行する結合検証で、366ケースとは別の3確認グループとして数える。
 
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-14。Lua全359ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES3が通過。SEADの任意実生成診断をSEAD-67〜69で確認し、実.mizの全15 ClientでCAP2〜3・SEAD2〜4候補と全90組のSAM離隔を確認。実地形の50点抽選・SAM実生成結果は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。
+最新の自動検証: 2026-10-15。Lua全366ケース（9スイート）、BUILD2・SYNC3・INSTALL5・ZONES3が通過。INT-23 / CAP-35 / PAR-17 / SEAD-70/71 / DEAD-104/105で公開済み本文だけのStatus再表示・達成前の座標維持／達成後の座標除外・計画中秘匿・複数任務の隔離を確認。実DCSの再表示はMAN-59で確認待ち。
+
+前回の自動検証: 2026-10-14。Lua全359ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES3が通過。SEADの任意実生成診断をSEAD-67〜69で確認し、実.mizの全15 ClientでCAP2〜3・SEAD2〜4候補と全90組のSAM離隔を確認。実地形の50点抽選・SAM実生成結果は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。
 同日のIntercept距離変更後にも全件通過。INT-08で90/100/110 NMの配置と抽選上下限、Wingで長機基準を確認し、実.mizへSync/Checkした。実飛行のレーダー検出時間は未確認。
 
 2026-10-12の自動検証、`training-8`。Lua全356ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES2が通過。CAP9＋SEAD10をすべてME円へ統一し、ZONESは全19円の存在・円形・半径18,288 m・可視性・名前/IDの一意性、全出撃Clientから各2〜3候補と全候補の受注・生成・中止を確認する。ME実体の直接参照、Zone欠落時にLua円で補完しないこと、受注失敗後のロック解放・復旧後の再受注も確認。CAP-31は死亡後の再搭乗位置を出撃地点へ戻すfixtureを明示し、GC・イベント受信の期待値を維持する。SEAD-63〜66は全10候補をME境界のfixtureとして与える。
@@ -57,7 +59,7 @@ CAP-31は同梱MOOSEのEVENT:InitとOnEventGenericを確認したうえで、受
 採点台帳の単体確認では `src/config.lua` と `src/scoring.lua` も直接読み込む。
 
 時刻は `s:tick(time)`、イベントは `s:event(...)`、抽選結果は `s.randomValues` で指定する。
-60秒・10秒の確認は模擬ミッション時刻であり、実時間を待つテストではない。
+30秒の抑制・60秒の座標表示・10秒の帰還確認は模擬ミッション時刻であり、実時間を待つテストではない。
 抽選テストは選択範囲と各候補への分岐を検証する。大量試行による確率分布の統計検定は行わない。
 
 MOOSE本体や実際のSyria地形・SAM AI・DCSのイベント配信・サーバーのUCID取得は模擬環境では検証できない。
@@ -170,13 +172,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | INT-13 | 2機編成の1機だけを破壊 | 残り1機が生存する間は未達成 |
 | INT-14 | 選ばれたテンプレートが見つからない | 予約解除後に別の受注を開始可能 |
 | INT-15 | 再受注と複数ウィングの受注 | 任務ごとにテンプレートを選び、他任務の抽選・敵に影響しない |
-| INT-16 | 単独・MP2の地上／空中受注、両者の連打、離陸イベント、カウントダウンリセット、定期監視 | 画面の開始はIntercept MISSION STARTだけを1回。Range・Altitude・HOT・Hostiles・Pilots・20秒待ち・リセットはDEBUGのみ。通常通知もMESSAGEへ記録。敵は1回生成、開始15秒・Status20秒を維持 |
+| INT-16 | 単独・MP2の地上／空中受注、両者の連打、離陸イベント、カウントダウンリセット、定期監視 | 画面の開始はIntercept MISSION STARTだけを1回。Range・Altitude・HOT・Hostiles・Pilots・20秒待ち・リセットはDEBUGのみ。通常通知もMESSAGEへ記録。敵は1回生成、開始15秒・Statusも同じ本文15秒を再表示 |
 | INT-17 | IsAlive=nil/不正値/例外、生存・死亡wrapperの別ID、復旧後false＋IDなし | 不明観測中はACTIVE・未達成を維持、復旧後の明示死亡でRTB_PENDING。観測例外で他の処理を止めない |
 | INT-18 | IsAlive=nil・IDなしでも元のDCS実体の死亡イベントを順に受信 | 既知対象のlossを優先し、全対象の明示loss後だけ達成。pollingで達成を取り消さない |
 | INT-19 | Abort後のDestroyが2回例外、新任務と別Wingを開始、旧Destroyが死亡イベントを発生 | 参照・削除待ちを保持し5秒・10秒に再試行。削除待ちの画面ERRORなし。任務ロックは即解放、新任務・他WingはACTIVE/0点のまま。成功後に待ち参照を解放し再削除なし、失敗・回復ログ各1回 |
 | INT-20 | 生成後の編隊／経路設定失敗と初回削除失敗、そのまま再受注 | 旧任務を解放し、未追跡の旧敵だけ削除待ちへ保持。5秒後に旧敵を削除、新敵の達成・採点へ干渉しない |
 | INT-21 | Destroy=false、nilで実体が残る、消失検索が例外／false | 不正・未確認を削除成功にしない。参照を保持し、5秒後に正常消失を確認して解放、以後再削除なし |
 | INT-22 | 帰還150／達成後事故90／未達成事故0で精算、初回削除失敗 | 精算・ロック解放を先に確定し、削除待ちの画面ERRORなしで5秒後に削除。遅れた死亡イベントでもreceipt・点数・任務数1件を維持 |
+| INT-23 | 地上受注・離陸待ち・生成・達成・AbortでStatus再表示 | 公開済み待機通知→開始タイトル→達成・帰還指示を同じ本文で再表示。生成残り秒数なし、拒否通知で上書きなし、終了後Idle |
 
 ### CAP（CAP）
 
@@ -206,7 +209,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | CAP-22 | Spawn/Route設定失敗 | 0点解除、途中生成したGroupもCleanup |
 | CAP-23 | Destroy失敗、5秒後復旧 | Group参照を保持し、共通tickで削除再試行 |
 | CAP-24 | 設定Zone欠落、不正半径 | 安全に受注解除し、ロックを残さない |
-| CAP-25 | Mission Statusを再表示 | 同じCAP AREA座標・進捗を60秒表示、半径・PATROL CENTER行なし。抽選や時計を変更しない |
+| CAP-25 | Mission Statusを再表示 | 同じ公開済みCAP AREA座標・目的・人数・報酬を60秒再表示。進捗・時計・敵残数を追加しない、半径・PATROL CENTER行なし。抽選や時計を変更しない |
 | CAP-26 | 120秒後、空域外で敵全滅 | 時間進捗を維持して達成 |
 | CAP-27 | 死亡wrapperがIsAlive=false、GetID=nil | 明示死亡を残存扱いせず達成可能 |
 | CAP-28 | CAP中の重複CAP/SEAD受注、同UCID別Wing | 既存ブロッカーで拒否、再抽選なし |
@@ -216,6 +219,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Ch
 | CAP-32 | 39.999/40/100/100.001 NMの候補、受注後移動・Status | 40/100を含む2候補だけ抽選対象。受注位置のコピー・計画・時計を維持し再抽選なし |
 | CAP-33 | 全候補が範囲外、位置変更後に再受注 | 通常通知20秒、敵生成・採点・乱数・errorログなし。Wing/UCIDロックを解除し次受注可能 |
 | CAP-34 | 列挙順と機体番号が逆のMP2、長機座標API例外 | 最小番号の長機位置で選定。座標例外でもロック解除、復旧後に再受注可能 |
+| CAP-35 | 哨戒・進捗通知・敵生成・全滅・時間達成後にStatus | 受注時の座標・目的・人数・報酬を保持し、現在の進捗／時計／敵残数を追加しない。達成後は座標を外し、公開済み達成・帰還指示だけを20秒 |
 
 
 CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し、受信DEBUGだけで一致・精算しないことを確認する。元実体のgetID例外ではUNAVAILABLEを記録しつつ元参照で0点精算し、登録／受信／一致ログにUCIDを含めない。初期化の版ログは重複読み込み後も1回。
@@ -303,6 +307,7 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | PAR-14 | 自ウィングにも任務があり、旧任務を持つ人が参加 | 全体中止は現在の自ウィングだけに適用 |
 | PAR-15 | 古い個人中止callback | 新任務・並行任務のいずれにも影響しない |
 | PAR-16 | Aの監視処理に例外、Bは帰還確認中 | Bの監視・精算を継続 |
+| PAR-17 | 地上待機Wingと空中実行Wing、元UCIDが移動・同Groupへ集合 | 各WingとUCID対応の公開済み本文だけを再表示。複数関連任務は結合し、無関係な情報や内部Wingヘッダを追加しない |
 
 ### SEAD：配置・排他（SEAD-01〜17）
 
@@ -367,24 +372,24 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 
 | ID | 条件・操作 | 期待結果 |
 |---|---|---|
-| SEAD-45 | 両方式・両SAMで生存、開始時Life100→99、Radar OFF | OFF観測開始後59秒では未達成、60秒でSUPPRESSED。帰還150、完了後の再発信でも結果固定 |
+| SEAD-45 | 両方式・両SAMで生存、開始時Life100→99、Radar OFF | OFF観測開始後29秒では未達成、30秒でSUPPRESSED。帰還150、完了後の再発信でも結果固定 |
 | SEAD-46 | 無傷/開始時以上のLifeでOFF、または大損傷・追尾対象nilでON | 計測も達成もしない。追尾対象nilをOFFと誤認しない |
-| SEAD-47 | 無傷で長時間OFFの後に損傷 | 無傷の時間を除外し、損傷＋OFFの観測開始から60秒 |
-| SEAD-48 | 計測開始後59秒付近でON、再びOFF | ACTIVEへ戻りタイマー破棄。新しいOFFから60秒必要 |
-| SEAD-49 | IsAlive/Life/Radarのnil・不正値・NaN・無限大・API例外 | lost・DESTROYEDにせず継続時間を破棄、正常観測の再開後に60秒を数え直す。IsAlive不明時のSite残数も不明 |
+| SEAD-47 | 無傷で長時間OFFの後に損傷 | 無傷の時間を除外し、損傷＋OFFの観測開始から30秒 |
+| SEAD-48 | 計測開始後29秒付近でON、再びOFF | ACTIVEへ戻りタイマー破棄。新しいOFFから30秒必要 |
+| SEAD-49 | IsAlive/Life/Radarのnil・不正値・NaN・無限大・API例外 | lost・DESTROYEDにせず継続時間を破棄、正常観測の再開後に30秒を数え直す。IsAlive不明時のSite残数も不明 |
 | SEAD-50 | 生成時Life50、後で60→49→48 | 基準50を固定。60は損傷扱いにせず、49で開始、48への追加損傷でリセットしない |
 | SEAD-51 | 計測中にLifeが開始値へ戻り、再度減少 | 計測を解除し、再度の損傷＋OFFから開始 |
 | SEAD-52 | SUPPRESSION_PENDING中に破壊、Life/Radar APIも失敗 | タイマーを待たずDESTROYED、達成後事故90 |
 | SEAD-53 | 開始時Lifeが0・負値・文字列・無限大 | 基準を捏造せず生成失敗。Groupを削除して再受注可能 |
-| SEAD-54 | 複数主要対象で個別損傷・OFF・再発信・破壊 | 個別タイマーで全対象を要求。一部だけ60秒でも確定せず、再発信を再評価 |
+| SEAD-54 | 複数主要対象で個別損傷・OFF・再発信・破壊 | 個別タイマーで全対象を要求。一部だけ30秒でも確定せず、再発信を再評価 |
 | SEAD-55 | 別ウィングが異なる時刻から計測 | 自ウィングの時間・結果だけ進む |
 | SEAD-56 | MP2がSUPPRESSED、再発信、1人帰還・1人脱出、重複死亡 | 共有達成後は結果固定、150/90を一度ずつ加算 |
-| SEAD-57 | 60秒確定前に参加者喪失、Cleanupの死亡イベント | 0、後からSUPPRESSED/DESTROYEDで報酬を得ない |
-| SEAD-58 | ACTIVE→PENDING→ONでACTIVE→再計測→SUPPRESSED | Statusの4状態・経過時間が一致、完了後Life/Radar呼出しを停止 |
+| SEAD-57 | 30秒確定前に参加者喪失、Cleanupの死亡イベント | 0、後からSUPPRESSED/DESTROYEDで報酬を得ない |
+| SEAD-58 | ACTIVE→PENDING→ONでACTIVE→再計測→SUPPRESSED | 内部FSMの4状態・経過時間が一致。Statusは公開済み情報だけで状態やOFF秒数を出さない。完了後Life/Radar呼出しを停止 |
 | SEAD-59 | ACTIVEまたはPENDINGからDESTROYED、残存車両破壊、精算 | 完了表示・終端状態が固定、追加報酬なし。精算まで保持し、Cleanup後も保持したsite参照の結果は不変 |
 | SEAD-60 | MP2片方だけ精算、全員終了後の削除が2回失敗、新任務受注 | 全員終了まで削除なし。ロックは解放し、site参照を保持して再試行、新任務へ干渉せず3回目で削除 |
 | SEAD-61 | 別ウィングと並行中に自任務を中止 | 自サイトだけ削除し、未達成を成功へ変えず、他サイトを維持 |
-| SEAD-62 | TOO/PBを地上・空中で受注、複数tickの計画、離陸待ち・カウントダウンリセット、生成前後のStatus、表示時間60／90秒を設定 | 受注時MODE・計画時Ground acceptance説明・開始Pilots・20秒待ち・リセット・HARM攻撃指示はDEBUGのみ。生成待ちStatusにもSpawn inを出さない。方式と座標は計画確定で自動1回。DEBUGの計画に通常本文も含む。座標・コード秘匿、手動Statusと表示時間を維持 |
+| SEAD-62 | TOO/PBを地上・空中で受注、複数tickの計画、離陸待ち・カウントダウンリセット、生成前後のStatus、表示時間60／90秒を設定 | 受注時MODE・計画時Ground acceptance説明・開始Pilots・20秒待ち・リセット・HARM攻撃指示はDEBUGのみ。生成待ちStatusにもSpawn inを出さない。方式と座標は計画確定で自動1回。DEBUGの計画に通常本文も含む。PBもTHREAT AREAに推定座標を表示し、地域名・ESTIMATED LOCATION行を除外。座標・コード秘匿、手動Statusと表示時間を維持 |
 | SEAD-63 | 全10地域×2テンプレートの診断で全点適合 | 各50点・計1,000点を成功後も続け、firstSuccess=1、Spawn/任務/採点なし、候補Configを復元 |
 | SEAD-64 | 全診断点をnon-LANDで拒否 | 各50点・計1,000点を検査しpassed=0、拒否理由に50件、エラーと区別 |
 | SEAD-65 | SA-6テンプレート欠落、SA-8は正常 | 10組合せはSETUP_ERROR/checked=0、残り500点は検査。欠落を地形失敗や成功に置換しない |
@@ -392,19 +397,21 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | SEAD-67 | 任意SpawnCheckで全10地域・両SAMを生成、削除後2秒は生存表示を返す | 各組50点の検査後に計20 Groupを配置点・構成確認して削除。削除反映を待ち、通常任務・採点を初期化しない |
 | SEAD-68 | SpawnCheckで全地点不適合、またはSpawn APIがnil | 不適合はSPAWN_SKIPPED、生成失敗はspawnErrors=20。地形適合と実生成成功を混同しない |
 | SEAD-69 | 診断SAMのDestroyが例外 | 50点・1生成で診断停止、cleanupErrors=1・complete=false。残った診断Groupで後続抽選を汚染しない |
+| SEAD-70 | TOO/PB・地上/空中受注、計画中Status、公開後に計画座標を変更、抑制中・達成・Preserve | 計画中は受注・計画中通知だけ。公開後は当時の座標と開始指示を保持し、達成後は座標を外して達成・帰還指示だけを20秒表示し、レーダー・試行数・予約・内部状態を追加しない。Preserveで正確座標を公開しない |
+| SEAD-71 | MissionReportだけを読み、未公開フィールド・環境の参照を例外化、複数公開本文と段階切替 | StatusはpublicReport以外を参照せず副作用なし。開始時は座標維持、達成時は座標ブリーフィングを削除して通知だけ20秒、新ブリーフィングで次段階の座標を保持、複数表示の時間は公開本文の最大値 |
 
 ### DEAD follow-on（DEAD）
 
 | ID | 条件・操作 | 期待結果 |
 |---|---|---|
-| DEAD-01 | SA-6損傷＋OFF60秒 | Site SUPPRESSED、CLEANUP標準、元assignmentで予約、Continue/Preserveを表示 |
+| DEAD-01 | SA-6損傷＋OFF30秒 | Site SUPPRESSED、CLEANUP標準、元assignmentで予約、Continue/Preserveを表示 |
 | DEAD-02 | SA-8死亡イベント、wrapperは生存表示 | Site DESTROYED、follow-onなし、SEAD精算後Cleanup |
 | DEAD-03 | 生存SA-8をSuppressしてContinue | 1両をDEAD対象、帰還でSEAD150＋DEAD150 |
 | DEAD-04 | 通常SEAD、選択なしでRTB | SEAD150、従来通りSite削除 |
 | DEAD-05 | Preserveのcallbackを複数回実行、RTB | 時刻・状態不変、同じ損傷GroupをRETAIN、元任務終了で使用予約だけ解除し保持元Wingの予約は維持 |
 | DEAD-06 | 未完了SEADや未PreserveのSiteに別WingからTask: DEAD | 候補にならず、元SEADを変更しない |
 | DEAD-07 | MP2でPreserve後、片方だけ精算、別Wingが取得を試す | 元全員終了前後とも別Wingを拒否。終了後は保持元Wingのみ取得可能 |
-| DEAD-08 | TOO/PBから即DEADへ継続、Spawn/乱数とDMS APIを拒否、座標表示を90秒に設定 | 同record・ID・Group・計画・Life・Radarを維持、再Acquire・再Spawn・再抽選なし。Continue前・Preserveのみでは実配置点を秘匿、Continue通知に正確なSite DDMを90秒・1回表示。Continue後とDEAD達成後のStatusは同じ座標・SAM種類と元SEAD推定点を90秒表示 |
+| DEAD-08 | TOO/PBから即DEADへ継続、Spawn/乱数とDMS APIを拒否、座標表示を90秒に設定 | 同record・ID・Group・計画・Life・Radarを維持、再Acquire・再Spawn・再抽選なし。Continue前・Preserveのみでは実配置点を秘匿。開始→指示→残数→SITE LOCATION（座標と同じ行）→追加報酬→SEAD報酬保持の全文を照合し、90秒・1回表示。Continue後のStatusはContinue本文だけ、達成後は座標を外して公開済み達成・帰還指示だけを20秒表示。SAM種類・元SEAD推定点を追加しない |
 | DEAD-09 | SEADでレーダーと1発射機を破壊後Continue | 生存2両だけsnapshot、全対象破壊でRTBへ、SEAD150＋DEAD150 |
 | DEAD-10 | Immediateの全対象をイベントなしで喪失 | pollingでDEAD達成、SEAD結果を固定、SiteはCLEANUP |
 | DEAD-11 | Immediate途中に5種の事故、重複通知 | SEAD90を一度だけ付与、IN_USEをCleanup、DEAD Scoreは0 |
@@ -412,7 +419,7 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | DEAD-13 | Preserve後にContinue、DEAD完了・RTB | RETAIN→IN_USE→CLEANUP、保持を解除して削除 |
 | DEAD-14 | 候補なしでTask: DEAD、その後Intercept受注 | 定型通知で拒否、新規Site・Spawn・抽選なし、Wing/UCIDロックを残さない |
 | DEAD-15 | 保持後Follow-on DEAD受注、Spawn APIを拒否 | 元Group・計画・損傷を継承、新ID・category DEADで予約 |
-| DEAD-16 | Follow-on DEADの受注・開始とStatus、DMS APIを使用不可にする、表示時間を90秒へ変更 | 実配置点のDDMを受注時1回自動表示、Statusは同情報90秒で再確認、開始は座標なし25秒。内部Group/object ID・Estimated表現なし |
+| DEAD-16 | SA-6破壊済み／抑制済み・SA-8抑制済みのFollow-on DEAD受注・開始とStatus、DMS APIを使用不可、表示時間90秒 | DEAD MISSION→TARGET SITE→SITE LOCATION（座標と同じ行）→STATUS→OBJECTIVE→報酬→人数の全文一致、AREA行なし。実配置点DDMを受注時1回表示、Statusは同じブリーフィング90秒、開始は座標なし25秒。内部Group/object ID・Estimated表現なし |
 | DEAD-17 | 地上MP2受注、1対象喪失、全員離陸 | snapshot維持、ARMEDで予約済み、全員離陸で即ACTIVE、20秒待ちなし。受注通知10秒1回、座標ブリーフィング60秒1回、開始25秒。予約待ち説明はDEBUGのみ |
 | DEAD-18 | 地上予約中に全対象喪失、後で離陸 | ARMED中は未達成、ACTIVEへ移ってから達成 |
 | DEAD-19 | Follow-on DEAD全対象破壊・RTB | DEAD150、元SEAD150、Total/Career300、独立した2精算、Cleanup |
@@ -462,7 +469,7 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | DEAD-63 | SA-6レーダー破壊＋生存Launcher1/3両、Immediate/Follow-onを実施 | Primary DESTROYEDとSite SUPPRESSEDを分離、1/3両だけ対象、再Spawnなし、全滅後もSEAD結果維持 |
 | DEAD-64 | SA-6 Suppression後、両DEAD経路でLauncherだけ破壊→レーダー破壊 | 生存4両を対象、レーダーが残る間は未達成、全滅でDEAD達成、SEAD SUPPRESSED履歴維持 |
 | DEAD-65 | SA-6/SA-8全車両の死亡通知、wrapperはまだ生存表示 | 実残存0としてSite DESTROYED、継続メニューなし、保持候補なし |
-| DEAD-66 | 未達成SEADの生存4両、損傷＋OFF59秒→60秒 | 完了前の継続不可、60秒達成で残存4両の継続を解放 |
+| DEAD-66 | 未達成SEADの生存4両、損傷＋OFF29秒→30秒 | 完了前の継続不可、30秒達成で残存4両の継続を解放 |
 | DEAD-67 | Immediate両目標達成後の5種事故と重複通知 | SEAD90＋DEAD90を一度ずつ、任務・Primary・Recovery統計は各1、Cleanup |
 | DEAD-68 | Continue時DEAD報酬175/0、後で50に変更、古いcallback再実行 | 採点ID・満額固定、元record維持、帰還合計325/150、任務1 |
 | DEAD-69 | MP2 Immediate達成後、1人RTB・1人脱出・重複死亡 | 各自300/180、全員終了までSite予約維持、各任務1 |
@@ -500,6 +507,8 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | DEAD-101 | timeout設定を0／5秒へ変更 | 不正設定では専用保持維持、有効な5秒設定で期限適用 |
 | DEAD-102 | 同Wingで2 Site保持、操縦者交代、地域別解除 | 個別メニュー、古い操縦者callback拒否、指定Siteだけ開放、signature更新 |
 | DEAD-103 | 元SEAD精算前に開放してContinue | 同record・同GroupのImmediate DEAD、timerなし、SEAD＋DEAD300 |
+| DEAD-104 | Continue後1両撃破、座標再計算を例外化、全滅後もStatus | Continue本文を維持し、残数は公開時の値。旧SEAD推定点・機種・現在残数を追加せず、達成後は実座標を外し、公開済み達成・帰還指示だけを20秒表示 |
+| DEAD-105 | Follow-onを地上／空中で受注、部分撃破・座標再計算を例外化・全滅後のStatus | 達成前は公開時のSite座標と開始指示、達成後は座標なしの達成・帰還指示だけを20秒再表示。現在残数・内部Site／予約状態を追加しない |
 
 ### 成績永続化（PERSIST）
 
@@ -615,9 +624,9 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-08 | PBで地上・空中受注、推定点・コードを受け取りHornetのHARMへ設定、開始・Statusを確認 | 座標・コードの自動表示は計画確定時の1回だけで、Statusで再確認可能。DDM・分の小数3桁、SA-6=108/SA-8=117、位置誤差1〜3 NM。実際にPB攻撃の入力・使用が可能 |
 | MAN-09 | SA-6の発射機だけを破壊、別試行でレーダーを破壊。SA-8も破壊 | 発射機だけでは未達成。主要対象の破壊で即DESTROYED、`SEAD Objective Complete / Enemy radar destroyed.` |
 | MAN-10 | 主要対象を無傷でRadar OFF、または損傷させたままRadar ON | どちらも成功しない。単なるLife残量や発信なしだけで達成しない |
-| MAN-11 | 主要対象が生存したまま損傷し、Radar OFFを維持 | StatusがSUPPRESSION PENDING。59秒では未達成、連続60秒以上でSUPPRESSED、`Enemy radar suppressed.` |
-| MAN-12 | MAN-11の計測途中でRadar ONへ戻し、再びOFFにする | ACTIVEへ戻って経過時間をリセット、次のOFFから新たに60秒必要 |
-| MAN-13 | PENDING中に主要対象を破壊 | 60秒を待たずDESTROYED |
+| MAN-11 | 主要対象が生存したまま損傷し、Radar OFFを維持 | DCSログ・観測でSUPPRESSION_PENDINGを確認（Statusには内部状態を出さない）。29秒では未達成、連続30秒以上でSUPPRESSED、`Enemy radar suppressed.` |
+| MAN-12 | MAN-11の計測途中でRadar ONへ戻し、再びOFFにする | ACTIVEへ戻って経過時間をリセット、次のOFFから新たに30秒必要 |
+| MAN-13 | PENDING中に主要対象を破壊 | 30秒を待たずDESTROYED |
 | MAN-14 | SUPPRESSED後にRadarを再開、または残存Launcherを破壊 | 結果はSUPPRESSEDのまま、追加報酬なし。精算前にサイトが自動削除されない |
 | MAN-15 | 達成後BLUE飛行場へ着陸、5 knots以下で10秒停止 | 各自150を一度だけ加算。9秒まで未確定、速度超過・復行では確認リセット |
 | MAN-16 | 達成後に移動中のBLUE空母へ着艦、ボルターも別試行 | 艦との相対速度で10秒確認し150。ボルターでは未確定 |
@@ -629,15 +638,15 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-22 | Hook導入下で複数任務を精算、保存済み表示を確認してミッション・DCSを再開始 | 同じUCIDのTotal/Career・カテゴリ別Score・任務／帰還／死亡統計を復元する。別UCIDの成績は混ざらない |
 | MAN-23 | 最後の参加者が精算・中止し、残存SAMと次の受注を確認 | 残存Groupが削除され、次の受注が可能。完了時点では削除されない |
 | MAN-24 | SA-6レーダーだけ破壊・Suppress、別試行でSA-8を全滅 | 残存がある場合だけContinue/Preserve。SA-8全滅では選択肢なし |
-| MAN-25 | SEADからContinueし、開始通知・Status座標・損傷・発信状態と車両を確認、残存全滅してRTB | 同じGroupを使用、Continue直後に実配置点のSITE LOCATIONを1回表示、Continue後と達成後のStatusでも確認可能（DDM・分の小数3桁、初期60秒）、SEAD150＋DEAD150、合計300、任務1件 |
+| MAN-25 | SEADからContinueし、開始通知・Status座標・損傷・発信状態と車両を確認、残存全滅してRTB | 同じGroupを使用、Continue直後に残数→SITE LOCATION（座標と同じ行）→追加報酬の順で1回表示、Continue後のStatusでも確認可能（DDM・分の小数3桁、初期60秒）。達成後のStatusは座標なしの達成・帰還指示だけ20秒、SEAD150＋DEAD150、合計300、任務1件 |
 | MAN-26 | Immediate途中に事故、別試行で両目標達成後事故、全体Abort | 未達成事故SEAD90／DEAD0、達成後事故各90、Abort両方0、全員終了でCleanup |
 | MAN-27 | Preserve、全員RTB・再武装、地上でTask: DEAD、全員離陸 | 同じSiteが残り、新IDで予約。ARMED中もSAMは存在、全員離陸でACTIVE、20秒待ちなし |
-| MAN-28 | Follow-on DEADの開始・Status座標確認、全残存対象破壊後RTB、別試行で事故/Abort | SITE LOCATIONは実配置点のDDM・分の小数3桁で初期60秒表示。DEAD150/90/0、SEAD Scoreを変えない、全員終了後Cleanup |
+| MAN-28 | Follow-on DEADの開始・Status座標確認、全残存対象破壊後RTB、別試行で事故/Abort | TARGET SITE→SITE LOCATION（座標と同じ行）→STATUS→OBJECTIVE→報酬→人数の順。AREA行なし。SITE LOCATIONは実配置点のDDM・分の小数3桁で初期60秒表示。達成後のStatusは座標なしの達成・帰還指示だけ20秒。DEAD150/90/0、SEAD Scoreを変えない、全員終了後Cleanup |
 | MAN-29 | 複数保持Siteを作り、異なる長機位置から受注 | 最も近いRETAINを選び、2Wingが同Siteを二重取得できない |
 | MAN-30 | MP2でPreserve後に1人だけ精算、別WingがDEAD取得を試す | 元SEAD全員終了前後とも別Wingは取得不可。元Wingは全員終了後に取得可能 |
 | MAN-31 | 2つのFollow-on DEADを並行実行し、片方だけ中止・達成 | 対象・敵・ポイント・ロック・Cleanupを混同しない |
 | MAN-32 | 保持Siteを味方が外部攻撃で全滅、Task: DEAD | 全滅したSiteは候補にならず、再生成しない |
-| MAN-33 | Immediate・Follow-on DEADのStatusと一時メニューを遷移ごとに確認 | disposition・予約可否・残数・DEAD Scoreが一致し、不要になったContinue/Preserveを消す |
+| MAN-33 | Immediate・Follow-on DEADのStatusと一時メニューを遷移ごとに確認 | Statusは達成前に公開済み座標・指示、達成後に座標なしの達成・帰還通知だけ20秒。現在残数・予約状態は出さず、Continue時の残数は公開時のまま。予約・採点データはログ／観測で確認し、不要になったContinue/Preserveを消す |
 | MAN-34 | 保持・DEAD精算後にミッション再開始 | Siteと進行中任務は復元しない。Hookで保存済みの成績だけを復元する |
 | MAN-35 | Preserve時の長機がRTB後にログアウト、別試行で精算前にログアウト | 1秒監視でRETAIN Site削除、SEAD採点・任務ロックを巻き戻さない |
 | MAN-36 | MP2僚機がPreserveを選び、観戦へ移動・僚機切断・長機切断 | 保持者は最初の登録長機、観戦・僚機切断では保持、長機ログアウトで削除 |
@@ -663,10 +672,11 @@ SAM・方式・編隊はランダムなので、必要な組合せが未選択�
 | MAN-56 | training-8で4空港と空母からCAP/SEADを受注。全候補を個別確認し、範囲外位置でCAPを受注して戻る | TRAINING_AREASのCAP2〜3・SEAD2〜4候補から選定。CAP中心40〜100 NM、SEAD中心40〜130 NM。CAP候補なしの通知20秒とロック解放、戻った後の再受注。SEAD追加6地域の実地形・障害物・SAM交戦もMAN-06で確認 |
 | MAN-57 | 配置検査専用ミッションを開始して一時停止せず完了まで待つ | 全10地域×SA-6/SA-8で各checked=50、20 RESULT、COMPLETE checked=1,000/errors=0。成功数・初回成功回・拒否理由を記録。SAM生成・精算・保存なし。2026-10-09実施済み：20組合せ各50点、初期5 NMは適合350/1,000、Islahiye両方0/50。半径統一・中心調整後は各地域の最終設定に一致する複数実行を合算して適合352/1,000、観測エラー0、全地域で両SAMの適合点を発見。地域指定の再検査では対象地域数×2×50点を確認。結果はSEAD_PLACEMENT_CHECKとHISTORYを参照 |
 | MAN-58 | `Build-SEADPlacementMission.ps1 -SpawnCheck`で検査用ミッションを作成し、隔離プロファイルで完了まで待つ | 全20組合せ各50点、checked=1,000・errors=0、20件の実生成と削除確認、spawned=20・spawnErrors=0・cleanupErrors=0。4両/1両・主要レーダー・配置位置を確認。HARM交戦・精算とは区別する。2026-10-14実施済み、適合396/1,000・観測エラー0・実生成20・削除確認20 |
+| MAN-59 | 全任務で受注・計画中・開始・達成・Preserve・Continue・部分撃破の前後にStatus、MP2の個人精算後も確認 | 公開済み本文だけ。計画中MODE・機種・PBコードなし。開始後は最後の公開座標を維持し、達成後は座標なしの達成・帰還指示だけ20秒、生成予定・レーダー状態・現在残数・予約・参加者状態なし。Continue後は新Site座標へ切替、残数は公開時の値のまま。無関係な通知で上書きせず、全員終了後Idle。未実施 |
 
 
 MAN-10〜14は、実際にLife減少とRadar ON/OFFの前提を確認できたときに実施済みとする。
-HARMの命中やRWR表示だけからLife/Radar状態を推測しない。Mission Statusの状態とDCS/MOOSEの観測を併せて確認する。
+HARMの命中やRWR表示だけからLife/Radar状態を推測しない。DCSログのFSM遷移とDCS/MOOSEの観測を併せて確認する。Mission Statusにはレーダー状態やOFF秒数を表示しない。
 AIが意図したON/OFFを起こさず再現できない場合は「未実施」または「条件未成立」と記録する。
 制御用のテストスクリプトを使用する場合は、通常ミッションへ恒久的に追加せずテスト用コピーで実施する。
 1秒のpollingなので、観測の間の短いON/OFF切替は今回の判定では検出できない。

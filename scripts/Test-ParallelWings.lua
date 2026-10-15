@@ -21,9 +21,10 @@ local function parallel(crew)
     return s, other, mate, s.spawns[1], s.spawns[2]
 end
 local function status(s, player, state)
+    local r = s:mission(player)
+    assert(state == "Idle" and not r or r and r.state == state)
     s:command("Mission Status", player)
-    s:lastMessageContains("Intercept: " .. state)
-    if state ~= "Idle" then s:lastMessageContains("Wing: " .. player.group:GetName()) end
+    if r then s:lastMessageContains(r.publicReport.notice.text) else s:lastMessageContains("Intercept: Idle.") end
 end
 
 test("an airborne wing can start while another wing is still awaiting takeoff", function()
@@ -157,7 +158,7 @@ test("moving UCID still blocks a new mission and shows only that pilot's earlier
     local s, other, _, a, b = parallel(true)
     local moved = s:addPilot("Moved", "ucid-a", 60); moved.airborne = true; s:tick(4)
     s:command("Task: Intercept", moved); s:lastMessageContains("Wing assignment blocked")
-    s:command("Mission Status", moved); s:lastMessageContains("Wing: " .. s.player.group:GetName())
+    s:command("Mission Status", moved); s:lastMessageContains("Intercept MISSION START")
     assert(not string.find(s.messages[#s.messages].text, other.group:GetName(), 1, true))
     s:abortSortie(s.player, moved)
     assert(not a.destroyed and not b.destroyed)
@@ -174,7 +175,7 @@ test("a shared group can manage two earlier sorties without ambiguously aborting
     assert(not a.destroyed and not b.destroyed)
     s:abortSortie(s.player, moved)
     assert(a.destroyed and not b.destroyed)
-    s:command("Mission Status", moved); s:lastMessageContains("Wing: " .. other.group:GetName())
+    s:command("Mission Status", moved); s:lastMessageContains("Intercept MISSION START")
     s:abortSortie(other, moved); assert(b.destroyed); s:assertClean()
 end)
 
@@ -184,7 +185,7 @@ test("own wing abort is scoped to that wing when a newcomer carries an earlier a
     s:command("Abort Mission", other)
     assert(b.destroyed and not a.destroyed)
     status(s, s.player, "ACTIVE")
-    s:command("Mission Status", other); s:lastMessageContains("Wing: " .. s.player.group:GetName())
+    s:command("Mission Status", other); s:lastMessageContains("Intercept MISSION START")
     s:abortSortie(s.player, other); assert(a.destroyed); s:assertClean()
 end)
 
@@ -208,6 +209,21 @@ test("an exception in one wing's monitor does not interrupt another wing's safe 
     assert(#s.errors > 0 and string.find(s.errors[1], "wing monitor exception", 1, true))
     s.player.GetVelocityVec3 = velocity
     hold(s, 22, 32); s:score(150); status(s, s.player, "Idle")
+end)
+
+test("Status recalls only the caller wing or its UCID-linked earlier public briefings", function()
+    local s = scenario(); s.generate(); local waiting = s.messages[#s.messages].text
+    local other = s:addPilot("Other", "ucid-other", 40); other.airborne = true; s:tick(2)
+    s:command("Task: Intercept", other); local start = s.messages[#s.messages].text
+    local moved, mate = s:addPilot("MovedA", "ucid-a", 60); s:tick(4)
+    s:command("Mission Status", moved); assert(s.messages[#s.messages].text == waiting)
+    s:command("Mission Status", other); assert(s.messages[#s.messages].text == start)
+    s:occupyWing("MovedB", "ucid-other", mate); s:tick(6)
+    s:command("Mission Status", moved)
+    assert(s.messages[#s.messages].text == waiting .. "\n\n" .. start)
+    assert(not string.find(s.messages[#s.messages].text, "Wing:", 1, true))
+    assert(s:mission().state == "ARMED" and s:mission(other).state == "ACTIVE")
+    s:assertClean()
 end)
 
 print(string.format("All %d parallel wing tests passed (simulated DCS/MOOSE).", count))

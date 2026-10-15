@@ -11,7 +11,7 @@ F10から任務を受注し、任務ごとの条件で敵を配置します。�
 |---|---|---|
 | **Intercept — 迎撃** | ランダムな敵編成・方位・高度・フォーメーションに対する空対空戦闘 | 生成された敵航空機をすべて撃墜 |
 | **CAP — 戦闘空中哨戒** | 指定空域を哨戒し、途中で出現する敵戦闘機と交戦 | 空域内の累計120秒と生成された敵航空機の全滅の両方 |
-| **SEAD — 防空制圧** | TOO / PBでSA-6またはSA-8のレーダーを捜索・攻撃 | 主要レーダーを破壊、または損傷させて連続60秒間レーダー停止 |
+| **SEAD — 防空制圧** | TOO / PBでSA-6またはSA-8のレーダーを捜索・攻撃 | 主要レーダーを破壊、または損傷させて連続30秒間レーダー停止 |
 | **DEAD — 防空サイト破壊** | SEADで制圧したサイトに残る車両への継続攻撃 | DEAD開始時に生存していた対象車両をすべて破壊 |
 
 InterceptではMiG-29A ×2、Su-27 ×1、MiG-29A ×1のいずれかが、編隊リーダー機から90～110 NM、機首方向の左右60°以内に生成されます。高度や編隊も毎回変わります。
@@ -52,7 +52,7 @@ Dynamic Training
 └─ Player Statistics
 ```
 
-`Mission Status` で任務の進行状況、`Player Statistics` で自分の成績を確認できます。
+`Mission Status` で案内済みの任務ブリーフィング・座標・指示を見返せます。開始後は座標を残し、達成後は座標を外して公開済みの達成結果と帰還指示だけを表示します。敵残数・レーダー状態など未公開情報は追加しません。`Player Statistics` では自分の成績を確認できます。
 `Abort Mission` はウィング全体の中止です。参加者ごとの `Abort Sortie` が表示されている場合は、その人だけ離脱できます。
 
 BLUE所属の陸上AirbaseはF10上に青色Drawingで表示します。表示対象はruntimeでcoalitionから自動取得し、半径2,500 mの薄い青色Circleと `BLUE AIRBASE`・基地名をBLUE側だけに表示します。文字は基地中心から南へ1,000 mずらしています。Carrier・Ship・FARP・Helipadは対象外です。Allies OnlyとFog of Warの設定は維持します。詳細は [BLUE Airbase表示仕様](docs/MAP_OVERLAY.md) を参照してください。オフセット表示の見やすさはユーザーから改善報告がありますが、DCS内の全確認ケースは未実施です。
@@ -140,7 +140,8 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 | [Persistence](docs/PERSISTENCE.md) | サーバーHookの導入、成績保存・復元、バックアップ |
 | [Testing](docs/TESTING.md) | 自動テストの実行方法、DCS内の確認手順 |
 | [History](docs/HISTORY.md) | 過去の検証・DCS実測・保存障害の診断経過 |
-| [Messages](docs/MESSAGES.md) | 全任務の画面メッセージ・DCSログ、タイミング、表示時間 |
+| [メッセージの分岐一覧](docs/MESSAGE_FLOW.md) | 全任務の受注〜精算・SEAD→DEAD各分岐の本文とタイミング、無通知の遷移、表示見直し用ID |
+| [Messages](docs/MESSAGES.md) | 英語の画面メッセージ全文例・DCSログ、タイミング、表示時間 |
 | [Briefing](docs/BRIEFING.md) | Mission Editorへ貼り付ける日本語・英語のミッション説明 |
 | [AGENTS.md](AGENTS.md) | 設計方針と開発ルール |
 

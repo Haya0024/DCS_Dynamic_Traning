@@ -141,7 +141,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - ZoneはすべてMEに登録した計10候補。追加6地域は現在TURKOGLU / HASSA / KILIS / MORPHOU_NORTH / GECITKALE_EAST / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、全円の中心・半径は実.mizのME Trigger Zoneだけに置く。Luaの代替定義は持たない。追加6地域の半径は既存MEと同じ18,288 m（約9.9 NM）。
 - `Task: SEAD` の受注時に TOO / PB を等確率で抽選し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
 - 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
-- TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。
+- TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。PBの `THREAT AREA` は実配置点から1～3 NMずらした推定座標とし、地域名と `ESTIMATED LOCATION` 行は表示しない。
 - TOOの捜索座標とPBの推定座標はDDM（度＋小数分、分の小数3桁）で計画確定時とMission Statusに表示する。MOOSEのToStringLLDDMへ精度3を明示し、全体の表示設定から独立させる。
 - SEADの座標付きブリーフィングは計画確定時に1回だけ自動表示する。受注直後は受注と計画中の通知だけでMODEはDEBUGのみ、方式は計画確定時に画面へ出す。計画のGround acceptance説明と生成時のPilots一覧はDEBUGのみ。生成時は短い開始通知とし、離陸待ち・カウントダウン再開・監視で座標を再掲しない。Mission Statusでは同じ計画情報を任意に再確認できる。
 - SEADの20秒生成待ち・カウントリセット・TOO/PBのHARM攻撃指示は画面／Statusから除外し、DCSデバッグログだけに出す。計画確定時のデバッグログには通常ブリーフィングと攻撃指示をまとめる。座標・UNKNOWN・PB機種／コード・秘匿条件は維持する。
@@ -154,8 +154,8 @@ BLUE 空港への RTB を追加評価対象とする。
 - `src/sead.lua` に配置ロジック、`src/config.lua` の `sead` に設定を置く。
 - `SpawnFromVec2` で地上配置し、SAM を戦闘状態・停止状態にする。
 - SEAD と Intercept は同じウィング・UCID の受注ロックを共有する。
-- 主要レーダーの状態を `ACTIVE` / `SUPPRESSION_PENDING` / `SUPPRESSED` / `DESTROYED` の遷移表で管理する。SA-6 は `Kub 1S91 str`、SA-8 は `Osa 9A33 ln`。破壊は即達成、生存中は開始時Lifeより減少＋Radar OFF連続60秒で達成。無傷OFFやLife残量だけでは達成しない。再発信・観測失敗でタイマーをリセットする。
-- `src/sead_objective.lua` に判定を分離し、成功後は再判定を停止する。`sead.suppressionHoldSeconds` に60秒を集約する。
+- 主要レーダーの状態を `ACTIVE` / `SUPPRESSION_PENDING` / `SUPPRESSED` / `DESTROYED` の遷移表で管理する。SA-6 は `Kub 1S91 str`、SA-8 は `Osa 9A33 ln`。破壊は即達成、生存中は開始時Lifeより減少＋Radar OFF連続30秒で達成。無傷OFFやLife残量だけでは達成しない。再発信・観測失敗でタイマーをリセットする。
+- `src/sead_objective.lua` に判定を分離し、成功後は再判定を停止する。`sead.suppressionHoldSeconds` に30秒を集約する。
 - `sead.templates` の `name` / `type` / `pbCode` / `primaryUnitType` に対応をまとめる。TypeNameは `.miz` で確認済みの値を使い、複数の主要レーダーがある場合は全対象の破壊または損傷＋OFF継続時間達成を要求する。
 - 満額は `sead.fullReward = 150`。目標達成後の帰還成功で各自150、墜落・死亡・脱出で90、達成前の事故・任意中止は0。UCID ごとの既存帰還評価と重複防止を使う。
 - Total Score / Career Points / SEAD Score を更新し、Intercept Score と分ける。UCID累計はサーバーHookで保存・復元する。未接続時はセッション内のみ。
@@ -177,10 +177,10 @@ BLUE 空港への RTB を追加評価対象とする。
 - RETAINは同じミッション実行中の次Sortie向け保持であり、Site・生成Group・進行中任務はミッション再開始／サーバー再起動後に復元しない。永続保存するのはUCIDごとの精算済み成績だけ。
 - 通常の `Task: DEAD` は保持予約先が受注Wingと一致するRETAIN、または明示開放された期限内のAVAILABLE Siteから、使用中assignmentがない最寄り候補を取得。専用保持の候補選定と使用予約では両方でWing所有を照合する。既存のWing/UCID排他とSite使用予約を併用し、準備失敗では使用予約と任務ロックをrollbackし、元の保持予約・未予約時刻を維持する。同UCIDでも別グループのスロットは別Wingとする。
 - Follow-on DEADは新しいDEAD recordをAcquireし、受注時の生存RED ground targetsを固定。地上ならARMED、全員離陸検出でACTIVEへ移行する。既存SAMを隠さず、20秒のSpawn待ちは設けない。
-- Follow-on DEADの表示もSEAD型とし、短い受注通知10秒→受注時座標ブリーフィング60秒設定を1回→座標なし開始通知25秒にする。地上からの離陸後に座標を自動再掲しない。予約待ち・開始時の残数等はDEBUGに残し、Mission Statusで座標・残数を任意確認できる。
+- Follow-on DEADの表示もSEAD型とし、短い受注通知10秒→受注時座標ブリーフィング60秒設定を1回→座標なし開始通知25秒にする。地上からの離陸後に座標を自動再掲しない。予約待ち・開始時の残数等はDEBUGに残し、Mission Statusで公開済み座標ブリーフィングを再表示できる。現在残数は追加しない。
 - DEAD全対象破壊でRTB_PENDING。両DEADの満額は `dead.fullReward = 150`、達成後事故90、達成前事故・Abort0。DEAD Scoreへ独立加算し、既存Recovery/Scoringを使う。
 - Site/DEAD対象のIsAliveはtrue=生存、false=死亡、nil=観測不能とする。未確認対象のnil・例外・不正値・ID不一致を全滅根拠にせず、Site残数は不明・継続候補から除外、DEADは残存側に数える。観測不能ログは移行時だけ記録する。明示死亡のlostを優先し、Group一覧欠落だけでも既知対象を全滅扱いしない。
-- DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Follow-onは受注時とMission Status、ImmediateはContinue直後の通知とMission Status（達成後の帰還待ちも含む）で表示する。Continue通知はcoordinateBriefingSeconds（初期60秒）で1回。座標は移行前に取得・整形し、失敗時は元SEADの帰還評価を維持する。車両ごとの座標ではなくSiteの配置基準点とする。元SEADの推定点は変更せず、Continue前・PreserveのみではTOO/PBの秘匿を維持する。
+- DEADのSITE LOCATIONは元Site実配置点をDDM・分の小数3桁で表示する。Follow-onは受注時とMission Status、ImmediateはContinue直後の通知とMission Status（目標達成前のみ）で表示する。Continue通知はcoordinateBriefingSeconds（初期60秒）で1回。Continue通知は残数の次に `SITE LOCATION: <座標>` を同じ行で置き、追加報酬・SEAD報酬保持を続ける。共通DEADブリーフィングはTARGET SITE→SITE LOCATION→STATUS→OBJECTIVEの順で、AREA行を出さない。Statusは公開済み本文だけを保存・再表示し、Follow-onでは受注ブリーフィング、ImmediateではContinue本文を使う。開始後は座標を残し、達成後は座標を外して公開済み達成・帰還指示だけを20秒表示する。現在残数・レーダー状態・予約・内部phase・参加者状態・生成予定を追加せず、計画中は計画中通知だけ。座標は移行前に取得・整形し、失敗時は元SEADの帰還評価を維持する。車両ごとの座標ではなくSiteの配置基準点とする。元SEADの推定点は変更せず、Continue前・PreserveのみではTOO/PBの秘匿を維持する。
 - 保持元Wingの `Release Site Reservation` で専用予約を明示解除したSiteだけAVAILABLEへ移し、他WingのTask: DEAD候補にする。元SEAD全員終了までは使用予約を維持し、受注・精算・Wing/UCIDロックを変更しない。複数保持Siteは地域名付きの個別解除メニューにする。古いcallbackはSite・Wing・操縦者を再照合する。
 - AVAILABLEで使用中assignmentがない状態を `unreservedSince` から連続計測し、`dead.unreservedSiteCleanupSeconds = 1800`（ミッション時刻30分）でCleanupする。RETAIN専用予約中・IN_USE（地上ARMED含む）は計測しない。準備失敗のrollbackは元の開始時刻を復元し、期限を延長しない。候補選定・使用予約時にも期限を確認する。AVAILABLEは元保持者の切断Cleanup対象外。観測不能を全滅とは扱わないが未予約timeoutは適用し、削除失敗はSweepで再試行する。
 - 全員終了時にIN_USEならCLEANUPへ倒す。明示保持・開放済みSite以外はCleanupが標準。専用保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
@@ -372,7 +372,7 @@ CAS: 720
 - 地上受注でも即ACTIVEで空域への到達待ち。CAPにInterceptの離陸待ち・20秒Spawn待ちを適用しない。個人中止でCAPをARMEDへ戻さない。
 - 既存Wing/UCIDロックと個別帰還を使い、満額150・達成後事故90・未達成事故/Abort0をCAP Scoreへ独立加算。全参加者終了で敵をCleanupし失敗を再試行する。
 - 保存schema2はcapScoreを追加し、schema1の従来成績をCAP=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
-- 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（34ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。CAPとSEADの全90組で円外縁の間隔を最大planningRangeNM（SA-6:15 / SA-8:8 NM）＋cap.samSafetyBufferNM（5 NM）以上とする。配置・飛行経路が円外へ出た場合の安全は保証しない。2026-10-09の旧中心の地形検査は履歴として保持。2026-10-14のユーザー移動後は全10地域・両SAM各50点を単一実行し、適合396/1,000・観測エラー0、全20組の実生成と削除を確認した。Morphou NorthのSA-8は適合1/50・初回43回目で不安定な候補。詳細はdocs/SEAD_PLACEMENT_CHECK.md。HARM交戦・抑制・精算と追加CAP哨戒はDCS内確認待ち。
+- 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（35ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。CAPとSEADの全90組で円外縁の間隔を最大planningRangeNM（SA-6:15 / SA-8:8 NM）＋cap.samSafetyBufferNM（5 NM）以上とする。配置・飛行経路が円外へ出た場合の安全は保証しない。2026-10-09の旧中心の地形検査は履歴として保持。2026-10-14のユーザー移動後は全10地域・両SAM各50点を単一実行し、適合396/1,000・観測エラー0、全20組の実生成と削除を確認した。Morphou NorthのSA-8は適合1/50・初回43回目で不安定な候補。詳細はdocs/SEAD_PLACEMENT_CHECK.md。HARM交戦・抑制・精算と追加CAP哨戒はDCS内確認待ち。
 
 ---
 

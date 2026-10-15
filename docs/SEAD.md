@@ -23,14 +23,14 @@ Follow-onの境界・採点・予約は [DEAD.md](DEAD.md) を参照する。SEA
 候補がなければ受注ロックを解除し、生成失敗を通知する。
 
 地点選定は `PLANNING` として段階的に処理する。受注直後は抽選した方式と計画中の短い通知だけを表示し、安全な予定点が見つかったら完全なブリーフィングを1回だけ自動表示する。
-計画完成前に `Mission Status` を開いた場合、TOOの捜索座標、PBの推定座標は `Planning in progress` と表示する。
+計画完成前に `Mission Status` を開いた場合、受注時の `SEAD mission accepted.` と `Mission planning in progress.` だけを再表示し、方式・機種・コード・座標欄を先出ししない。
 選定中も実体は生成しない。受注計画が完成するまで通常1秒、全候補不合格なら通常約25秒かかる。
 確定後はテンプレート・方式・Zone・予定点・推定点・コード・IDを変更しない。
 
 | 方式 | プレイヤーへ渡す情報 |
 |---|---|
 | TOO | `MODE: TOO`、`THREAT AREA`として捜索用座標（DDM：度＋小数分）、`TARGET TYPE: UNKNOWN`。HARM TOOの捜索・攻撃指示はDCSデバッグログだけに出す |
-| PB | `MODE: PB`、SAM種類、推定位置の緯度経度（DDM：度＋小数分）、3桁のHARM PBコード。HARM PBの攻撃指示はDCSデバッグログだけに出す |
+| PB | `MODE: PB`、`THREAT AREA`として推定位置の緯度経度（DDM：度＋小数分）、SAM種類、3桁のHARM PBコード。地域名と `ESTIMATED LOCATION` 行は出さない。HARM PBの攻撃指示はDCSデバッグログだけに出す |
 
 両方式とも分の小数部は3桁。MOOSEの `COORDINATE:ToStringLLDDM({ LL_Accuracy = 3 })` を使用し、計画確定時とMission Statusで同じDDM形式を表示する。MOOSE全体の座標表示設定には依存しない。
 全員離陸後の20秒待ちと着地によるカウントリセットは画面に出さず、DCSデバッグログだけに記録する。通常の画面通知は同じ本文をDCSログにも記録する。実際の出力例は [MESSAGES.md](MESSAGES.md) を参照する。
@@ -39,7 +39,7 @@ Follow-onの境界・採点・予約は [DEAD.md](DEAD.md) を参照する。SEA
 TOOの `THREAT AREA` は地域名から捜索用座標へ変更した。実配置予定点からランダム方位へ3～5 NMずらした座標を渡す。
 誤差の設定は `tooEstimateErrorMinNM` / `tooEstimateErrorMaxNM`。計画完成時に座標を固定し、その時のブリーフィングと `Mission Status` に同じ座標を表示する。
 TOOでは正確な位置・SAM機種・PBコード・車両数を表示しない。開始時だけでなく `Mission Status` も同じ情報制限を適用する。
-PBでも正確な実配置座標は表示しない。安全な実配置予定点を先に選び、その地点からランダム方位へ1～3 NMずらした推定点を渡す。
+PBでも正確な実配置座標は表示しない。安全な実配置予定点を先に選び、その地点からランダム方位へ1～3 NMずらした推定点を `THREAT AREA` に表示する。計画確定時とMission Status、DEBUGのブリーフィングに同じ形式を使い、地域名と推定座標を別行で重複表示しない。
 PBの実配置点と推定点の水平距離は `pbEstimateErrorMinNM` / `pbEstimateErrorMaxNM` の範囲内。
 TOO / PBの表示座標は捜索・攻撃の参考情報であり、Zone外や配置に不適な地形上でもよい。
 実体は計画した実配置点にそのまま生成する。推定点を基準に離陸後に別の配置点を抽選しない。
@@ -72,8 +72,8 @@ TypeNameは現在の `.miz` の `mission` エントリで確認済み。PBコー
 
 | テンプレート | 破壊対象の主要レーダー（DCS 機種名） | 成功条件 |
 |---|---|---|
-| `TPL_SEAD_SA6` | `Kub 1S91 str` | 破壊、または損傷後の連続60秒のRadar OFF。発射機が残っていても達成 |
-| `TPL_SEAD_SA8` | `Osa 9A33 ln` | 一体型車両の破壊、または損傷後の連続60秒のRadar OFF |
+| `TPL_SEAD_SA6` | `Kub 1S91 str` | 破壊、または損傷後の連続30秒のRadar OFF。発射機が残っていても達成 |
+| `TPL_SEAD_SA8` | `Osa 9A33 ln` | 一体型車両の破壊、または損傷後の連続30秒のRadar OFF |
 
 対象は選択した `sead.templates` の `primaryUnitType` で識別し、テンプレート内の並び順や車両名には依存しない。
 武器種は問わず、HARM以外でも条件を満たせば達成とする。
@@ -109,7 +109,7 @@ TypeNameは現在の `.miz` の `mission` エントリで確認済み。PBコー
 |---|---|
 | `ACTIVE` | 未達成。通常は生存・Radar ON。無傷のRadar OFFや観測不明もこの状態に留め、成功にしない |
 | `SUPPRESSION_PENDING` | 生存・開始時Lifeより減少・Radar OFFの3条件を満たし、OFF継続時間を計測中 |
-| `SUPPRESSED` | 損傷した生存エミッターのRadar OFFが連続60秒以上。終端状態・目標達成 |
+| `SUPPRESSED` | 損傷した生存エミッターのRadar OFFが連続30秒以上。終端状態・目標達成 |
 | `DESTROYED` | Primary Emitter破壊。終端状態・目標達成 |
 
 | 現在状態 | 観測・イベント | 次状態と処理 |
@@ -117,7 +117,7 @@ TypeNameは現在の `.miz` の `mission` エントリで確認済み。PBコー
 | `ACTIVE` | 生存、`Life < initialLife`、Radar OFF | `SUPPRESSION_PENDING`。この観測時刻から計測 |
 | `SUPPRESSION_PENDING` | Radar ONに復帰 | `ACTIVE`。OFF開始時刻を破棄（継続時間0） |
 | `SUPPRESSION_PENDING` | Lifeが開始時以上に戻る、Life/Radarの観測失敗 | `ACTIVE`。タイマーを破棄し、観測失敗はログへ記録 |
-| `SUPPRESSION_PENDING` | 3条件を維持して60秒以上経過 | `SUPPRESSED`。既存の帰還評価へ一度だけ移行 |
+| `SUPPRESSION_PENDING` | 3条件を維持して30秒以上経過 | `SUPPRESSED`。既存の帰還評価へ一度だけ移行 |
 | `ACTIVE` / `SUPPRESSION_PENDING` | Primary Emitter破壊 | `DESTROYED`。タイマーに関係なく既存の帰還評価へ移行 |
 | `SUPPRESSED` / `DESTROYED` | 任意の後続イベント | 状態・結果を維持。目標の観測・再判定を停止 |
 
@@ -128,13 +128,13 @@ Life・Radarの不正値やAPI例外をOFFと見なさない。IsAliveのnilも�
 参照: [MOOSE UNIT API](https://flightcontrol-master.github.io/MOOSE_DOCS/Documentation/Wrapper.Unit.html)。
 
 継続時間はミッション時刻で測る。無傷のOFF時間は加算せず、損傷を観測した時点から数える。
-計測中の追加損傷はタイマーをリセットしない。`sead.suppressionHoldSeconds = 60` に集約し、生成時に値を固定する。
+計測中の追加損傷はタイマーをリセットしない。`sead.suppressionHoldSeconds = 30` に集約し、生成時に値を固定する。
 1秒間隔の観測なので、観測の間に起きた短いON/OFFの切替は検出できない。
 
 現在の両テンプレートはPrimary Emitter各1両。複数を含む構成では全対象が破壊または損傷・OFF継続時間達成することを要求する。
 タイマーは対象ごとに保持し、全対象の破壊なら `DESTROYED`、生存対象を含む達成なら `SUPPRESSED`。
 全生存対象が3条件を満たす間だけサイト状態を `SUPPRESSION_PENDING` とする。
-一部が60秒に達しても全対象が達成するまでは成功を確定せず、再発信した対象のタイマーをリセットする。
+一部が30秒に達しても全対象が達成するまでは成功を確定せず、再発信した対象のタイマーをリセットする。
 
 ### 完了後のSAMサイトとCleanup
 
@@ -169,7 +169,7 @@ IN_USEのまま全員終了した場合はCLEANUPへ倒す。RETAIN専用保持�
 保持SiteのTask: DEADは新しい任務IDを使用し、DEAD Scoreへ独立精算する。
 Site stateの残存判定はSEADエミッターの終端状態と別に監視する。DEADで残存車両を破壊してもSEAD結果は変えない。
 `record.primaryResult = "DESTROYED"` は主要レーダー破壊だけを意味する。SA-6のLauncherが1両以上生存していればDEAD継続可能で、Site全滅は生存RED ground車両が0の場合だけとする。
-損傷＋Radar OFF60秒のSUPPRESSEDでは、生存レーダーもLauncherもDEAD対象に含める。SEAD完了済みの前提は `site.seadCompleted`、残存数は実Groupから取得する `site.remainingTargetCount` として分離する。
+損傷＋Radar OFF30秒のSUPPRESSEDでは、生存レーダーもLauncherもDEAD対象に含める。SEAD完了済みの前提は `site.seadCompleted`、残存数は実Groupから取得する `site.remainingTargetCount` として分離する。
 
 ## Mission Editor の前提
 
@@ -283,31 +283,34 @@ API例外は「Site check error」と表示し、ログに例外の詳細を残�
 
 ## 表示・操作
 
+Mission Statusは公開済み通知の再表示に限定する。受注／計画中の通知を保持し、座標付きブリーフィングを実際に案内した時点で、その本文を任務recordへ保存する。開始・達成通知も公開時の本文を保持する。Statusは目標達成前に保存済みブリーフィングと最新の開始通知、達成後に公開済み達成・帰還通知だけを表示し、敵・レーダー・Siteを再観測しない。計画中は受注時の「Mission planning in progress」だけを再表示し、MODE・SAM機種・PBコード・試行数を先出ししない。
+
+開始後は案内済みの座標を確認できる。目標達成時にStatus用の座標ブリーフィングを外し、達成後は公開済みの達成結果と帰還指示だけを20秒表示する。TOO/PBの秘匿条件は公開時の本文そのものによって維持し、レーダー状態・OFF秒数・残数・Site状態・予約状態・参加者の内部状態を追加しない。Preserve/Releaseや個人精算・拒否通知は任務ブリーフィングを上書きしない。Immediate DEADへ移行したら最後に公開したDEAD開始本文を新しい座標ブリーフィングとして保持し、古いSEAD推定座標を重ねて出さない。DEAD達成後はその座標ブリーフィングも外し、公開済み達成・帰還指示だけを20秒表示する。
+
 座標付きブリーフィングの自動表示は計画確定時の1回だけ。地上・空中受注のどちらでも、受注直後は受注と計画中の通知だけで方式はDEBUG限定、SAM生成時は開始・成功条件の短い通知を表示する。参加者一覧はDEBUG限定とし、座標やPBコードを再掲しない。
 座標付き表示は `src/config.lua` の `coordinateBriefingSeconds` で設定し、初期値は60秒。計画確定時と座標を含むMission Statusの両方へ適用する。
 離陸待ち・カウントダウンのリセット・ACTIVE中の監視でもブリーフィングを再掲しない。必要な場合は `Mission Status` から何度でも同じ計画ブリーフィングを確認でき、TOO / PBの情報制限を維持する。
 地域表示名は `sead.zoneLabels`、SAM表示名はテンプレートの `type` に置き、ME の参照名と分離する。
-`Mission Status` では方式別の情報に加え、計画中の地点選定回数・各参加者の状態を表示する。生成までの残り秒数は画面／Statusに出さずDEBUGだけに残す。
-生成後は `Emitter state: ACTIVE / SUPPRESSION PENDING / SUPPRESSED / DESTROYED` と、計測中の継続時間を表示する。
+`Mission Status` には公開時の本文以外の計画試行数・参加者状態・生成までの残り秒数・レーダー状態・抑制継続時間を付けない。内部の観測・判定は従来どおり行い、発信状態の遷移はDCSログで確認する。
 SEAD ScoreはIntercept Scoreと別に集計・保存する。`Player Statistics` にはカテゴリ別Scoreを表示せず、累計と任務・帰還・喪失統計を表示する（[SCORING.md](SCORING.md)）。
-SEAD達成後の残存あり時だけContinue/Preserveを表示し、StatusへSite dispositionとFollow-on DEAD availableを加える。
-`Continue as DEAD` 直後の通知にはSiteの実配置座標を追加し、共通設定 `coordinateBriefingSeconds`（初期60秒）で1回表示する。Mission StatusにはDEAD情報として実配置座標・SAM種類を追加し、DEAD達成後の帰還待ちも維持する。元のSEAD計画・推定座標は変更しない。Continue前とPreserveのみでは従来のTOO / PB秘匿を維持する。詳細は [DEAD.md](DEAD.md)。
+SEAD達成後の残存あり時だけContinue/Preserveメニューを表示する。StatusへSite dispositionやFollow-on DEAD availableは追加しない。
+`Continue as DEAD` 直後の通知には残数の次に `SITE LOCATION: <Site実配置座標>` を同じ行で表示し、追加DEAD報酬とSEAD報酬保持の案内を続ける。共通設定 `coordinateBriefingSeconds`（初期60秒）で1回表示する。Mission StatusはContinueの公開済み開始本文を新しいブリーフィングとして再表示し、DEAD達成後は座標を外し、公開済み達成・帰還指示だけを20秒表示する。SAM種類など開始通知にない情報は追加しない。元のSEAD計画・推定座標は変更しない。Continue前とPreserveのみでは従来のTOO / PB秘匿を維持する。詳細は [DEAD.md](DEAD.md)。
 `Abort Mission` でウィング全体、`Abort Sortie: <名前> [<機体>]` でその参加者だけを中止する。
 今回、F10 地図マーカー・コックピットのウェイポイント設定は追加しない。
 
 ## 検証と反映
 
 - [src/sead.lua](../src/sead.lua): Zone 抽選・地形／離隔判定・地上生成・主要レーダーの追跡。
-- [src/sead_objective.lua](../src/sead_objective.lua): エミッター観測・遷移表・終端状態・デバッグ状態表示。
+- [src/sead_objective.lua](../src/sead_objective.lua): エミッター観測・遷移表・終端状態・遷移ログ。
 - [src/sead_sites.lua](../src/sead_sites.lua): サイト参照の登録・全員終了後の削除・削除失敗時の再試行。
 - [src/dead.lua](../src/dead.lua): 保持Siteの選定・残存対象snapshot・DEAD判定。
 - [src/main.lua](../src/main.lua): F10・共有受注・段階的な地点選定・状態・終了。
 - [src/mission_report.lua](../src/mission_report.lua): Status/Statistics本文と表示時間。画面・ログ出力は`notifications.lua`へ分離。
 - [scripts/Test-SEAD.lua](../scripts/Test-SEAD.lua): 方式抽選・情報制限・計画固定・PB誤差・距離候補・離陸待ち・配置条件・失敗復旧・主要目標・個別採点・複数ウィングの模擬検証。
-  状態遷移、60秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
+  状態遷移、30秒境界、無傷OFF、再発信、観測不明、開始時Life、終端状態での観測停止、全員精算、Cleanup再試行も検証する。
 
 `scripts/Test-All.ps1`で両bundleを結合後、Lua全9スイートとBuild/Sync/Installテストを実行する。
-SEAD69件・DEAD103件を含む対応表と現在の全件数は [TESTING.md](TESTING.md) を参照する。
+SEAD71件・DEAD105件を含む対応表と現在の全件数は [TESTING.md](TESTING.md) を参照する。
 実際のDCSでのRadar状態・損傷Life・イベント順序・残存SAMのCleanupはゲーム内確認待ち。
 既存の埋め込み Lua に結合するため、ME の追加トリガー登録は不要。
 `Sync-Mission.ps1` と `-Check` を順に実行し、ME で `.miz` を開き直してミッションを再開始する。
@@ -318,7 +321,7 @@ DCS 内では10 ZoneそれぞれでSA-6／SA-8の車両位置、建物からの�
 TOOで捜索座標が表示され、機種・正確な座標・PBコードが表示されないこと、PBのコードと推定座標を使ってHARMを設定・攻撃できることを確認する。
 Intercept との二重受注拒否、選定中の中止、MP2 の共有操作、別ウィングの同時受注も確認する。
 SA-6 は発射機を残してレーダーだけ破壊し、SA-8 は車両を破壊して帰還待ちになることを確認する。
-無傷のRadar OFFでは未達成、損傷＋OFFで計測開始、途中のONでリセット、損傷＋連続60秒OFFでSuppressedとなることを確認する。
+無傷のRadar OFFでは未達成、損傷＋OFFで計測開始、途中のONでリセット、損傷＋連続30秒OFFでSuppressedとなることを確認する。
 完了後のRadar再開・残存車両撃破で結果が変わらず、全員の精算まで残存Groupが保持されることを確認する。
 その後の帰還150、墜落・死亡・脱出90、達成前の事故0、および SEAD Score の加算を確認する。
 

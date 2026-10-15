@@ -1,8 +1,10 @@
 # Mission messages and DCS logs
 
-Updated: 2026-10-13
+Updated: 2026-10-15
 
-The separate placement-only diagnostic mission logs `[SEADPlacementCheck] START`, one `RESULT zone=<name> template=<name> checked=50 passed=<n> firstSuccess=<n|NONE> errors=<n> rejected=<counts>` for each of 20 pairs, and `COMPLETE pairs=20 checked=1000 passed=<n> errors=<n>`. Accepted diagnostic points use `VALID_POINT zone=<name> template=<name> sample=<n> x=<northing> y=<easting>`; exact coordinates appear only in the diagnostic log, not normal mission messages. Setup/observation exceptions use `SETUP_ERROR` / `OBSERVATION_ERROR` and are distinct from terrain rejection. These messages have no screen output and are absent from the normal training mission. See [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md) for the procedure and measured results.
+日本語の任務別・分岐別タイムラインと表示見直し用の参照IDは [任務メッセージのタイミング・分岐一覧](MESSAGE_FLOW.md) を参照。このページは英語の全文例とログの詳細カタログ。
+
+The separate placement diagnostic mission logs `[SEADPlacementCheck] START`, one `RESULT zone=<name> template=<name> checked=50 passed=<n> firstSuccess=<n|NONE> errors=<n> rejected=<counts>` for each of 20 pairs, and `COMPLETE pairs=20 checked=1000 passed=<n> errors=<n>` (plus spawn/cleanup totals with `-SpawnCheck`). Accepted diagnostic points use `VALID_POINT zone=<name> template=<name> sample=<n> x=<northing> y=<easting>`; exact coordinates appear only in the diagnostic log, not normal mission messages. Optional real-spawn verification adds `SPAWN_RESULT` / `CLEANUP_RESULT`. Setup/observation exceptions use `SETUP_ERROR` / `OBSERVATION_ERROR` and are distinct from terrain rejection. These messages have no screen output and are absent from the normal training mission. See [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md) for the procedure and measured results.
 
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
 
@@ -19,6 +21,8 @@ The four F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, and
 | Other DCS logs | Assignment, objective, observation, cleanup and persistence events |
 
 Screen durations: default 10 seconds, coordinate briefings 60 seconds, settlements 20 seconds. Mission polling: 1 second. Takeoff checks: 2 seconds. Spawn delay: 20 seconds after all registered pilots are observed airborne. Recovery: speed at or below 5 knots for 10 consecutive seconds after a valid landing.
+
+Durations are display lifetimes, not delays between messages. Acceptance and briefing calls can occur in the same operation; airborne activation can immediately follow a coordinate briefing. The script does not wait for the previous message to expire.
 
 The supplied MOOSE returns DDM on one line, with the `LL DDM` prefix and three decimal places in minutes. The coordinate examples below use that exact format.
 
@@ -79,9 +83,8 @@ Registered pilots: 2.
 ```text
 SEAD MISSION
 MODE: PB
-THREAT AREA: Palmyra
+THREAT AREA: LL DDM 034° 39.420'N   037° 57.180'E
 THREAT: SA-6
-ESTIMATED LOCATION: LL DDM 034° 39.420'N   037° 57.180'E
 HARM PB CODE: 108
 Reward per pilot: 150 points.
 Registered pilots: 2.
@@ -97,7 +100,7 @@ No screen message at countdown start or reset. Airborne acceptance can produce a
 
 ```text
 SEAD TRAINING START
-Objective: destroy primary emitter, or damage it and keep radar OFF for 60 seconds; then RTB.
+Objective: destroy primary emitter, or damage it and keep radar OFF for 30 seconds; then RTB.
 ```
 
 ### Destroyed result — 20 seconds, once
@@ -118,7 +121,7 @@ Each pilot: return to a BLUE airfield or carrier.
 Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
-No automatic screen message when suppression timing starts, resets, or progresses. Use Mission Status for the emitter state and observed OFF duration.
+No automatic screen message when suppression timing starts, resets, or progresses. Status does not reveal the emitter state or OFF duration; inspect DCS transition logs and protected test observations for diagnostics.
 
 ## Screen: Site actions and Immediate DEAD
 
@@ -138,13 +141,12 @@ Site will be cleaned when the keeper disconnects.
 Immediate DEAD started.
 Destroy all remaining SAM site vehicles.
 Remaining targets: 3
+SITE LOCATION: LL DDM 034° 40.000'N   037° 55.000'E
 Additional DEAD reward per pilot: 150 points.
 SEAD reward also retained.
-SITE LOCATION:
-LL DDM 034° 40.000'N   037° 55.000'E
 ```
 
-Uses `coordinateBriefingSeconds` (default 60). SITE LOCATION is the exact site placement reference, also available in Mission Status.
+Uses `coordinateBriefingSeconds` (default 60). SITE LOCATION is on one line after Remaining targets and before the reward lines. It is the exact site placement reference, also available in Mission Status.
 
 ### Immediate DEAD complete — 20 seconds, once
 
@@ -192,17 +194,15 @@ DEAD mission accepted.
 
 ```text
 DEAD MISSION
-AREA: Palmyra
 TARGET SITE: SA-6
+SITE LOCATION: LL DDM 034° 39.420'N   037° 57.180'E
 STATUS: Primary radar destroyed
 OBJECTIVE: Destroy all remaining SAM site vehicles.
-SITE LOCATION:
-LL DDM 034° 39.420'N   037° 57.180'E
 Reward per pilot: 150 points.
 Registered pilots: 2.
 ```
 
-A suppressed emitter instead produces `STATUS: Previously suppressed`.
+A suppressed emitter instead produces `STATUS: Previously suppressed`. The DEAD briefing omits the AREA line and puts SITE LOCATION on one line immediately after TARGET SITE; the shared Status and debug briefing use the same format.
 
 ### Activation after takeoff / airborne acceptance — 25 seconds, once
 
@@ -270,7 +270,7 @@ Persistence pending; not yet saved.
 ```
 
 Wing abort uses `Wing mission aborted. No reward.` and generates one settlement per participant.
-Before Intercept/SEAD spawning, no scoring ID exists, so the settlement body has only its heading and reason. A whole-assignment abort before spawning also sends `SEAD reservation cancelled.` or `Intercept reservation cancelled.` for 10 seconds.
+Before Intercept/SEAD spawning, participants have no scoring ID (SEAD already has a planning record ID), so the settlement body has only its heading and reason. A whole-assignment abort before spawning also sends `SEAD reservation cancelled.` or `Intercept reservation cancelled.` for 10 seconds.
 
 ### Immediate DEAD incomplete, safe RTB
 
@@ -306,7 +306,9 @@ Unscored sortie (UCID unavailable).
 
 Landing, LANDING_CHECK entry, the recovery hold countdown, and a go-around have no automatic screen notification. Successful recovery produces settlement only after the stable hold finishes.
 
-## Screen: Mission Status — requested manually
+## Screen: Mission Status — published information recalled manually
+
+Before objective completion, Status replays the exact published coordinate briefing plus the latest published start notice, separated by a blank line. Completion removes the briefing and start notice; only the published result and RTB instruction are recalled for 20 seconds. It does not regenerate the briefing or query targets, radars, sites, reservations, or participant states.
 
 ### Idle — 10 seconds
 
@@ -314,97 +316,88 @@ Landing, LANDING_CHECK entry, the recovery hold countdown, and a go-around have 
 Intercept: Idle.
 SEAD: Idle.
 DEAD: Idle.
+CAP: Idle.
 ```
 
-### Intercept ACTIVE — 20 seconds
+### Intercept waiting / active / complete
+
+Ground waiting and the spawn countdown both recall the published ground-acceptance body for 10 seconds. No countdown is appended. After spawning, Status is exactly `Intercept MISSION START` for 15 seconds. After completion it recalls the objective-complete message, including the RTB instruction, for 20 seconds. It appends no Wing, lead, or participant information.
+
+### SEAD planning — 10 seconds
 
 ```text
-Intercept: ACTIVE
-Wing: BLUE_HORNET_INCIRLIK_MP2_01
-Lead reference: Hawk 1
-Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: ACTIVE
-Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: ACTIVE
+SEAD mission accepted.
+Mission planning in progress.
 ```
 
-### SEAD SUPPRESSION_PENDING — 60 seconds
+Neither mode, SAM type, PB code, planned coordinates, nor site-check counts are disclosed before the plan briefing has actually been published.
+
+### SEAD active TOO — 60 seconds
 
 ```text
-SEAD: ACTIVE
-Wing: BLUE_HORNET_INCIRLIK_MP2_01
-Lead reference: Hawk 1
 SEAD MISSION
 MODE: TOO
 THREAT AREA: LL DDM 034° 39.420'N   037° 57.180'E
 TARGET TYPE: UNKNOWN
-Emitter state: SUPPRESSION PENDING
-Radar 1 OFF: 35 / 60 seconds
-Site state: ACTIVE
-Site disposition: CLEANUP
-Follow-on DEAD available: NO
-Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: ACTIVE
-Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: ACTIVE
+Reward per pilot: 150 points.
+Registered pilots: 2.
+
+SEAD TRAINING START
+Objective: destroy primary emitter, or damage it and keep radar OFF for 30 seconds; then RTB.
 ```
 
-Planning SEAD uses 20 seconds and `THREAT AREA: Planning in progress`, with `Site checks: 4` instead of emitter/site details.
-Planning PB uses `ESTIMATED LOCATION: Planning in progress`. Once coordinates exist, SEAD Status uses 60 seconds.
-SEAD Status never adds the `Spawn in ... seconds.` line during TAKEOFF_DELAY. Spawn countdowns and resets remain DEBUG-only; Intercept Status retains its countdown.
+Before spawning, only the coordinate briefing is recalled. PB uses the already published PB briefing, including THREAT AREA, THREAT and HARM PB CODE. No live emitter state or OFF timer is appended.
 
-### Immediate DEAD ACTIVE — 60 seconds
+### SEAD objective complete — 20 seconds
+
+Only the published result and recovery instruction remain:
 
 ```text
-SEAD: COMPLETE
-Follow-on: DEAD ACTIVE
-Remaining targets: 3
-Wing: BLUE_HORNET_INCIRLIK_MP2_01
-SEAD MISSION
-MODE: TOO
-THREAT AREA: LL DDM 034° 39.420'N   037° 57.180'E
-TARGET TYPE: UNKNOWN
-SEAD Primary result: DESTROYED
-Emitter state: DESTROYED
-DEAD MISSION
-AREA: Palmyra
-TARGET SITE: SA-6
-STATUS: Primary radar destroyed
-OBJECTIVE: Destroy all remaining SAM site vehicles.
-SITE LOCATION:
-LL DDM 034° 40.000'N   037° 55.000'E
-Site state: SUPPRESSED
-Site remaining vehicles: 3
-Site disposition: IN USE
-Follow-on DEAD available: NO
-Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: DEAD_ACTIVE
-DEAD objective: INCOMPLETE
-Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: DEAD_ACTIVE
-DEAD objective: INCOMPLETE
+SEAD Objective Complete
+Enemy radar destroyed.
+Each pilot: return to a BLUE airfield or carrier.
+Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
-After Immediate DEAD completion the assignment remains SEAD and shows `SEAD: RTB_PENDING`, `DEAD objective: COMPLETE`, the original SEAD briefing and the exact DEAD site location. The DEAD section appears only after Continue as DEAD; preserving the site alone keeps SEAD information restrictions. SITE LOCATION is the site's placement reference, not individual vehicle coordinates. Continue's automatic notification also includes SITE LOCATION once.
+A suppressed result recalls `Enemy radar suppressed.`. Preserve and Release do not replace this information or expose the actual site location.
 
-### Follow-on DEAD ACTIVE — 60 seconds
+### Immediate DEAD active — 60 seconds
+
+Status recalls exactly the Continue notification:
 
 ```text
-DEAD: ACTIVE
-Area: Palmyra
+Immediate DEAD started.
+Destroy all remaining SAM site vehicles.
 Remaining targets: 3
-DEAD MISSION
-AREA: Palmyra
-TARGET SITE: SA-6
-STATUS: Primary radar destroyed
-OBJECTIVE: Destroy all remaining SAM site vehicles.
-SITE LOCATION:
-LL DDM 034° 39.420'N   037° 57.180'E
-Site state: SUPPRESSED
-Site remaining vehicles: 3
-Site disposition: IN USE
-Follow-on DEAD available: NO
-Hawk 1 [BLUE_HORNET_INCIRLIK_MP2_01-1]: ACTIVE
-Hawk 2 [BLUE_HORNET_INCIRLIK_MP2_01-2]: ACTIVE
+SITE LOCATION: LL DDM 034° 40.000'N   037° 55.000'E
+Additional DEAD reward per pilot: 150 points.
+SEAD reward also retained.
 ```
 
-Other states appear literally, for example `DEAD: ARMED` and `DEAD: RTB PENDING`.
-A pending spawn adds `Spawn in 12 seconds.`; an unknown site count displays `Site remaining vehicles: UNKNOWN`.
-Status shows all matching assignments in one message. Any coordinate-bearing assignment selects the coordinate duration.
+Remaining targets is the number announced at Continue; it is not updated to reveal current losses. This new briefing replaces the former SEAD estimate and completion notice. No SAM type or other site data is added beyond what that notification already contained. After DEAD completion, the coordinate briefing is removed; only the published Immediate DEAD complete / RTB message is recalled for 20 seconds.
+
+### Follow-on DEAD active — 60 seconds
+
+```text
+DEAD MISSION
+TARGET SITE: SA-6
+SITE LOCATION: LL DDM 034° 39.420'N   037° 57.180'E
+STATUS: Primary radar destroyed
+OBJECTIVE: Destroy all remaining SAM site vehicles.
+Reward per pilot: 150 points.
+Registered pilots: 2.
+
+DEAD TRAINING START
+Objective: destroy all remaining SAM site vehicles; then RTB.
+```
+
+Ground acceptance recalls only the briefing until activation. Suppressed sites retain the already published `STATUS: Previously suppressed` history. After completion, the accepted coordinate briefing and start notice are removed; only the objective-complete / RTB message is recalled for 20 seconds. No current target count is added.
+
+### Replay duration and isolation
+
+Each recalled message retains its published duration; the combined Status uses the longest duration, with a minimum of 10 seconds. Coordinate messages normally use 60 seconds; a briefing published with a configured 90-second duration is recalled for 90 seconds while the objective is unfinished. After completion, its briefing is removed and the result / RTB message alone is recalled for 20 seconds. Unrelated errors, blockers, personal settlements, site-management messages and CAP progress updates do not overwrite the replay.
+
+Status shows only the caller Group's active assignment and any earlier assignment linked by the current pilot UCIDs. Multiple matching assignments are separated by blank lines without adding internal identifiers. With no published information, the safe fallback is `Mission briefing unavailable.` for 10 seconds; hidden state is not used to fill it in. Closed assignments return Idle.
 
 ## Screen: CAP acceptance, patrol and completion
 
@@ -443,7 +436,7 @@ Each pilot: return to a BLUE airfield or carrier.
 Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
-`Mission Status` lasts 60 seconds for CAP and appends the accepted briefing, `Patrol: 40% (48/120 seconds)`, `Clock: RUNNING` / `WAITING / PAUSED` / `TIME COMPLETE`, and `Hostiles remaining: 2` / `0` / `NOT SPAWNED`. It does not redraw or reroll the area.
+`Mission Status` recalls the accepted CAP briefing, including coordinates, objectives, registered count and reward, for its published duration (default 60 seconds). After completion it removes that briefing and recalls only the published objective-complete / RTB message for 20 seconds. No patrol clock, exact progress, hostile count or spawn status is appended. It does not redraw or reroll the area.
 CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant messages, points, totals and persistence status. Setup failure shows `ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.` for 20 seconds. A monitor/spawn failure settles each registered participant with `CAP setup/spawn failed. No reward.` for 20 seconds.
 Acceptance selection and actual spawn details are DEBUG only: `CAP accepted; zone=<name> template=<name> enemy at on-station second <n>` and `CAP enemy spawned; template=<name> units=<n> altitude=<n> ft`. No separate hostile spawn message appears on screen. Normal CAP group messages are mirrored to the DCS MESSAGE log.
 Idle Status and Abort Mission use the same Intercept / SEAD / DEAD / CAP list, including `CAP: Idle.`.
@@ -630,7 +623,7 @@ Mission planning in progress.
 ```text
 [DynamicTraining] [DEBUG] run7:SEAD:2
 SEAD TRAINING START
-Objective: destroy primary emitter, or damage it and keep radar OFF for 60 seconds; then RTB.
+Objective: destroy primary emitter, or damage it and keep radar OFF for 30 seconds; then RTB.
 Pilots: Hawk 1 (reward: 150), Hawk 2 (reward: 150)
 ```
 
@@ -639,12 +632,10 @@ Pilots: Hawk 1 (reward: 150), Hawk 2 (reward: 150)
 ```text
 [DynamicTraining] [DEBUG] run7:DEAD:3
 DEAD MISSION
-AREA: Palmyra
 TARGET SITE: SA-6
+SITE LOCATION: LL DDM 034° 39.420'N   037° 57.180'E
 STATUS: Primary radar destroyed
 OBJECTIVE: Destroy all remaining SAM site vehicles.
-SITE LOCATION:
-LL DDM 034° 39.420'N   037° 57.180'E
 Reward per pilot: 150 points.
 Registered pilots: 2.
 Remaining targets: 3
@@ -658,12 +649,10 @@ The final waiting line is omitted when all participants are already airborne.
 ```text
 [DynamicTraining] [DEBUG] run7:DEAD:3
 DEAD MISSION
-AREA: Palmyra
 TARGET SITE: SA-6
+SITE LOCATION: LL DDM 034° 39.420'N   037° 57.180'E
 STATUS: Primary radar destroyed
 OBJECTIVE: Destroy all remaining SAM site vehicles.
-SITE LOCATION:
-LL DDM 034° 39.420'N   037° 57.180'E
 DEAD TRAINING START
 Objective: destroy all remaining SAM site vehicles; then RTB.
 Remaining targets: 3
@@ -692,9 +681,8 @@ Search near the reported area and engage the hostile radar emitter using HARM TO
 [DynamicTraining] [DEBUG] run7:SEAD:2
 SEAD MISSION
 MODE: PB
-THREAT AREA: Palmyra
+THREAT AREA: LL DDM 034° 39.420'N   037° 57.180'E
 THREAT: SA-6
-ESTIMATED LOCATION: LL DDM 034° 39.420'N   037° 57.180'E
 HARM PB CODE: 108
 Reward per pilot: 150 points.
 Registered pilots: 2.

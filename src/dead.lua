@@ -71,9 +71,8 @@ end
 function DEAD.Briefing(site)
     local location = DEAD.SiteLocation(site)
     local status = site.primaryResult == "DESTROYED" and "Primary radar destroyed" or "Previously suppressed"
-    return "DEAD MISSION\nAREA: " .. site.plan.areaLabel .. "\nTARGET SITE: " .. site.plan.samType ..
-        "\nSTATUS: " .. status .. "\nOBJECTIVE: Destroy all remaining SAM site vehicles.\n" ..
-        "SITE LOCATION:\n" .. location
+    return "DEAD MISSION\nTARGET SITE: " .. site.plan.samType .. "\nSITE LOCATION: " .. location ..
+        "\nSTATUS: " .. status .. "\nOBJECTIVE: Destroy all remaining SAM site vehicles."
 end
 
 return DEAD

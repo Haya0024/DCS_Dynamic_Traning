@@ -25,12 +25,23 @@ local function setup(templateIndex, options)
     s.randomValues = { templateIndex or 1, 2, 1 } -- Template, PB mode, first eligible zone.
     return s, s.zones[names[1]]
 end
+local function module(s, wanted)
+    for i = 1, 100 do
+        local name, value = debug.getupvalue(s.timers[1].callback, i)
+        if not name then break end
+        if name == wanted then return value end
+    end
+    error("Test module unavailable: " .. wanted)
+end
 local function generate(s)
     s:command("Task: SEAD")
     s:lastMessageContains("SEAD mission accepted.")
 end
 local function status(s, expected, pilot)
-    s:command("Mission Status", pilot); s:lastMessageContains("SEAD: " .. expected)
+    local r = s:mission(pilot)
+    assert(expected == "Idle" and not r or r and r.state == expected)
+    s:command("Mission Status", pilot)
+    if expected == "Idle" then s:lastMessageContains("SEAD: Idle.") end
 end
 local function object(x, y, radius)
     return { getPoint = function() return { x = x, y = 0, z = y } end,
@@ -213,7 +224,8 @@ test("MP2 individual withdrawal during selection leaves the partner's job active
     s:abortSortie(s.player)
     status(s, "PLANNING"); s:tick(1)
     assert(#s.spawns == 1); status(s, "ACTIVE")
-    s:lastMessageContains("Pilot [Player10]: ABORT")
+    assert(s:mission().participants[1].state == "ABORT")
+    assert(not string.find(s.messages[#s.messages].text, "Pilot [Player10]: ABORT", 1, true))
     s:event("Crash", s.wingman); assert(s.spawns[1].destroyed)
     s:score(0); s:score(0, s.wingman); s:assertClean()
 end)
@@ -279,7 +291,10 @@ test("zone draw chooses one eligible zone without changing the configured pool",
         local expected = second and names[2] or names[1]
         assert(s.zones[expected].calls == 1)
         status(s, "ACTIVE")
-        s:lastMessageContains("THREAT AREA: " .. (second and "Salamiyah" or "Palmyra"))
+        assert(s:mission().plan.zoneName == expected)
+        local point = s:mission().plan.estimatedPoint
+        local location = s.env.COORDINATE:NewFromVec2(point):ToStringLLDDM({ LL_Accuracy = 3 })
+        s:lastMessageContains("THREAT AREA: " .. location)
         s:assertClean()
     end
 end)
@@ -522,7 +537,7 @@ test("TOO three-to-five NM and PB one-to-three NM estimates match actual spawns 
             local g = s.spawns[1]
             assert(g.position.x == p.actualSpawnPoint.x and g.position.z == p.actualSpawnPoint.y)
             s:command("Mission Status")
-            local label = mode == 1 and "THREAT AREA: " or "ESTIMATED LOCATION: "
+            local label = "THREAT AREA: "
             local location = s.env.COORDINATE:NewFromVec2(p.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
             s:lastMessageContains(label .. location)
             assert(not string.find(s.messages[#s.messages].text, "LL DMS", 1, true))
@@ -530,6 +545,8 @@ test("TOO three-to-five NM and PB one-to-three NM estimates match actual spawns 
                 if string.find(message.text, "SEAD MISSION", 1, true)
                     and not string.find(message.text, "Planning in progress", 1, true) then
                     assert(string.find(message.text, label .. location, 1, true), message.text)
+                    assert(not string.find(message.text, "ESTIMATED LOCATION:", 1, true), message.text)
+                    assert(not string.find(message.text, "THREAT AREA: " .. p.areaLabel, 1, true), message.text)
                 end
             end
             if mode == 2 then s:lastMessageContains("HARM PB CODE: 117")
@@ -708,20 +725,21 @@ test("placement failure counts every rejection reason without revealing TOO targ
     end
 end)
 
-test("damaged live emitters need sixty full OFF seconds in both modes and both SAM types before RTB scoring", function()
+test("damaged live emitters need thirty full OFF seconds in both modes and both SAM types before RTB scoring", function()
     for template = 1, 2 do
         for mode = 1, 2 do
             local s = setup(template); s.randomValues = { template, mode, 1 }; generate(s); s:tick(1)
             local r = s:mission(); local g = r.spawn.group; local radar = g.units[1]
-            assert(r.spawn.primaryUnits[1].initialLife == 100)
+            assert(r.spawn.primaryUnits[1].initialLife == 100 and r.spawn.suppressionHoldSeconds == 30)
+            s:lastMessageContains("keep radar OFF for 30 seconds; then RTB.")
             radar.life, radar.radarEmitting = 99, false
             s:tick(2)
-            for t = 3, 61 do s:tick(t); assert(r.state == "ACTIVE") end
-            s:tick(62); s:lastMessageContains("Enemy radar suppressed.")
+            for t = 3, 31 do s:tick(t); assert(r.state == "ACTIVE") end
+            s:tick(32); s:lastMessageContains("Enemy radar suppressed.")
             assert(r.state == "RTB_PENDING" and r.primaryResult == "SUPPRESSED" and radar.alive and not g.destroyed)
-            status(s, "RTB_PENDING"); s:lastMessageContains("Primary result: SUPPRESSED")
+            status(s, "RTB_PENDING"); s:lastMessageContains("Enemy radar suppressed.")
             s:score(0); s:command("Task: SEAD"); s:lastMessageContains("already active")
-            radar.radarEmitting = true; s:tick(63); assert(r.primaryResult == "SUPPRESSED")
+            radar.radarEmitting = true; s:tick(33); assert(r.primaryResult == "SUPPRESSED")
             recover(s, nil, 70); s:score(150)
             s:categoryScores({ seadScore = 150 }); s:lastMessageContains("Primary Success: 1")
             assert(g.destroyed and not s:mission()); s:assertClean()
@@ -746,21 +764,21 @@ test("undamaged OFF time is excluded; counting starts when damage and OFF are bo
     assert(s:mission().state == "ACTIVE")
     radar.life = 99; s:tick(101)
     assert(s:mission().spawn.primaryUnits[1].offSince == 101)
-    for t = 102, 160 do s:tick(t) end
+    for t = 102, 130 do s:tick(t) end
     assert(s:mission().state == "ACTIVE")
-    s:tick(161); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
+    s:tick(131); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
 end)
 
-test("radar restart resets OFF continuity and requires a new complete sixty-second interval", function()
+test("radar restart resets OFF continuity and requires a new complete thirty-second interval", function()
     local s, g = started(); local radar = g.units[1]
     radar.life, radar.radarEmitting = 90, false
-    for t = 2, 60 do s:tick(t) end
-    radar.radarEmitting = true; s:tick(61)
+    for t = 2, 30 do s:tick(t) end
+    radar.radarEmitting = true; s:tick(31)
     assert(s:mission().spawn.primaryUnits[1].offSince == nil and s:mission().state == "ACTIVE")
-    radar.radarEmitting = false; s:tick(62)
-    for t = 63, 121 do s:tick(t) end
+    radar.radarEmitting = false; s:tick(32)
+    for t = 33, 61 do s:tick(t) end
     assert(s:mission().state == "ACTIVE")
-    s:tick(122); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
+    s:tick(62); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
 end)
 
 test("invalid alive/life/radar observations and API exceptions break continuity without implying OFF or destruction", function()
@@ -768,7 +786,7 @@ test("invalid alive/life/radar observations and API exceptions break continuity 
         local s, g = started(); local radar = g.units[1]
         local isAlive = radar.IsAlive
         radar.life, radar.radarEmitting = 95, false
-        for t = 2, 60 do s:tick(t) end
+        for t = 2, 30 do s:tick(t) end
         if problem == "aliveNil" then radar.IsAlive = function() return nil end
         elseif problem == "aliveNumber" then radar.IsAlive = function() return 0 end
         elseif problem == "aliveError" then radar.IsAlive = function() error("Injected emitter life observation failure") end
@@ -779,20 +797,21 @@ test("invalid alive/life/radar observations and API exceptions break continuity 
         elseif problem == "lifeNaN" then radar.life = 0 / 0
         elseif problem == "lifeInfinity" then radar.life = math.huge
         else radar[problem] = true end
-        s:tick(61); s:tick(62)
+        s:tick(31); s:tick(32)
         assert(s:mission().spawn.primaryUnits[1].offSince == nil and s:mission().state == "ACTIVE")
         assert(not s:mission().spawn.primaryUnits[1].lost and not s:mission().primaryResult)
         if string.sub(problem, 1, 5) == "alive" then
+            module(s, "SEADSites").Refresh(s:mission().site)
             s:command("Mission Status")
             assert(s:mission().site.state == "ACTIVE" and s:mission().site.observationUnavailable)
             assert(s:mission().site.remainingTargetCount == nil)
         end
         radar.IsAlive = isAlive
         radar.life, radar.radarEmitting, radar.lifeError, radar.radarError = 95, false, nil, nil
-        s:tick(63)
-        for t = 64, 122 do s:tick(t) end
+        s:tick(33)
+        for t = 34, 62 do s:tick(t) end
         assert(s:mission().state == "ACTIVE")
-        s:tick(123); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
+        s:tick(63); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
     end
 end)
 
@@ -805,21 +824,21 @@ test("damage comparison uses the mission-start snapshot rather than factory life
     radar.life = 49; s:tick(101)
     radar.life = 48; s:tick(120) -- Further damage does not restart the OFF timer.
     assert(record.initialLife == 50 and record.offSince == 101)
-    for t = 121, 160 do s:tick(t) end
+    for t = 121, 130 do s:tick(t) end
     assert(s:mission().state == "ACTIVE")
-    s:tick(161); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
+    s:tick(131); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
 end)
 
 test("life returning to its initial value resets suppression eligibility", function()
     local s, g = started(); local radar = g.units[1]
     radar.life, radar.radarEmitting = 99, false
-    for t = 2, 60 do s:tick(t) end
-    radar.life = 100; s:tick(61)
+    for t = 2, 30 do s:tick(t) end
+    radar.life = 100; s:tick(31)
     assert(s:mission().spawn.primaryUnits[1].offSince == nil)
-    radar.life = 99; s:tick(62)
-    for t = 63, 121 do s:tick(t) end
+    radar.life = 99; s:tick(32)
+    for t = 33, 61 do s:tick(t) end
     assert(s:mission().state == "ACTIVE")
-    s:tick(122); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
+    s:tick(62); s:lastMessageContains("Enemy radar suppressed."); s:assertClean()
 end)
 
 test("destruction completes immediately while suppression is pending and does not depend on life/radar readings", function()
@@ -849,13 +868,13 @@ test("multiple primary emitters require each to be destroyed or currently suppre
     local s = setup(); s.groundTemplates.TPL_SEAD_SA6.units[2].type = "Kub 1S91 str"
     generate(s); s:tick(1); local g = s.spawns[1]
     g.units[1].life, g.units[1].radarEmitting = 99, false
-    for t = 2, 62 do s:tick(t) end
+    for t = 2, 32 do s:tick(t) end
     assert(s:mission().state == "ACTIVE") -- First qualifies, second still active.
-    g.units[2].life, g.units[2].radarEmitting = 99, false; s:tick(63)
-    g.units[1].radarEmitting = true; s:tick(64)
-    for t = 65, 123 do s:tick(t) end
+    g.units[2].life, g.units[2].radarEmitting = 99, false; s:tick(33)
+    g.units[1].radarEmitting = true; s:tick(34)
+    for t = 35, 63 do s:tick(t) end
     assert(s:mission().state == "ACTIVE") -- First no longer qualifies.
-    g.units[1].alive = false; s:event("Dead", g.units[1]); s:tick(124)
+    g.units[1].alive = false; s:event("Dead", g.units[1]); s:tick(64)
     s:lastMessageContains("Enemy radar suppressed.")
     assert(g.units[2].alive and s:mission().primaryResult == "SUPPRESSED")
     s:assertClean()
@@ -867,12 +886,12 @@ test("suppression timers are scoped to their own wing and cannot complete anothe
     s.randomValues = { 2, 1, 2 }; s:command("Task: SEAD", other); s:tick(4)
     local b = s.spawns[2]
     g.units[1].life, g.units[1].radarEmitting = 99, false
-    for t = 5, 65 do s:tick(t) end
+    for t = 5, 35 do s:tick(t) end
     assert(s:mission().primaryResult == "SUPPRESSED" and s:mission(other).state == "ACTIVE")
     b.units[1].life, b.units[1].radarEmitting = 99, false
-    for t = 66, 125 do s:tick(t) end
+    for t = 36, 65 do s:tick(t) end
     assert(s:mission(other).state == "ACTIVE")
-    s:tick(126); assert(s:mission(other).primaryResult == "SUPPRESSED")
+    s:tick(66); assert(s:mission(other).primaryResult == "SUPPRESSED")
     s:event("Ejection", other); s:score(90, other)
     assert(s:mission().state == "RTB_PENDING" and not g.destroyed)
     recover(s, nil, 130); s:score(150); s:assertClean()
@@ -882,9 +901,9 @@ test("MP2 suppression shares the objective and settles 150/90 once while later r
     local s, g = started(1); s:command("Abort Mission")
     s:occupyWing(); s.randomValues = { 1, 1, 1 }; generate(s); s:tick(2); g = s.spawns[2]
     g.units[1].life, g.units[1].radarEmitting = 99, false
-    for t = 3, 63 do s:tick(t) end
+    for t = 3, 33 do s:tick(t) end
     assert(s:mission().primaryResult == "SUPPRESSED")
-    g.units[1].radarEmitting = true; s:tick(64)
+    g.units[1].radarEmitting = true; s:tick(34)
     recover(s, nil, 70); s:score(150)
     assert(not g.destroyed and s:mission().state == "RTB_PENDING")
     s:event("Ejection", s.wingman); s:event("Dead", s.wingman); s:score(90, s.wingman)
@@ -893,32 +912,33 @@ end)
 
 test("pilot loss before suppression confirmation gives zero and cleanup cannot retrospectively complete", function()
     local s, g = started(); g.units[1].life, g.units[1].radarEmitting = 99, false
-    for t = 2, 61 do s:tick(t) end
-    s.cleanupEvents = true; s:event("Crash", s.player, nil, 62)
-    s:tick(62); s:score(0); s:lastMessageContains("Primary Success: 0")
+    for t = 2, 31 do s:tick(t) end
+    s.cleanupEvents = true; s:event("Crash", s.player, nil, 32)
+    s:tick(32); s:score(0); s:lastMessageContains("Primary Success: 0")
     assert(g.destroyed and not s:mission()); s:assertClean()
 end)
 
 test("emitter FSM exposes ACTIVE, PENDING, reset and SUPPRESSED independently of wing recovery state", function()
     local s, g = started(); local r = s:mission(); local radar = g.units[1]
     assert(r.spawn.emitterState == "ACTIVE" and r.site.spawn == r.spawn and r.site.plan == r.plan)
-    status(s, "ACTIVE"); s:lastMessageContains("Emitter state: ACTIVE")
+    status(s, "ACTIVE"); assert(r.spawn.emitterState == "ACTIVE")
     radar.radarEmitting = false; s:tick(2)
     assert(r.spawn.emitterState == "ACTIVE") -- OFF alone is not a transition.
     radar.life = 99; s:tick(3)
     assert(r.spawn.emitterState == "SUPPRESSION_PENDING" and r.state == "ACTIVE")
-    status(s, "ACTIVE"); s:lastMessageContains("Emitter state: SUPPRESSION PENDING")
-    s:lastMessageContains("Radar 1 OFF: 0 / 60 seconds")
-    s:tick(62); assert(r.spawn.emitterState == "SUPPRESSION_PENDING")
-    radar.radarEmitting = true; s:tick(63)
+    status(s, "ACTIVE"); assert(r.spawn.emitterState == "SUPPRESSION_PENDING")
+    assert(not string.find(s.messages[#s.messages].text, "Emitter state:", 1, true))
+    assert(not string.find(s.messages[#s.messages].text, "Radar 1 OFF:", 1, true))
+    s:tick(32); assert(r.spawn.emitterState == "SUPPRESSION_PENDING")
+    radar.radarEmitting = true; s:tick(33)
     assert(r.spawn.emitterState == "ACTIVE" and not r.spawn.primaryUnits[1].offSince)
-    radar.radarEmitting = false; s:tick(64); s:tick(124)
+    radar.radarEmitting = false; s:tick(34); s:tick(64)
     assert(r.spawn.emitterState == "SUPPRESSED" and r.state == "RTB_PENDING")
     s:lastMessageContains("SEAD Objective Complete\nEnemy radar suppressed.")
-    status(s, "RTB_PENDING"); s:lastMessageContains("Emitter state: SUPPRESSED")
+    status(s, "RTB_PENDING"); s:lastMessageContains("Enemy radar suppressed.")
     local lifeCalls, radarCalls = radar.lifeCalls, radar.radarCalls
     radar.lifeError, radar.radarError, radar.radarEmitting = true, true, true
-    s:tick(125); s:event("Dead", radar); s:tick(126)
+    s:tick(65); s:event("Dead", radar); s:tick(66)
     assert(radar.lifeCalls == lifeCalls and radar.radarCalls == radarCalls)
     assert(r.spawn.emitterState == "SUPPRESSED" and r.primaryResult == "SUPPRESSED" and not g.destroyed)
     s:score(0); s:assertClean()
@@ -934,7 +954,7 @@ test("DESTROYED is terminal from ACTIVE or PENDING and site cleanup preserves th
         s:event("Dead", radar)
         s:lastMessageContains("SEAD Objective Complete\nEnemy radar destroyed.")
         assert(r.spawn.emitterState == "DESTROYED" and r.primaryResult == "DESTROYED")
-        status(s, "RTB_PENDING"); s:lastMessageContains("Emitter state: DESTROYED")
+        status(s, "RTB_PENDING"); s:lastMessageContains("Enemy radar destroyed.")
         local calls = radar.lifeCalls
         s:tick(3); assert(radar.lifeCalls == calls and not g.destroyed)
         for i = 2, #g.units do s:event("Dead", g.units[i]) end
@@ -1017,7 +1037,7 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
         s:tick(2); assert(briefings() == 1)
         local r = s:mission()
         local location = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
-        local label = mode == 1 and "THREAT AREA: " or "ESTIMATED LOCATION: "
+        local label = "THREAT AREA: "
         local briefing
         for _, message in ipairs(s.messages) do
             if string.find(message.text, "SEAD MISSION\n", 1, true) then
@@ -1191,6 +1211,73 @@ test("optional placement spawn check stops sampling if the diagnostic SAM cannot
     assert(results.spawned == 1 and results.cleanupErrors == 1 and results.spawnErrors == 0)
     assert(#s.spawns == 1 and not s.spawns[1].destroyed)
     s:assertClean()
+end)
+
+test("TOO and PB Status keep only published coordinates and instructions from planning through completion", function()
+  for mode = 1, 2 do
+    for _, airborne in ipairs({ false, true }) do
+        local s, zone = setup(); s.player.airborne = airborne; s.randomValues = { 1, mode, 1 }
+        zone.points = { { x = 9000, y = 0 }, { x = 9000, y = 0 }, zone.center }
+        generate(s); local planning = s.messages[#s.messages].text
+        s:tick(1); s:command("Mission Status")
+        assert(s.messages[#s.messages].text == planning and s.messages[#s.messages].seconds == 10)
+        for _, hidden in ipairs({ "MODE:", "SA-6", "108", "THREAT AREA:", "Site checks:" }) do
+            assert(not string.find(planning, hidden, 1, true))
+        end
+        s:tick(2); local r = s:mission(); local briefing
+        for _, message in ipairs(s.messages) do
+            if string.find(message.text, "SEAD MISSION\n", 1, true) then briefing = message.text end
+        end
+        assert(briefing and string.find(briefing, "THREAT AREA:", 1, true))
+        if not airborne then
+            s:command("Mission Status"); assert(s.messages[#s.messages].text == briefing)
+            s.player.airborne = true; s:tick(3); s:tick(23)
+        end
+        local start = s.messages[#s.messages].text
+        assert(string.find(start, "SEAD TRAINING START", 1, true))
+        r.plan.estimatedPoint = { x = 999999, y = 999999 } -- Never recompute a published coordinate.
+        local radar = r.spawn.primaryUnits[1].unit
+        radar.life, radar.radarEmitting = 99, false; s:tick(s.time + 1)
+        assert(r.spawn.emitterState == "SUPPRESSION_PENDING")
+        s:command("Mission Status")
+        assert(s.messages[#s.messages].text == briefing .. "\n\n" .. start)
+        assert(s.messages[#s.messages].seconds == 60)
+        for _, hidden in ipairs({ "Emitter state:", "Radar 1 OFF:", "Site state:", "Site disposition:",
+            "Site remaining vehicles:", "Follow-on DEAD available:", "Spawn in", "Wing:", "Lead reference:" }) do
+            assert(not string.find(s.messages[#s.messages].text, hidden, 1, true))
+        end
+        destroyRadar(s, r.spawn.group); local complete = s.messages[#s.messages].text
+        assert(string.find(complete, "Enemy radar destroyed.", 1, true))
+        s:command("Preserve Site for DEAD"); s:command("Mission Status")
+        assert(s.messages[#s.messages].text == complete and s.messages[#s.messages].seconds == 20)
+        assert(not string.find(s.messages[#s.messages].text, "SITE LOCATION:", 1, true))
+        assert(not string.find(s.messages[#s.messages].text, "THREAT AREA:", 1, true))
+        s:assertClean()
+    end
+  end
+end)
+
+test("Status reads only publication snapshots and cannot inspect live mission targets or reservations", function()
+    local chunk = assert(loadfile("src/mission_report.lua"))
+    local env = setmetatable({ math = math, ipairs = ipairs, table = table }, {
+        __index = function(_, key) error("Unpublished observer access: " .. tostring(key)) end })
+    local report = setfenv(chunk, env)()
+    local function locked(record)
+        return setmetatable(record, { __index = function(_, key) error("Unpublished record access: " .. tostring(key)) end })
+    end
+    local a, b = {}, {}
+    report.Remember(a, "notice", "Planning in progress", 10)
+    local planning = report.Status({ locked(a) }); assert(planning == "Planning in progress")
+    report.Remember(a, "briefing", "Public coordinate A", 60)
+    report.Remember(a, "notice", "Public start A", 25)
+    report.Remember(b, "briefing", "Public coordinate B", 90)
+    local text, seconds = report.Status({ a, locked(b) })
+    assert(text == "Public coordinate A\n\nPublic start A\n\nPublic coordinate B" and seconds == 90)
+    report.Remember(a, "complete", "Public completion A", 20)
+    text, seconds = report.Status({ a })
+    assert(text == "Public completion A" and seconds == 20 and not a.publicReport.briefing)
+    report.Remember(a, "briefing", "Public next-stage coordinate", 60)
+    text = report.Status({ a }); assert(text == "Public next-stage coordinate")
 end)
 
 print(string.format("All %d SEAD tests passed (simulated DCS/MOOSE).", count))

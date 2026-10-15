@@ -50,7 +50,7 @@ test("staggered returns at different bases award each 150; first return keeps wi
     local s = wing(true); s.generate(); s:complete()
     s:land(s:base(), 10); hold(s, 11, 21)
     s:score(150); s:score(0, s.wingman)
-    s:command("Mission Status"); s:lastMessageContains("WingPilot [Wing10]: RTB_PENDING")
+    s:command("Mission Status"); s:lastMessageContains("Intercept PRIMARY OBJECTIVE COMPLETE"); assert(s:mission().participants[2].state == "RTB_PENDING")
     s.generate(); s:lastMessageContains("Wing assignment blocked"); assert(#s.spawns == 1)
     local otherBase = s:base(2, 0, "OtherBase"); otherBase.position.x = 20000
     s:land(otherBase, 30, s.wingman); hold(s, 31, 41)
@@ -91,7 +91,7 @@ test("leader lost before clear remains at zero; surviving wingman can clear and 
     local s = wing(true); s.generate()
     s:event("Dead", s.player); s:event("Crash", s.player)
     assert(not s.spawns[1].destroyed)
-    s:command("Mission Status"); s:lastMessageContains("Lead reference: WingPilot")
+    s:command("Mission Status"); s:lastMessageContains("Intercept MISSION START"); assert(s:mission().owner.name == "WingPilot")
     s:complete(); s:land(s:base(), 10, s.wingman); hold(s, 11, 21)
     s:score(0); s:score(150, s.wingman)
     s:lastMessageContains("WingPilot [Wing10]\nTotal Score: 150")

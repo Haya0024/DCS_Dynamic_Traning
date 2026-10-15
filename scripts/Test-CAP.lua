@@ -215,7 +215,7 @@ test("status recalls the same briefing without rerolling or advancing patrol tim
     local s = new(); local r = accept(s); local calls = #s.randomCalls
     s:command("Mission Status")
     assert(s.messages[#s.messages].seconds == 60)
-    s:lastMessageContains("CAP AREA: LL DDM"); s:lastMessageContains("Patrol: 0%")
+    s:lastMessageContains("CAP AREA: LL DDM"); assert(not s.messages[#s.messages].text:find("Patrol:", 1, true))
     local text = s.messages[#s.messages].text
     assert(not text:find("PATROL CENTER", 1, true) and not text:find("Radius:", 1, true))
     assert(#s.randomCalls == calls and r.capPlan.elapsed == 0)
@@ -343,6 +343,25 @@ test("CAP filters from the lowest flight-number accepted pilot and releases a fa
     assert(not s:mission() and #s.errors == 1)
     s.wingman.GetVec3 = original
     assert(accept(s).owner.unit == s.wingman)
+end)
+
+test("CAP status keeps public coordinates until completion then recalls only result and RTB", function()
+    local s = new(); local r = accept(s)
+    local briefing = s.messages[#s.messages].text
+    enter(s, r); advance(s, 50)
+    assert(r.spawn and r.capPlan.elapsed > 24)
+    s:command("Mission Status")
+    assert(s.messages[#s.messages].text == briefing and s.messages[#s.messages].seconds == 60)
+    for _, hidden in ipairs({ "Hostiles remaining:", "NOT SPAWNED", "Patrol:", "Clock:", "Wing:", "Lead reference:" }) do
+        assert(not s.messages[#s.messages].text:find(hidden, 1, true))
+    end
+    s:complete(); advance(s, 80)
+    local complete = s.messages[#s.messages].text
+    assert(complete:find("CAP PRIMARY OBJECTIVE COMPLETE", 1, true))
+    s:command("Mission Status")
+    assert(s.messages[#s.messages].text == complete and s.messages[#s.messages].seconds == 20)
+    assert(not s.messages[#s.messages].text:find("CAP AREA:", 1, true))
+    s:assertClean()
 end)
 
 print(string.format("All %d CAP tests passed (simulated DCS/MOOSE).", count))

@@ -12,7 +12,7 @@ Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨�
 
 ### 出撃準備と任務操作
 
-プレイヤー機の初期兵装は空です。地上で再武装を要請し、訓練内容に合わせて兵装を選んでください。「Task: Intercept」「Task: CAP」「Task: SEAD」「Task: DEAD」で任務を受注し、「Mission Status」で受注中の情報や進捗を確認できます。「Abort Mission」はグループ全体の任務中止、「Abort Sortie」は名前と機体を指定した参加者だけの中止です。「Player Statistics」で自分の累計成績と保存状態を確認できます。
+プレイヤー機の初期兵装は空です。地上で再武装を要請し、訓練内容に合わせて兵装を選んでください。「Task: Intercept」「Task: CAP」「Task: SEAD」「Task: DEAD」で任務を受注し、「Mission Status」で案内済みの任務ブリーフィング・座標・指示を見返せます。目標達成後は座標を外して達成結果と帰還指示だけを表示し、敵残数やレーダー状態などの未公開情報は追加しません。「Abort Mission」はグループ全体の任務中止、「Abort Sortie」は名前と機体を指定した参加者だけの中止です。「Player Statistics」で自分の累計成績と保存状態を確認できます。
 
 ### Intercept — 迎撃
 
@@ -24,7 +24,7 @@ Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨�
 
 ### SEAD — 防空制圧
 
-指定地域のSA-6またはSA-8を捜索し、主要レーダーを破壊するか、損傷させたうえでレーダー停止を連続60秒維持させてください。攻撃方式はTOOまたはPBからランダムに選ばれます。TOOでは機種不明の捜索座標、PBではSAM機種、推定座標、HARM PBコードを案内します。案内座標は実際の配置位置と一致するとは限らないため、索敵して目標を確認してください。HARM以外の武器でレーダーを破壊しても達成です。地上受注では登録参加者全員の離陸検出から20秒後、空中受注では配置計画の確定後にSAMを生成します。目標達成後は帰還するか、残存車両があればDEADへ継続できます。
+指定地域のSA-6またはSA-8を捜索し、主要レーダーを破壊するか、損傷させたうえでレーダー停止を連続30秒維持させてください。攻撃方式はTOOまたはPBからランダムに選ばれます。TOOでは機種不明の捜索座標、PBではSAM機種、推定座標、HARM PBコードを案内します。案内座標は実際の配置位置と一致するとは限らないため、索敵して目標を確認してください。HARM以外の武器でレーダーを破壊しても達成です。地上受注では登録参加者全員の離陸検出から20秒後、空中受注では配置計画の確定後にSAMを生成します。目標達成後は帰還するか、残存車両があればDEADへ継続できます。
 
 ### DEAD — 防空サイト破壊
 
@@ -50,7 +50,7 @@ Persistent and Dynamic F/A-18C Training provides repeatable F/A-18C training in 
 
 ### Preparation and mission controls
 
-Player aircraft start without weapons. Request rearming on the ground and choose a loadout suited to your training. Accept a task with "Task: Intercept", "Task: CAP", "Task: SEAD", or "Task: DEAD", and use "Mission Status" to review its information and progress. "Abort Mission" cancels the entire group's mission; "Abort Sortie" cancels only the named participant's sortie. "Player Statistics" displays your accumulated results and their save status.
+Player aircraft start without weapons. Request rearming on the ground and choose a loadout suited to your training. Accept a task with "Task: Intercept", "Task: CAP", "Task: SEAD", or "Task: DEAD", and use "Mission Status" to recall the published briefing, coordinates and instructions. After objective completion, only the published result and recovery instruction are recalled, without coordinates; no hidden enemy counts or radar status are added. "Abort Mission" cancels the entire group's mission; "Abort Sortie" cancels only the named participant's sortie. "Player Statistics" displays your accumulated results and their save status.
 
 ### Intercept
 
@@ -62,7 +62,7 @@ Proceed to the randomly assigned patrol area and accumulate 120 seconds inside i
 
 ### SEAD — Suppression of Enemy Air Defenses
 
-Locate the SA-6 or SA-8 site in the assigned region. Complete the objective by destroying its primary radar, or by damaging it and keeping its radar off for 60 consecutive seconds. The attack mode is randomly selected as TOO or PB. TOO provides search coordinates with the SAM type unknown; PB provides the SAM type, estimated coordinates, and a HARM PB code. These coordinates may differ from the site's actual location, so search and identify the target. Radar destruction with weapons other than HARM also counts. Ground acceptance spawns the SAM 20 seconds after all registered participants are detected airborne; airborne acceptance spawns it once the placement plan is ready. After completing SEAD, return to base or continue as DEAD if vehicles remain.
+Locate the SA-6 or SA-8 site in the assigned region. Complete the objective by destroying its primary radar, or by damaging it and keeping its radar off for 30 consecutive seconds. The attack mode is randomly selected as TOO or PB. TOO provides search coordinates with the SAM type unknown; PB provides the SAM type, estimated coordinates, and a HARM PB code. These coordinates may differ from the site's actual location, so search and identify the target. Radar destruction with weapons other than HARM also counts. Ground acceptance spawns the SAM 20 seconds after all registered participants are detected airborne; airborne acceptance spawns it once the placement plan is ready. After completing SEAD, return to base or continue as DEAD if vehicles remain.
 
 ### DEAD — Destruction of Enemy Air Defenses
 

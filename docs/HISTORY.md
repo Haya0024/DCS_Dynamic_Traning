@@ -2,6 +2,46 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-15 達成後のMission Statusから座標を除外
+
+ユーザー指定により、目標達成前は公開済み座標ブリーフィングと開始指示を再表示し、達成時にStatus用のブリーフィングを外す方式へ変更した。達成後は公開済みの達成結果・帰還指示だけを20秒表示する。SEAD達成後にContinue as DEADを選ぶと新しい実配置座標入り本文へ切り替わり、DEAD達成時に再び座標を外す。任務判定・帰還・採点・Site寿命は維持する。
+
+CAP-35・SEAD-70/71・DEAD-08/104/105を現行仕様に合わせ、達成前の座標維持、達成後の座標除外と20秒表示、座標90秒設定でも達成通知は20秒、DEAD継続による座標復帰を検証した。仕様書・表示一覧・日英BRIEFING・ARCHITECTURE・TESTINGを更新。Lua全366ケース（9スイート）とBUILD2・SYNC3・INSTALL5・ZONES3が通過。実.mizをSync/Checkし、ZIP CRC・埋め込みbundle一致と登録済みDynamicTraining.lua以外の内容不変を確認した。DCS内の表示はMAN-59で確認待ち。更新版.mizでミッションを再開始して適用する。
+
+## 2026-10-15 Mission Statusを公開済み情報の再表示へ変更
+
+ユーザー指定により、内部状態から詳細レポートを組み立てる方式を廃止。mainのPublishMissionが案内した座標ブリーフィングと最新の開始／達成通知を任務record.publicReportへ保持し、MissionReport.Statusはその本文だけを再表示する。開始・達成後も座標を維持し、達成通知は開始通知を置き換える。Continueでは最新のSite座標入り開始本文へ切り替えて旧SEAD推定点を重ねない。計画中は受注・計画中通知だけで、MODE・SAM種類・PBコード・試行数を先出ししない。
+
+Statusから敵残数・出現有無・発信状態／OFF秒数・Site/予約状態・Wing/長機・参加者別の内部状態・精算行を除去した。Continue本文の残数は公開時の値を再掲し、現在数へ更新しない。Preserve/Release・個人精算・拒否・エラー・CAP進捗通知は再表示用情報を上書きしない。未使用になったCAP.Status/SEADObjective.Statusも削除。任務判定・監視・採点・帰還・ロック・Site寿命・Hook/schemaは維持する。
+
+INT-23・CAP-35・PAR-17・SEAD-70/71・DEAD-104/105を追加し、計画中の秘匿、開始／達成後の座標維持、公開後の計画座標変更や再計算API例外でも本文が変わらないこと、未公開フィールド／観測環境を参照しない純粋な再表示、別Wing・移動UCID・複数関連任務の範囲を検証した。旧Statusに内部状態を期待していた回帰テストは内部データの直接検証へ移し、Site Refreshの観測テストもStatusの副作用に依存させない。
+
+Lua全366ケース（INT23・CAP35・SCORE26・WING27・PAR17・SEAD71・DEAD105・PERSIST44・MAP18）とBUILD2・SYNC3・INSTALL5・ZONES3が通過。実.mizのSync/Check・ZIP CRC・埋め込みbundle一致を確認し、変更内容は登録済みDynamicTraining.luaだけ。仕様・一覧・日英BRIEFING・ARCHITECTURE・TESTINGを更新。DCS内の表示はMAN-59で確認待ち。更新版.mizでミッションを再開始して適用する。
+
+## 2026-10-15 DEADの座標行・ブリーフィング順序を整理
+
+Immediate DEAD開始通知を開始・指示・残数・SITE LOCATION・追加報酬・SEAD報酬保持の順へ変更し、座標をラベルと同じ行にまとめた。Follow-on DEAD受注ブリーフィングはDEAD MISSION・TARGET SITE・SITE LOCATION・STATUS・OBJECTIVE・報酬・人数の順とし、AREA行を削除した。共通DEAD.Briefingを使う両DEADのMission StatusとDEBUGにも同じ整形を適用する。Status外枠の地域表示は維持する。
+
+DEAD/SEAD仕様・MESSAGES・MESSAGE_FLOW・AGENTS・TESTINGを更新。DEAD-08でImmediate全文と90秒設定を照合し、DEAD-16をSA-6破壊済み／抑制済み・SA-8抑制済みに広げ、Follow-on全文・AREA行除外・Statusの同じ本文を検証した。座標精度・実配置点・失敗時のrollback・秘匿条件・表示時間・採点や状態遷移は維持する。
+
+Lua全359ケースとBUILD2・SYNC3・INSTALL5・ZONES3が通過。実.mizをSync/Checkし、登録済みDynamicTraining.lua以外のZIP内容が不変、CRC正常を確認。実DCSでの表示確認は今回未実施。更新版.mizでミッションを再開始して適用する。
+
+## 2026-10-15 SEAD PB表示の簡略化・抑制条件を30秒へ変更
+
+PBブリーフィングの `THREAT AREA` を地域名から実配置点より1〜3 NMずらした推定DDM座標へ変更し、別の `ESTIMATED LOCATION` 行を削除した。共通のSEAD.Briefingを使う計画確定通知・手動Mission Status・DEBUGの計画本文すべてに適用し、SAM種類・PBコード・推定誤差・正確な位置の秘匿を維持する。
+
+`sead.suppressionHoldSeconds` を60から30へ変更した。TOO/PB・SA-6/SA-8とも、開始時Lifeから損傷しRadar OFFが連続30秒でSUPPRESSEDとなる。開始通知とStatusの分母も同じ設定を参照する。無傷OFF、再発信・観測不能によるリセット、破壊時の即達成、報酬150/90、座標表示60秒は維持する。
+
+SEAD/DEAD仕様を先に更新し、既存テストの未達成29秒／達成30秒境界、リセット、複数レーダー、別Wing、事故順序とDEAD解放境界を合わせた。PBの推定座標・旧ラベル／地域名行の除外を地上／空中受注とStatusで検証。Lua全359ケースとBUILD2・SYNC3・INSTALL5・ZONES3が通過。最初の隔離環境の一時ファイル置換失敗後、通常権限で全統合検証も完了した。
+
+実.mizをSync/Checkし、変更したZIP内容は登録済みDynamicTraining.luaだけ。ME設定・Zone・ニーボード等は維持、ZIP CRC正常。README・AGENTS・BRIEFING・SCORING・WING・MESSAGES・MESSAGE_FLOW・TESTINGを現行値に合わせた。実DCS内の表示・30秒判定の実測は今回未実施。更新版.mizでミッションを再開始して適用する。
+
+## 2026-10-15 全任務の画面通知・分岐タイムラインを整理
+
+表示を見直す依頼に対し、main・各任務・MissionReport・Notifications・Recovery・Player/Missions・Persistence・Configを照合し、MESSAGE_FLOWへ日本語の一覧を追加した。Intercept / CAP / SEADのTOO・PB / Immediate DEAD / Follow-on DEAD、保持・開放・何も選ばず帰還、個人精算・Abort・拒否／例外・手動Status・Statisticsを対象とし、本文・表示時間・発生条件・回数・無通知の遷移を整理した。
+
+連続する通知は表示時間の終了を待たないこと、Immediate DEAD未達帰還の個人終了、Statusの情報重複なども明記。表示見直し候補は未実装として分離し、既存MESSAGESのIdle例のCAP欠落と生成カウントダウンの説明を現実装に合わせた。README・ARCHITECTUREから参照できる。文書のみの変更で、ソース・実.miz・画面文言・採点・状態遷移は変更していない。実DCSでの通知の重なり方は今回検証していない。
+
 ## 2026-10-14 Interceptの生成距離を90〜110 NMへ変更
 
 ユーザーのレーダー索敵時間を増やす依頼で、Interceptの水平生成距離を60〜80から90〜110 NMへ変更。地上受注の全員離陸後20秒待ち、空中受注の即時生成、機首方向±60°、HOT、テンプレート・編隊・高度・速度・採点は維持した。README・Intercept・AGENTS・日英BRIEFING・MESSAGESのDEBUG例とTESTINGを合わせた。

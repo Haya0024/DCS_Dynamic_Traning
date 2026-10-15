@@ -37,7 +37,7 @@ local function primary(s, r, suppressed)
     local radar = r.spawn.primaryUnits[1].unit
     if suppressed then
         radar.life, radar.radarEmitting = 99, false
-        s:tick(s.time + 1); s:tick(s.time + 60)
+        s:tick(s.time + 1); s:tick(s.time + 30)
     else destroy(s, radar) end
     assert(r.state == "RTB_PENDING")
 end
@@ -73,8 +73,8 @@ test("SA6 suppression offers follow-on while the site defaults to CLEANUP and re
     assert(site.state == "SUPPRESSED" and site.primaryResult == "SUPPRESSED" and site.followOnAvailable)
     assert(site.disposition == "CLEANUP" and site.sourceMissionID == r.id)
     assert(site.reservedByAssignmentID == r.assignmentID and has(s, "Continue as DEAD") and has(s, "Preserve Site for DEAD"))
-    s:command("Mission Status"); s:lastMessageContains("Site disposition: CLEANUP")
-    s:lastMessageContains("Follow-on DEAD available: YES"); s:assertClean()
+    s:command("Mission Status"); assert(not string.find(s.messages[#s.messages].text, "Site disposition:", 1, true))
+    assert(not string.find(s.messages[#s.messages].text, "Follow-on DEAD available:", 1, true)); s:assertClean()
 end)
 
 test("SA8 destruction never offers follow-on even if the wrapper still reports alive", function()
@@ -141,7 +141,8 @@ test("immediate DEAD uses the same record, ID, group, plan, life and radar witho
         local location = s.env.COORDINATE:NewFromVec2(r.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
         local estimate = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
         assert(location ~= estimate and r.plan.attackMode == mode)
-        s:command("Mission Status"); s:lastMessageContains(estimate)
+        s:command("Mission Status"); s:lastMessageContains("SEAD Objective Complete")
+        assert(not string.find(s.messages[#s.messages].text, estimate, 1, true))
         assert(not string.find(s.messages[#s.messages].text, location, 1, true))
         s:command("Preserve Site for DEAD"); s:command("Mission Status")
         assert(not string.find(s.messages[#s.messages].text, "SITE LOCATION", 1, true))
@@ -151,7 +152,7 @@ test("immediate DEAD uses the same record, ID, group, plan, life and radar witho
         s:command("Continue as DEAD")
         local started = s.messages[#s.messages]
         assert(started.text == "Immediate DEAD started.\nDestroy all remaining SAM site vehicles.\nRemaining targets: 4\n" ..
-            "Additional DEAD reward per pilot: 150 points.\nSEAD reward also retained.\nSITE LOCATION:\n" .. location)
+            "SITE LOCATION: " .. location .. "\nAdditional DEAD reward per pilot: 150 points.\nSEAD reward also retained.")
         assert(started.seconds == 90)
         s:tick(s.time + 1)
         assert(s.messages[#s.messages] == started, "Immediate DEAD acceptance must not repeat")
@@ -160,15 +161,16 @@ test("immediate DEAD uses the same record, ID, group, plan, life and radar witho
         assert(#s.randomCalls == draws and g.units[1].life == 99 and not g.units[1].radarEmitting)
         assert(r.primaryResult == "SUPPRESSED" and r.primaryCompletedAt and r.deadStartedAt)
         assert(r.state == "DEAD_ACTIVE" and not has(s, "Continue as DEAD") and not has(s, "Preserve Site for DEAD"))
-        s:command("Mission Status"); s:lastMessageContains("SEAD: COMPLETE\nFollow-on: DEAD ACTIVE")
+        s:command("Mission Status"); s:lastMessageContains("Immediate DEAD started.")
         s:lastMessageContains("Remaining targets: 4")
-        s:lastMessageContains("SITE LOCATION:\n" .. location); s:lastMessageContains("TARGET SITE: SA-6")
-        s:lastMessageContains(estimate)
+        s:lastMessageContains("SITE LOCATION: " .. location)
+        assert(not string.find(s.messages[#s.messages].text, "TARGET SITE:", 1, true))
+        assert(not string.find(s.messages[#s.messages].text, estimate, 1, true))
         assert(s.messages[#s.messages].seconds == 90 and not string.find(s.messages[#s.messages].text, g.name, 1, true))
         finish(s, r); s:command("Mission Status")
-        s:lastMessageContains("SEAD: RTB_PENDING"); s:lastMessageContains("DEAD objective: COMPLETE")
-        s:lastMessageContains("SITE LOCATION:\n" .. location)
-        assert(s.messages[#s.messages].seconds == 90)
+        s:lastMessageContains("DEAD Objective Complete"); s:lastMessageContains("Return to base.")
+        assert(not string.find(s.messages[#s.messages].text, "SITE LOCATION:", 1, true))
+        assert(s.messages[#s.messages].seconds == 20)
         s:assertClean()
     end
 end)
@@ -235,7 +237,8 @@ test("Follow-on DEAD acquires the retained site without respawn and uses a new s
 end)
 
 test("Follow-on DEAD briefing exposes existing site information without internal object names", function()
-    local s, site, g = preserved(1, false)
+  for _, variant in ipairs({ { 1, false }, { 1, true }, { 2, true } }) do
+    local s, site, g = preserved(variant[1], variant[2])
     assert(module(s, "Config").coordinateBriefingSeconds == 60)
     module(s, "Config").coordinateBriefingSeconds = 90
     s.env.COORDINATE.ToStringLLDMS = function() error("Follow-on DEAD must display DDM") end
@@ -251,15 +254,20 @@ test("Follow-on DEAD briefing exposes existing site information without internal
     s:lastMessageContains("DEAD TRAINING START")
     assert(s.messages[#s.messages].seconds == 25 and not string.find(s.messages[#s.messages].text, "SITE LOCATION", 1, true))
     local location = s.env.COORDINATE:NewFromVec2(site.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
-    for _, expected in ipairs({ "DEAD MISSION", "AREA: Palmyra", "TARGET SITE: SA-6", "Primary radar destroyed", "SITE LOCATION:\n" .. location }) do
-        assert(string.find(text, expected, 1, true), text)
-    end
+    local sam = variant[1] == 1 and "SA-6" or "SA-8"
+    local status = variant[2] and "Previously suppressed" or "Primary radar destroyed"
+    local body = "DEAD MISSION\nTARGET SITE: " .. sam .. "\nSITE LOCATION: " .. location ..
+        "\nSTATUS: " .. status .. "\nOBJECTIVE: Destroy all remaining SAM site vehicles."
+    assert(text == body .. "\nReward per pilot: 150 points.\nRegistered pilots: 1.", text)
     assert(not string.find(text, "Estimated site location", 1, true) and not string.find(text, "LL DMS", 1, true))
     assert(not string.find(text, g.name, 1, true) and not string.find(text, "objectID", 1, true))
-    s:command("Mission Status"); s:lastMessageContains("DEAD: ACTIVE"); s:lastMessageContains("Remaining targets: 3")
-    s:lastMessageContains("SITE LOCATION:\n" .. location)
+    s:command("Mission Status"); s:lastMessageContains("DEAD TRAINING START")
+    assert(not string.find(s.messages[#s.messages].text, "Remaining targets:", 1, true))
+    s:lastMessageContains(body)
+    assert(not string.find(s.messages[#s.messages].text, "\nAREA:", 1, true))
     assert(s.messages[#s.messages].seconds == 90)
     s:assertClean()
+  end
 end)
 
 test("ground Follow-on DEAD reserves immediately, snapshots at acceptance and starts at all-airborne without twenty seconds", function()
@@ -296,7 +304,7 @@ test("Follow-on DEAD whole target loss completes and RTB awards DEAD150 alongsid
     local s, site = preserved(1, false); local r = followOnDead(s)
     destroy(s, r.deadTargets[1].unit); assert(r.state == "ACTIVE")
     finish(s, r); assert(site.state == "DESTROYED" and site.disposition == "CLEANUP" and not site.cleaned)
-    s:command("Mission Status"); s:lastMessageContains("DEAD: RTB PENDING")
+    s:command("Mission Status"); s:lastMessageContains("DEAD Objective Complete")
     recover(s); s:score(300); s:categoryScores({ deadScore = 150 }); s:categoryScores({ seadScore = 150 })
     s:lastMessageContains("Career Points: 300"); s:lastMessageContains("Settled Missions: 2")
     assert(site.cleaned and not s:sites()[site.id]); s:assertClean()
@@ -779,8 +787,9 @@ test("SA6 destroyed radar with one or three live launchers supports both DEAD pa
             assert(source.primaryResult == "DESTROYED" and site.primaryResult == "DESTROYED")
             assert(site.seadCompleted and site.state == "SUPPRESSED" and site.remainingTargetCount == remaining)
             assert(site.followOnAvailable and has(s, "Continue as DEAD") and has(s, "Preserve Site for DEAD"))
-            s:command("Mission Status"); s:lastMessageContains("SEAD Primary result: DESTROYED")
-            s:lastMessageContains("Site state: SUPPRESSED"); s:lastMessageContains("Site remaining vehicles: " .. remaining)
+            s:command("Mission Status"); s:lastMessageContains("Enemy radar destroyed.")
+            assert(not string.find(s.messages[#s.messages].text, "Site state:", 1, true))
+            assert(not string.find(s.messages[#s.messages].text, "Site remaining vehicles:", 1, true))
             s.env.SPAWN.NewWithAlias = function() error("DEAD must not spawn") end
             local dead = source
             if immediate then s:command("Continue as DEAD") else
@@ -831,11 +840,12 @@ end)
 
 test("live site targets alone do not allow DEAD before SEAD primary completion", function()
     local s = setup(); local r = begin(s); local site = r.site
+    module(s, "SEADSites").Refresh(site)
     s:command("Mission Status")
     assert(site.remainingTargetCount == 4 and site.state == "ACTIVE" and not site.seadCompleted)
     assert(not site.followOnAvailable and not has(s, "Continue as DEAD") and not has(s, "Preserve Site for DEAD"))
     local radar = r.spawn.primaryUnits[1].unit; radar.life, radar.radarEmitting = 99, false
-    s:tick(s.time + 1); s:tick(s.time + 59)
+    s:tick(s.time + 1); s:tick(s.time + 29)
     assert(r.state == "ACTIVE" and site.remainingTargetCount == 4 and not site.followOnAvailable)
     s:tick(s.time + 1); assert(site.seadCompleted and site.remainingTargetCount == 4 and site.followOnAvailable)
     s:assertClean()
@@ -1314,6 +1324,58 @@ test("source wing can continue immediate DEAD after releasing its preserved rese
     assert(r.state == "DEAD_ACTIVE" and site.disposition == "IN_USE" and not site.unreservedSince)
     assert(not has(s, "Release Site Reservation") and #s.spawns == 1 and r.spawn.group == g)
     finish(s, r); recover(s); s:score(300); assert(site.cleaned); s:assertClean()
+end)
+
+test("Immediate DEAD Status keeps its announced site snapshot until completion then recalls only result and RTB", function()
+    local s, r, site, g = ready(1, true)
+    local estimate = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
+    s:command("Continue as DEAD"); local briefing = s.messages[#s.messages].text
+    destroy(s, g.units[2]); assert(site.remainingTargetCount == 3)
+    local coordinate = s.env.COORDINATE.NewFromVec2
+    s.env.COORDINATE.NewFromVec2 = function() error("Status must not recalculate coordinates") end
+    s:command("Mission Status")
+    assert(s.messages[#s.messages].text == briefing and s.messages[#s.messages].seconds == 60)
+    s:lastMessageContains("Remaining targets: 4") -- The announced count, never the current hidden count.
+    assert(not string.find(s.messages[#s.messages].text, estimate, 1, true))
+    finish(s, r); local complete = s.messages[#s.messages].text
+    s:command("Mission Status")
+    assert(s.messages[#s.messages].text == complete and s.messages[#s.messages].seconds == 20)
+    assert(not string.find(s.messages[#s.messages].text, "SITE LOCATION:", 1, true)); s:lastMessageContains("Return to base.")
+    assert(not string.find(s.messages[#s.messages].text, "Remaining targets: 0", 1, true))
+    assert(not string.find(s.messages[#s.messages].text, "Site state:", 1, true))
+    s.env.COORDINATE.NewFromVec2 = coordinate
+    s:assertClean()
+end)
+
+test("Follow-on DEAD Status keeps accepted coordinates until completion then recalls only result and RTB", function()
+    for _, airborne in ipairs({ false, true }) do
+        local s, site, g = preserved(1, false)
+        local r = followOnDead(s, airborne); local briefing
+        for _, message in ipairs(s.messages) do
+            if string.find(message.text, "DEAD MISSION\n", 1, true) then briefing = message.text end
+        end
+        assert(briefing)
+        if not airborne then
+            s:command("Mission Status"); assert(s.messages[#s.messages].text == briefing)
+            s.player.airborne = true; s:tick(s.time + 2)
+        end
+        local start = s.messages[#s.messages].text
+        assert(string.find(start, "DEAD TRAINING START", 1, true))
+        destroy(s, r.deadTargets[1].unit)
+        local coordinate = s.env.COORDINATE.NewFromVec2
+        s.env.COORDINATE.NewFromVec2 = function() error("Status must not recalculate coordinates") end
+        s:command("Mission Status")
+        assert(s.messages[#s.messages].text == briefing .. "\n\n" .. start)
+        for _, hidden in ipairs({ "Remaining targets:", "Site state:", "Site disposition:", "Wing:", "Lead reference:" }) do
+            assert(not string.find(s.messages[#s.messages].text, hidden, 1, true))
+        end
+        finish(s, r); local complete = s.messages[#s.messages].text
+        s:command("Mission Status")
+        assert(s.messages[#s.messages].text == complete and s.messages[#s.messages].seconds == 20)
+        assert(not string.find(s.messages[#s.messages].text, "SITE LOCATION:", 1, true))
+        s.env.COORDINATE.NewFromVec2 = coordinate
+        s:assertClean()
+    end
 end)
 
 print(string.format("All %d DEAD tests passed (simulated DCS/MOOSE).", count))

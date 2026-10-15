@@ -203,7 +203,7 @@ test("two-aircraft template cannot complete while its second enemy is alive", fu
     s.randomValues = { 90, 15000, 0, 1, 1 }; s.generate()
     local g = s.spawns[1]
     g.units[1].alive = false; s:event("Dead", g.units[1]); s:tick(1)
-    s:command("Mission Status"); s:lastMessageContains("Intercept: ACTIVE")
+    s:command("Mission Status"); s:lastMessageContains("Intercept MISSION START")
     s:complete(g); s:lastMessageContains("PRIMARY OBJECTIVE COMPLETE")
     s:event("Crash", s.player); s:score(90); s:assertClean()
 end)
@@ -229,8 +229,8 @@ test("new assignments redraw templates and concurrent wings remain independent",
         local a, b = s.spawns[1], s.spawns[2]
         assert(a.name ~= b.name)
         s:complete(b)
-        s:command("Mission Status", other); s:lastMessageContains("Intercept: RTB_PENDING")
-        s:command("Mission Status"); s:lastMessageContains("Intercept: ACTIVE")
+        s:command("Mission Status", other); s:lastMessageContains("Intercept PRIMARY OBJECTIVE COMPLETE")
+        s:command("Mission Status"); s:lastMessageContains("Intercept MISSION START")
         s:command("Abort Mission")
         assert(a.destroyed and not b.destroyed)
         s.randomValues = { 90, 15000, 0, 1, 3 }; s.generate()
@@ -291,9 +291,9 @@ test("solo and MP2 show one title-only start; range altitude aspect hostiles cou
         assert(logs("[DEBUG] " .. s:mission().id .. "\nIntercept MISSION START") == 1)
         assert(logs("MESSAGE [" .. s.player.group:GetName() .. "]\n" .. text) == 1)
         assert(logs("Pilots:") == 1)
-        s:command("Mission Status"); s:lastMessageContains("Intercept: ACTIVE")
-        assert(s.messages[#s.messages].seconds == 20)
-        assert(messages("Intercept MISSION START") == 1 and logs("Intercept MISSION START") == 2)
+        s:command("Mission Status"); s:lastMessageContains("Intercept MISSION START")
+        assert(s.messages[#s.messages].seconds == 15)
+        assert(messages("Intercept MISSION START") == 2 and logs("Intercept MISSION START") == 3)
         s:assertClean()
     end
   end
@@ -437,6 +437,25 @@ test("cleanup retries after success or accident never resettle the closed sortie
         s:score(points); s:lastMessageContains("Settled Missions: 1")
         assert(#s.errors == 1)
     end
+end)
+
+test("status replays only published Intercept waiting start and completion without a spawn countdown", function()
+    local s = scenario(); s.generate()
+    local waiting = s.messages[#s.messages].text
+    s.player.airborne = true; s:tick(2)
+    s:command("Mission Status")
+    assert(s.messages[#s.messages].text == waiting and s.messages[#s.messages].seconds == 10)
+    assert(not string.find(waiting, "Spawn in", 1, true))
+    s:tick(22)
+    s.generate() -- A refusal must not replace the announced mission information.
+    s:command("Mission Status")
+    assert(s.messages[#s.messages].text == "Intercept MISSION START" and s.messages[#s.messages].seconds == 15)
+    s:complete(); local complete = s.messages[#s.messages].text
+    s:command("Mission Status")
+    assert(s.messages[#s.messages].text == complete and s.messages[#s.messages].seconds == 20)
+    s:lastMessageContains("Each pilot: return to a BLUE airfield or carrier.")
+    s:command("Abort Mission"); s:command("Mission Status"); s:lastMessageContains("Intercept: Idle.")
+    s:assertClean()
 end)
 
 print(string.format("All %d Intercept tests passed (simulated DCS/MOOSE).", count))

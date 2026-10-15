@@ -77,17 +77,4 @@ function SEADObjective.RecordLoss(spawn, event)
     return Transition(spawn, "DESTROYED", event.Time or event.time or timer.getTime()) ~= nil
 end
 
-function SEADObjective.Status(spawn, time)
-    local text = "Emitter state: " .. spawn.emitterState:gsub("_", " ")
-    if spawn.emitterState == "SUPPRESSION_PENDING" then
-        for i, record in ipairs(spawn.primaryUnits) do
-            if record.offSince then
-                text = text .. string.format("\nRadar %d OFF: %g / %g seconds", i,
-                    math.max(0, time - record.offSince), spawn.suppressionHoldSeconds)
-            end
-        end
-    end
-    return text
-end
-
 return SEADObjective

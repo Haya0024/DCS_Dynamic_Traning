@@ -277,8 +277,7 @@ function SEAD.Briefing(plan)
     if plan.attackMode == "TOO" then
         return text .. "\nTHREAT AREA: " .. location .. "\nTARGET TYPE: UNKNOWN"
     end
-    text = text .. "\nTHREAT AREA: " .. plan.areaLabel
-    return text .. "\nTHREAT: " .. plan.samType .. "\nESTIMATED LOCATION: " .. location ..
+    return text .. "\nTHREAT AREA: " .. location .. "\nTHREAT: " .. plan.samType ..
         string.format("\nHARM PB CODE: %03d", plan.pbCode)
 end
 

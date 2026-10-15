@@ -16,6 +16,11 @@ local menus = {}
 local nextPlayerScan = 0
 local ScanPlayers
 
+local function PublishMission(record, kind, text, seconds)
+    Message(record.group, text, seconds)
+    MissionReport.Remember(record, kind, text, seconds)
+end
+
 local function HasPending(record)
     for _, p in ipairs(record.participants) do if not p.done then return true end end
     return false
@@ -109,7 +114,7 @@ local function PrimaryComplete(record, time, result)
     elseif record.category == "CAP" then
         title, objective = "CAP PRIMARY OBJECTIVE COMPLETE", "Patrol time complete and all hostile aircraft destroyed."
     end
-    Message(record.group, title .. "\n" ..
+    PublishMission(record, "complete", title .. "\n" ..
         objective .. "\nEach pilot: return to a BLUE airfield or carrier.\n" ..
         string.format("Reward per pilot: %d points; recovery failure: %d points.",
             record.fullReward, math.floor(record.fullReward * Config.recoveryFailurePercent / 100)), 20)
@@ -136,7 +141,7 @@ local function DeadComplete(record, time)
             p.deadScoring.primaryCompletedAt = time
         end
     end
-    Message(record.group, "DEAD Objective Complete\nSAM site destroyed.\nReturn to base.\n" ..
+    PublishMission(record, "complete", "DEAD Objective Complete\nSAM site destroyed.\nReturn to base.\n" ..
         string.format("DEAD reward per pilot: %d points; recovery failure: %d points.\nSEAD reward also retained.",
             record.deadFullReward, math.floor(record.deadFullReward * Config.recoveryFailurePercent / 100)), 20)
     Log(record.id .. " immediate DEAD complete; awaiting SEAD and DEAD recovery settlement")
@@ -184,7 +189,7 @@ local function Start(record)
         for _, p in ipairs(record.participants) do if not p.done then p.state = "ACTIVE" end end
         local text = "DEAD TRAINING START\nObjective: destroy all remaining SAM site vehicles; then RTB."
         DebugLog(record, record.deadBriefing .. "\n" .. text .. "\nRemaining targets: " .. DEAD.Remaining(record))
-        Message(record.group, text, 25)
+        PublishMission(record, "notice", text, 25)
         Log(record.id .. " started using retained site " .. record.site.id)
         return
     end
@@ -204,7 +209,7 @@ local function Start(record)
             "\nObjective: destroy primary emitter, or damage it and keep radar OFF for %g seconds; then RTB.",
             spawn.suppressionHoldSeconds)
         DebugLog(record, text .. "\nPilots: " .. table.concat(pilots, ", "))
-        Message(record.group, text, 25)
+        PublishMission(record, "notice", text, 25)
         Log(record.id .. " started; mode=" .. record.plan.attackMode .. " template=" .. spawn.template .. " zone=" .. spawn.zone)
         return
     end
@@ -222,7 +227,7 @@ local function Start(record)
         spawn.distance, spawn.altitude)
     DebugLog(record, "Intercept MISSION START\nHostiles: " .. spawn.composition .. "\n" .. details ..
         "\nPilots: " .. table.concat(pilots, ", "))
-    Message(record.group, "Intercept MISSION START", 15)
+    PublishMission(record, "notice", "Intercept MISSION START", 15)
     Log(record.id .. " started; registered pilots=" .. tostring(#pilots) ..
         " template=" .. spawn.template ..
         " formation=" .. spawn.formation .. "/" .. spawn.formationSpacing)
@@ -263,7 +268,7 @@ local function Generate(groupName, category)
         record.capPlan, record.state = plan, "ACTIVE"
         BeginScoring(record, Config.cap.fullReward)
         Message(group, "CAP mission accepted.", 10)
-        Message(group, CAP.Briefing(plan) .. string.format("\nRegistered pilots: %d.\nReward per pilot: %d points.",
+        PublishMission(record, "briefing", CAP.Briefing(plan) .. string.format("\nRegistered pilots: %d.\nReward per pilot: %d points.",
             #roster, record.fullReward), Config.coordinateBriefingSeconds)
         DebugLog(record, "CAP accepted; zone=" .. plan.name .. " template=" .. plan.template ..
             " enemy at on-station second " .. plan.enemyAt)
@@ -302,7 +307,7 @@ local function Generate(groupName, category)
             record.fullReward, #record.participants)
         DebugLog(record, briefing .. "\nRemaining targets: " .. #record.deadTargets ..
             (airborne and "" or "\nSite reserved. Waiting for ALL registered pilots to take off."))
-        Message(group, briefing, Config.coordinateBriefingSeconds)
+        PublishMission(record, "briefing", briefing, Config.coordinateBriefingSeconds)
         if airborne then Start(record) else
             record.state = "ARMED"
             for _, p in ipairs(record.participants) do p.state = "ARMED" end
@@ -326,13 +331,13 @@ local function Generate(groupName, category)
         record.selection, record.plan, record.state = job, job.plan, "PLANNING"
         for _, p in ipairs(record.participants) do p.state = "PLANNING" end
         DebugLog(record, "SEAD mission accepted.\nMODE: " .. record.plan.attackMode .. "\nMission planning in progress.")
-        Message(group, "SEAD mission accepted.\nMission planning in progress.", 10)
+        PublishMission(record, "notice", "SEAD mission accepted.\nMission planning in progress.", 10)
         return
     end
     local _, airborne = Ready(record)
     if airborne then Start(record) else
         record.owner = roster[1]
-        Message(group, string.format(
+        PublishMission(record, "notice", string.format(
             "Intercept mission armed. Registered pilots: %d.\nWaiting for ALL registered pilots to take off.",
             #roster))
     end
@@ -349,7 +354,7 @@ end
 local function Status(groupName)
     local group = GROUP:FindByName(groupName)
     local records = Missions.ForGroup(groupName, Player.ForGroup(groupName))
-    local text, seconds = MissionReport.Status(records, timer.getTime())
+    local text, seconds = MissionReport.Status(records)
     Message(group, text, seconds)
 end
 
@@ -410,9 +415,10 @@ local function FollowOn(groupName, record, preserve)
                 fullReward = reward, scoreOnly = true }
         end
     end
-    Message(group, "Immediate DEAD started.\nDestroy all remaining SAM site vehicles.\nRemaining targets: " ..
-        #targets .. string.format("\nAdditional DEAD reward per pilot: %d points.\nSEAD reward also retained.", reward) ..
-        "\nSITE LOCATION:\n" .. location, Config.coordinateBriefingSeconds)
+    PublishMission(record, "briefing", "Immediate DEAD started.\nDestroy all remaining SAM site vehicles.\nRemaining targets: " ..
+        #targets .. "\nSITE LOCATION: " .. location ..
+        string.format("\nAdditional DEAD reward per pilot: %d points.\nSEAD reward also retained.", reward),
+        Config.coordinateBriefingSeconds)
     Log(record.id .. " continued as DEAD using original site")
 end
 
@@ -607,7 +613,7 @@ local function TickMission(record, time)
             DebugLog(record, briefing .. string.format(
                 "\nGround acceptance: SAM spawns %d seconds after ALL registered pilots take off.\n",
                 Config.takeoffDelaySeconds) .. SEAD.Instructions(record.plan))
-            Message(record.group, briefing, Config.coordinateBriefingSeconds)
+            PublishMission(record, "briefing", briefing, Config.coordinateBriefingSeconds)
             local _, airborne = Ready(record)
             if record.airborneAtAcceptance and airborne then Start(record) end
         end

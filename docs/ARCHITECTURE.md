@@ -1,10 +1,10 @@
 # 実装構成と設計上の約束
 
-更新日: 2026-10-13
+更新日: 2026-10-15
 
 ## 対象
 
-Intercept / CAP / SEAD / DEADの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。将来案は実装済みの機能と分ける。
+Intercept / CAP / SEAD / DEADの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
 この構成は`training-8`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
@@ -31,7 +31,7 @@ Intercept / CAP / SEAD / DEADの現在の実装を説明する。訓練の条件
 
 `Build-Mission.ps1`の順序付き対応表がモジュールの読み込み順とLua変数名を一箇所で管理する。依存先を先に結合し、実行調整を最後に置く。生成済みbundleは直接編集しない。DCS内では`require`や外部ファイル読み込みを使わない。
 
-MissionReportは本文と表示時間を返し、main.luaが対象グループへ送る。Statusは既存の目標観測・Site Refreshを呼ぶため完全な純粋関数ではないが、任務の生成・精算・帰還確定は行わない。Notificationsは受注や任務状態を判断せず、通知する時点はmain.luaが決める。
+MissionReportは公開済みブリーフィングと最新の開始／達成通知をrecord.publicReportへ保持し、本文と表示時間を返す。main.luaのPublishMissionが画面送信と保持を組にし、Mission Statusはその文字列のコピーだけを再表示する。Statusは敵・レーダー・Site・参加者状態を参照せず、座標再計算・目標観測・Site Refresh・任務生成・精算・帰還確定を行わない。座標を含む新ブリーフィングでは前段情報を置き換え、開始では座標を維持し、達成ではpublicReportを達成通知だけへ置き換えて座標ブリーフィングを外す。達成後のStatusは達成・帰還通知だけを20秒表示する。Notificationsは受注や任務状態を判断せず、通知する時点はmain.luaが決める。
 
 サーバー側は`DynamicTrainingPersistenceHook.lua`がcallback寿命、`persistence_service.lua`が保存手順、`mission_bridge.lua`が固定endpoint通信、`persistence_fs.lua`がnative I/O差異、`score_store.lua`が検証・backupを担当する。ミッションはSaved Gamesへ直接書き込まない。保存境界の詳細は [PERSISTENCE.md](PERSISTENCE.md) を参照する。
 

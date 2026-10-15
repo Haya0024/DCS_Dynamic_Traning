@@ -29,7 +29,7 @@ return {
     },
     sead = {
         fullReward = 150,
-        suppressionHoldSeconds = 60,
+        suppressionHoldSeconds = 30,
         modes = { "TOO", "PB" },
         templates = {
             { name = "TPL_SEAD_SA6", type = "SA-6", pbCode = 108, primaryUnitType = "Kub 1S91 str", planningRangeNM = 15 },

@@ -5,7 +5,7 @@
 2026-10-14のZone改名はSEAD由来の地域名に反映する。既存Siteの継承・保持・全対象破壊・帰還精算の状態遷移と終了方針は変更しない。
 
 画面メッセージ・DCSログの本文、タイミング、表示時間は [MESSAGES.md](MESSAGES.md) を参照する。
-Follow-on DEADの通知はSEADと同じ流れにする。準備成功後に短い `DEAD mission accepted.`（10秒）、受注時の座標付きブリーフィング（60秒設定）を1回、ACTIVE移行時は座標を含まない `DEAD TRAINING START` と目標・RTB指示（25秒）を出す。地上受注後の離陸でもブリーフィングを自動再掲しない。予約待ち・開始時の残数などはDEBUGへ記録し、Statusでは座標・残数を任意確認できる。
+Follow-on DEADの通知はSEADと同じ流れにする。準備成功後に短い `DEAD mission accepted.`（10秒）、受注時の座標付きブリーフィング（60秒設定）を1回、ACTIVE移行時は座標を含まない `DEAD TRAINING START` と目標・RTB指示（25秒）を出す。地上受注後の離陸でもブリーフィングを自動再掲しない。予約待ち・開始時の残数などはDEBUGへ記録し、Statusでは公開済み座標ブリーフィングを任意再表示できる。現在残数は追加しない。
 
 ## 目的と実装境界
 
@@ -46,7 +46,7 @@ Primary結果の値から残存数・DEAD可否を推測しない。SEAD完了�
 |---|---|---|---:|---|
 | SA-6の1S91破壊、2P25が3両生存 | DESTROYED | SUPPRESSED | 3 | 生存Launcherのみ |
 | SA-6の1S91破壊、2P25が1両生存 | DESTROYED | SUPPRESSED | 1 | 生存Launcherのみ |
-| SA-6の1S91損傷＋OFF60秒、全4両生存 | SUPPRESSED | SUPPRESSED | 4 | 生存レーダー＋Launcher |
+| SA-6の1S91損傷＋OFF30秒、全4両生存 | SUPPRESSED | SUPPRESSED | 4 | 生存レーダー＋Launcher |
 | SA-6の1S91と全2P25を破壊 | DESTROYED | DESTROYED | 0 | DEAD不可 |
 | SA-8のOsaを破壊 | DESTROYED | DESTROYED | 0 | DEAD不可 |
 
@@ -205,21 +205,22 @@ Follow-on DEADは受注時、Immediate DEADはContinue時に満額を固定。�
 
 ## Briefing・Status・F10
 
-Follow-on DEADは地域、SAM種類、主要レーダーの履歴（Primary radar destroyed / Previously suppressed）、残存車両全滅の指示と既存Site位置を表示する。
-既存Siteの実配置点（actualSpawnPoint、ない場合はspawn.coordinate）を `SITE LOCATION:` としてDDM（度＋小数分、分の小数3桁）で表示する。MOOSEのToStringLLDDMへLL_Accuracy=3を明示する。SEAD TOO/PBの推定点・秘匿仕様には影響しない。
-受注時の座標付きブリーフィングとMission Statusの表示時間は共通設定 `coordinateBriefingSeconds`（初期60秒）を使用する。開始通知は座標なし25秒で、ブリーフィングの自動再掲はしない。
+Mission Statusは公開済みブリーフィングと最新の開始／達成通知の再表示に限定する。Follow-onは受注時に公開したSite座標・SAM種類・履歴・目的・報酬・人数の本文を保存し、開始後はその座標に開始指示を添える。達成時にStatus用の座標ブリーフィングを外し、公開済み達成・帰還指示だけを20秒表示する。ImmediateはContinue直後に公開した本文を保存し、DEAD達成後は実配置座標を外し、公開済み達成・帰還指示だけを20秒表示する。Continue本文中のRemaining targetsは公開時の値の再表示であり、現在の残数へ更新しない。
+
+StatusはDEAD.Remaining / DEAD.Briefing / SEADSites.Refreshを呼ばず、未公開の敵残数・Site状態・保持／使用予約・参加者別状態・追加採点状態を付けない。Continue前／Preserveのみでは正確な配置座標を公開しない。切替時の座標取得失敗では元SEADの公開済み達成・帰還通知も維持する。帰還・精算・保持・Cleanup・任務ロックの状態遷移は変更しない。
+
+Follow-on DEADの受注ブリーフィングは `DEAD MISSION` → `TARGET SITE: <SAM種類>` → `SITE LOCATION: <座標>` → `STATUS: <主要レーダーの履歴>` → `OBJECTIVE: Destroy all remaining SAM site vehicles.` → 報酬 → 登録人数の順とする。`AREA:` 行は出さない。主要レーダーの履歴はPrimary radar destroyed / Previously suppressedを使い分ける。
+既存Siteの実配置点（actualSpawnPoint、ない場合はspawn.coordinate）を `SITE LOCATION: <DDM座標>` としてラベルと同じ行に表示する（度＋小数分、分の小数3桁）。MOOSEのToStringLLDDMへLL_Accuracy=3を明示する。Follow-onのMission Statusは公開したこの本文を保持して再表示し、DEBUGも同じ順序とする。ImmediateのStatusはContinue時の開始本文を保持して再表示する。SEAD TOO/PBの推定点・秘匿仕様には影響しない。
+受注時の座標付きブリーフィングと目標達成前のMission Statusの表示時間は共通設定 `coordinateBriefingSeconds`（初期60秒）を使用する。開始通知は座標なし25秒で、ブリーフィングの自動再掲はしない。
 SEADのTOO/PB秘匿はFollow-on DEADには適用しない。内部Group名・object IDは表示しない。
-Immediate DEADは `Continue as DEAD` 直後の開始通知へ `SITE LOCATION:` と実配置座標を追加し、共通設定 `coordinateBriefingSeconds`（初期60秒）で1回表示する。座標の取得・整形はDEAD移行前に行い、失敗時は元SEADの帰還待ちとSite予約・採点状態を維持する。Mission Statusにも同じDEADブリーフィングを追加し、Siteの実配置座標・SAM種類を表示する。DEAD達成後の帰還待ちでも表示を維持する。元のSEADブリーフィングは推定点のまま残し、Continue前やPreserveのみでは実配置座標を公開しない。
+Immediate DEADは `Continue as DEAD` 直後の開始通知を、開始 → 全残存車両破壊指示 → 残数 → `SITE LOCATION: <実配置座標>` → 追加DEAD報酬 → SEAD報酬保持の順とし、共通設定 `coordinateBriefingSeconds`（初期60秒）で1回表示する。座標はラベルと同じ行に置く。座標の取得・整形はDEAD移行前に行い、失敗時は元SEADの帰還待ちとSite予約・採点状態を維持する。Mission StatusはContinue時の公開済み本文を再表示し、通知にないSAM種類などを追加しない。DEAD達成後の帰還待ちは座標を外し、達成・帰還指示だけを20秒表示する。元のSEADブリーフィングは推定点のまま残し、Continue前やPreserveのみでは実配置座標を公開しない。
 `SITE LOCATION` はSAM陣地の実配置基準点であり、各残存車両の個別座標や移動後の位置を示すものではない。
 
 通常メニューにTask: DEADを追加。SEAD達成後に残存ありの場合だけ同じ階層へContinue/Preserveを追加する。
 Preserve後はPreserveを消しContinueは残す。Continue後や残存全滅・任務終了で両方を消す。
 signatureにfollow-on選択可否を含め、既存の再生成方式で反映する。古いcallbackもrecord/site/予約を再検証する。
 
-SEAD Statusには `Site disposition: CLEANUP / RETAIN / AVAILABLE / IN USE` と `Follow-on DEAD available: YES / NO` を追加。
-`SEAD Primary result` と `Site state` を別々に表示し、SEAD完了後は `Site remaining vehicles` で実残存数を表示する。観測失敗時の残数はUNKNOWN。
-Immediateには `SEAD: COMPLETE` / `Follow-on: DEAD ACTIVE` / `Remaining targets: X`。
-Follow-on DEADには `DEAD: ARMED / ACTIVE / RTB PENDING`、地域と残数を表示する。
+StatusへSite disposition・Follow-on可否・Site state・現在残数・内部phase・参加者状態を追加しない。判定・予約・Cleanupに使う内部データはそのまま維持し、Statusの表示データだけを公開済み本文に制限する。
 DEAD Scoreを独立して集計・保存する。Player Statisticsにはカテゴリ別Scoreを表示せず、累計と任務・帰還・喪失統計を表示する（[SCORING.md](SCORING.md)）。
 
 ## ゲーム内確認チェックリスト

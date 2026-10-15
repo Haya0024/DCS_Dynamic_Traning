@@ -115,13 +115,6 @@ function CAP.Remaining(spawn)
     return AirTargets.Remaining(spawn)
 end
 function CAP.Complete(plan, spawn) return plan.elapsed >= plan.holdSeconds and CAP.Remaining(spawn) == 0 end
-function CAP.Status(plan, spawn)
-    local remaining = CAP.Remaining(spawn)
-    return CAP.Briefing(plan) .. string.format("\nPatrol: %d%% (%d/%g seconds)\nClock: %s\nHostiles remaining: %s",
-        math.floor(plan.elapsed / plan.holdSeconds * 100), math.floor(plan.elapsed), plan.holdSeconds,
-        plan.elapsed >= plan.holdSeconds and "TIME COMPLETE" or (plan.inside and "RUNNING" or "WAITING / PAUSED"),
-        remaining and tostring(remaining) or "NOT SPAWNED")
-end
 function CAP.Cleanup(group)
     if not group then return end
     local ok, result = pcall(function() return group:Destroy(false) end)

@@ -61,6 +61,7 @@ return {
     dead = { fullReward = 150, unreservedSiteCleanupSeconds = 1800 },
     strike = {
         fullReward = 150, cleanupRetrySeconds = 5,
+        smoke = { color = "Red", northOffsetMeters = 50, durationSeconds = 120 },
         sites = {
             { id = "SITE01", airbase = "Damascus" },
             { id = "SITE02", airbase = "Palmyra" },

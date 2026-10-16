@@ -96,6 +96,7 @@ end
 local function PrimaryComplete(record, time, result)
     if not Missions.IsActive(record) or record.state ~= "ACTIVE" then return end
     record.primaryCompletedAt, record.state = time, "RTB_PENDING"
+    if record.category == "Strike" then Strike.StopMark(record.strikePlan) end
     if record.category == "SEAD" then
         record.primaryResult = result or "DESTROYED"
         SEADSites.PrimaryComplete(record.site, record.primaryResult)
@@ -399,6 +400,33 @@ local function CanManage(groupName, target)
     return false
 end
 
+local function CanMarkStrike(groupName, record)
+    if not Missions.IsActive(record) or record.groupName ~= groupName or record.category ~= "Strike"
+        or record.state ~= "ACTIVE" then return false end
+    for _, p in ipairs(record.participants) do
+        if not p.done and CanManage(groupName, p) and Player.IsControlling(p.owner) then return true end
+    end
+    return false
+end
+
+local function MarkStrike(groupName, record)
+    local group = GROUP:FindByName(groupName)
+    if not CanMarkStrike(groupName, record) then
+        Message(group, "Strike target marking is no longer available.", 10); return
+    end
+    local ok, marked = pcall(Strike.Mark, record.strikePlan, timer.getTime())
+    if not ok then
+        env.error("[DynamicTraining] Strike smoke: " .. tostring(marked))
+        Message(group, "ERROR: Strike target smoke failed. See DCS log; retry later.", 15)
+    elseif not marked then Message(group, "Strike target already marked. Try again later.", 10)
+    else
+        local cfg = Config.strike.smoke
+        Message(group, string.format("Strike target marked with %s smoke.\n" ..
+            "Smoke is %g m north of the target; lasts %g seconds.",
+            string.upper(cfg.color), cfg.northOffsetMeters, cfg.durationSeconds), 10)
+    end
+end
+
 local function FollowOnAvailable(groupName, record)
     if not Missions.IsActive(record) or record.groupName ~= groupName or record.category ~= "SEAD"
         or record.state ~= "RTB_PENDING" or record.deadStartedAt or not record.primaryCompletedAt then return false end
@@ -522,6 +550,9 @@ ScanPlayers = function()
         local followOn = Missions.wings[name]
         local canContinue = FollowOnAvailable(name, followOn)
         local canPreserve = canContinue and followOn.site.disposition == "CLEANUP"
+        local strike = Missions.wings[name]
+        local canMarkStrike = CanMarkStrike(name, strike)
+        signature = signature .. ":strikeMark:" .. tostring(canMarkStrike)
         signature = signature .. ":follow:" .. tostring(canContinue) .. ":preserve:" .. tostring(canPreserve)
         local reservations = {}
         for _, site in pairs(Missions.sites) do
@@ -546,6 +577,14 @@ ScanPlayers = function()
             if menus[name] then menus[name].root:Remove() end
             local root = MENU_GROUP:New(group, "Dynamic Training")
             menus[name] = { root = root, signature = signature }
+            -- Reserve one entry for the next page so MP2 personal aborts and
+            -- optional Strike/site actions remain reachable as menus grow.
+            local page, entries = root, 0
+            local function AddCommand(label, callback)
+                if entries == 9 then page, entries = MENU_GROUP:New(group, "More", page), 0 end
+                MENU_GROUP_COMMAND:New(group, label, page, callback)
+                entries = entries + 1
+            end
             for _, command in ipairs({
                 { "Task: Intercept", Generate },
                 { "Task: CAP", function(groupName) Generate(groupName, "CAP") end },
@@ -555,8 +594,14 @@ ScanPlayers = function()
                 { "Abort Mission", Abort }, { "Player Statistics", Statistics }
             }) do
                 local label, action = command[1], command[2]
-                MENU_GROUP_COMMAND:New(group, label, root, function()
+                AddCommand(label, function()
                     Safe(label, group, function() action(name); ScanPlayers() end)
+                end)
+            end
+            if canMarkStrike then
+                local record = strike
+                AddCommand("Mark Strike Target", function()
+                    Safe("Mark Strike Target", group, function() MarkStrike(name, record); ScanPlayers() end)
                 end)
             end
             if canContinue then
@@ -564,7 +609,7 @@ ScanPlayers = function()
                 for _, choice in ipairs({ { "Continue as DEAD", false }, { "Preserve Site for DEAD", true } }) do
                     local label, preserve = choice[1], choice[2]
                     if not preserve or canPreserve then
-                        MENU_GROUP_COMMAND:New(group, label, root, function()
+                        AddCommand(label, function()
                             Safe(label, group, function() FollowOn(name, record, preserve); ScanPlayers() end)
                         end)
                     end
@@ -576,7 +621,7 @@ ScanPlayers = function()
                 if #reservations > 1 then
                     label = label .. ": " .. (site.plan.areaLabel or "SAM site") .. " (" .. index .. ")"
                 end
-                MENU_GROUP_COMMAND:New(group, label, root, function()
+                AddCommand(label, function()
                     Safe(label, group, function()
                         local currentGroup, authorized = GROUP:FindByName(name), false
                         if currentGroup and currentGroup:GetID() == groupID then
@@ -603,7 +648,7 @@ ScanPlayers = function()
                 local target, record = entry.participant, entry.record
                 local p = target
                 local label = "Abort Sortie: " .. p.owner.name .. " [" .. p.owner.unitName .. "]"
-                MENU_GROUP_COMMAND:New(group, label, root, function()
+                AddCommand(label, function()
                     Safe("Individual abort", group, function() Abort(name, target, record); ScanPlayers() end)
                 end)
             end

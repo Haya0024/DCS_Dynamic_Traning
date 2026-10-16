@@ -846,3 +846,16 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 Status recalls the exact briefing until completion, then only the published result / RTB body for 20 seconds. It appends no live count, base reservation, candidate list or unselected facility. No takeoff, countdown or partial-destruction notice is added. Settlements use the existing `Strike RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant bodies for 20 seconds.
 
 If the nearest two RED bases are unavailable, display `No available Strike targets among the two nearest RED bases. Try again later.` for 20 seconds. A setup failure displays `ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Incomplete static cleanup keeps the base reservation for retries and is not reported as a new mission failure. Setup/initialization details and accepted Site ID / count are logged; screen bodies use the existing MESSAGE mirror.
+
+### Optional Strike target smoke
+
+Only while Strike is ACTIVE and its accepting Wing contains a controlling, unsettled registered participant, F10 includes `Mark Strike Target`. Selecting it emits one red smoke effect at ground level 50 m north of the published target point. It is stopped after about 120 mission seconds, on objective completion, or when all participants finish. There is no automatic emission. Repeated requests while the effect is still tracked do not create another effect. After it stops, another request is allowed. Smoke is a world effect visible to other players as well.
+
+| Trigger | Body | Seconds |
+|---|---|---:|
+| Successful manual mark | `Strike target marked with RED smoke.` + newline + `Smoke is 50 m north of the target; lasts 120 seconds.` | 10 |
+| Effect still active or stopping | `Strike target already marked. Try again later.` | 10 |
+| Saved callback no longer authorized | `Strike target marking is no longer available.` | 10 |
+| Smoke API failure | `ERROR: Strike target smoke failed. See DCS log; retry later.` | 15 |
+
+Values follow Config.strike.smoke. These messages do not replace the coordinate briefing recalled by Mission Status. No additional score, current target count, or spawn information is shown. Stop failures retry through the existing mission clock without blocking assignment settlement or base reuse. F10 menus paginate through `More` after nine commands so optional actions and MP2 personal aborts remain reachable.

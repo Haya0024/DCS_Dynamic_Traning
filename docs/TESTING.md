@@ -26,20 +26,20 @@
 | DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 105 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
 | PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 46 | schema1/2→3移行・CAP/Strike保存復元・未知schema保護、保存確認、再起動・遅延復元、native I/O、backup、run、Hook/manager/SSE分離、callback寿命、スロット未選択 |
 | MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
-| STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 32 | 近い2赤基地、3施設抽選、ME原本除去、正確な座標・標高、燃料3基全破壊、基地予約、MP2精算、生成失敗・削除再試行 |
+| STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 43 | 近い2赤基地、3施設抽選、ME原本除去、正確な座標・標高、燃料3基全破壊、基地予約、MP2精算、生成失敗・削除再試行 |
 | STRIKEME | [Test-StrikeMission.ps1](../scripts/Test-StrikeMission.ps1) | 2確認グループ | 実.mizの5赤基地・25テンプレート、全15施設の生成位置・削除 |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 | ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 3確認グループ | 実.mizの全Client駐機位置でCAP2〜3・SEAD2〜4候補、全19円のME登録・可視性・半径・名前/IDの一意性、全候補の受注・SEAD生成・解除、MEのみの参照・欠落時解除・再受注、CAP/SEAD全90組でSAM計画射程＋安全余裕の離隔 |
 
-Luaは合計400ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST46＋MAP18＋STRIKE32）、10スイート。各ケース内のループやassertは別ケースに数えない。Test-PersistenceDisk.luaはINSTALLが別プロセスで実行するfixture。Test-ZoneCoverage.luaとTest-StrikeMission.luaは実.mizのデータを前置する結合検証で、Luaケース数に含めない。
+Luaは合計411ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST46＋MAP18＋STRIKE43）、10スイート。各ケース内のループやassertは別ケースに数えない。Test-PersistenceDisk.luaはINSTALLが別プロセスで実行するfixture。Test-ZoneCoverage.luaとTest-StrikeMission.luaは実.mizのデータを前置する結合検証で、Luaケース数に含めない。
 
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの5行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-16、training-9。Lua全400ケース（10スイート）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2。Strikeの抽選・施設生成・座標・MP2精算・失敗rollback、schema1/2→3移行とHookでのStrike保存・次セッション復元を模擬検証。実DCSはMAN-60で確認待ち。
+最新の自動検証: 2026-10-16、training-9。Lua全411ケース（10スイート）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2。Strikeの抽選・施設生成・座標・任意スモーク・MP2精算・メニューページ分割・失敗rollback、schema1/2→3移行とHookでのStrike保存・次セッション復元を模擬検証。実DCSはMAN-60/61で確認待ち。
 
 前回の自動検証: 2026-10-14。Lua全359ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES3が通過。SEADの任意実生成診断をSEAD-67〜69で確認し、実.mizの全15 ClientでCAP2〜3・SEAD2〜4候補と全90組のSAM離隔を確認。実地形の50点抽選・SAM実生成結果は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。
 同日のIntercept距離変更後にも全件通過。INT-08で90/100/110 NMの配置と抽選上下限、Wingで長機基準を確認し、実.mizへSync/Checkした。実飛行のレーダー検出時間は未確認。
@@ -764,9 +764,24 @@ DCS内の不具合では任務ID・Group・時刻と、`dcs.log` の `[DynamicTr
 | STRIKE-30 | テンプレート欠落はStrike基地を無効にするがInterceptを停止しない |
 | STRIKE-31 | 座標整形失敗は生成前に解除、基地・Wingロックを残さない |
 | STRIKE-32 | 起動時の原本削除失敗中は基地使用不可、実体削除を再確認後に候補復帰 |
+| STRIKE-33 | 全3施設で自動点煙なし、要求時だけ赤煙を案内点北50 mの地表へ。乱数・目標・採点不変 |
+| STRIKE-34 | 連打で重複なし、Statusの座標維持、120秒後に停止して新しい効果名で再要求 |
+| STRIKE-35 | 達成で停止・メニュー解除、保存済みcallbackから点煙できない |
+| STRIKE-36 | Abortで停止、旧callbackが次任務を点煙しない |
+| STRIKE-37 | MP2個人Abort後も未精算僚機が使用可能、全員終了で停止 |
+| STRIKE-38 | 並行Wingは自目標だけを点煙し、一意名で相互の煙へ干渉しない |
+| STRIKE-39 | 点煙API失敗で任務・得点・Statusを保持し、再要求可能 |
+| STRIKE-40 | 点煙後の例外と停止失敗でも効果参照を保持し、5秒後に停止再試行 |
+| STRIKE-41 | Abort後の停止失敗は基地解放を妨げず、次任務の煙を消さない |
+| STRIKE-42 | 操縦中の登録者がいない途中参加者だけのWingでは表示せず、古いcallbackも拒否 |
+| STRIKE-43 | MP2 Strikeの各ページは10項目以内で、点煙と両参加者の個人Abortへ到達可能 |
 
 STRIKEMEは実.mizの25ユニットをMOOSE境界fixtureへ渡して全15施設の生成・削除を検証する。テスト内の基地中心は配置施設の平均座標であり、実DCSの基地中心（MOOSEの滑走路中心）や地形への埋まり・障害物・実際の破壊効果を検証したものではない。
 
 | 手動ID | 条件・期待結果 |
 |---|---|
 | MAN-60 | training-9の.mizとschema3対応HookでDCSを再開始。原本25物体が消えること、地上/空中受注・近い2赤基地の抽選・3施設候補、正確なDMS秒小数2桁/地表標高とPP入力、燃料3基全滅、弾薬庫・倉庫1棟、Statusの達成前座標/達成後20秒、3Dの埋まり・重なり、MP2の個人150/90/0、並行Wingの基地予約、全員終了後削除と再受注、Hook保存と次セッションのStrike復元を確認。未実施 |
+
+| 手動ID | 条件・期待結果 |
+|---|---|
+| MAN-61 | training-9でStrike受注後、F10 Mark Strike Targetを選ぶ。北50 mの赤煙と目標の見分けやすさ、約120秒停止・再要求・連打防止、達成/Abortで停止、他Wingとの非干渉、Statusの座標維持、MP2のMoreと両個人Abortを確認。未実施 |

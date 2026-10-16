@@ -52,4 +52,12 @@ Registered pilots: 1.
 
 Mission Statusは公開済み本文をそのまま再表示し、残数・内部予約・抽選候補・未選択目標を追加しない。達成後は座標を外し、公開済み達成・帰還通知だけを20秒表示する。全員終了後はIdle。
 
+## 任意の目標スモーク
+
+StrikeがACTIVEで、受注Wingに操縦中・未精算の登録参加者がいる場合だけF10へ `Mark Strike Target` を表示する。選択時に赤煙を目標案内点の北50 mの地表へ1本出し、約120秒後に停止する。燃料は3基の中心が基準。座標・抽選・目標・採点は変更せず、自動点煙はしない。色・北オフセット・表示時間はConfig.strike.smokeで管理する。スモークはDCS内の実体なので他プレイヤーからも見える。F10項目が増えた場合はMoreで続きへ進める。1ページはコマンド9件＋Moreを上限とし、MP2の個人中止も到達可能にする。
+
+成功通知は `Strike target marked with RED smoke.` と次行 `Smoke is 50 m north of the target; lasts 120 seconds.` を10秒表示する。煙が停止するまでは連打しても追加せず、`Strike target already marked. Try again later.` を10秒表示する。停止後は再度要求できる。Mission Statusへ点煙通知・残数・煙の状態は追加しない。
+
+達成時と全員終了時に煙を停止する。古いメニューcallbackは任務・状態・Wing・操縦中の登録参加者を再照合し、無効なら `Strike target marking is no longer available.` を10秒表示して終了する。煙APIの失敗は `ERROR: Strike target smoke failed. See DCS log; retry later.` を15秒表示し、任務・得点を維持する。停止失敗は共通監視で5秒ごとに再試行する。煙の寿命は基地予約・目標削除から分離し、停止失敗で帰還精算や基地解放を妨げない。
+
 自動検証はscripts/Test-Strike.lua、実.mizの25テンプレートと基地対応はscripts/Test-StrikeMission.ps1で確認する。実DCSでは地上/空中受注、PB入力、燃料3基判定、3Dの埋まり・重なり、MP2個人精算、並行Wing、再受注とHook保存を確認する。

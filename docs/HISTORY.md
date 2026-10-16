@@ -2,6 +2,14 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-16 Strikeの任意目標スモークを追加
+
+ユーザー指定により、受注Wingに操縦中・未精算の登録者がいるACTIVE StrikeへF10のMark Strike Targetを追加した。要求時だけ案内点の北50 mの地表へ赤煙を1本出し、約120秒後・達成・全員終了時に停止する。色・北オフセット・時間はConfig.strike.smoke、点煙・停止はMOOSE COORDINATE:Smoke/StopSmokeを使用する。グローバルSmokeOffsetの影響と追加乱数を避け、効果名は任務・要求ごとに分離する。
+
+連打による重複を拒否し、点煙通知はStatusの座標ブリーフィングを上書きしない。古いcallbackは任務・状態・Wing・操縦中登録者を再照合する。点煙後の例外も効果参照を保持し、停止失敗を5秒ごとに再試行する。煙の寿命は基地予約とStatic削除から分離し、煙APIの失敗で任務・精算を中断しない。MP2で任意メニューと個人Abortが増えても操作できるよう、9コマンドごとにMoreを追加し、各ページ10項目以内にした。
+
+STRIKE-33～43を追加し、全施設の点煙位置・色・地表高度、手動のみ・期限・再要求・Status維持、達成/Abort停止、MP2・並行Wing・旧callback、API失敗・停止再試行、メニュー到達性を模擬検証した。Lua全411ケース（10スイート、Strike43）とBUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2が通過。仕様・メッセージ一覧・タイムライン・日英BRIEFING・ARCHITECTURE・TESTINGを更新し、実.mizへSync/Checkした。ZIP CRC・bundle一致・登録済みDynamicTraining.lua以外の内容不変を確認。実DCSの煙の見え方・停止・MP2メニューはMAN-61で確認待ち。
+
 ## 2026-10-16 Strike座標をJDAM/JSOWのPP入力向けDMSへ変更
 
 ユーザー指定によりStrikeのTARGET LOCATIONをDMS（度・分・秒、秒の小数2桁）へ変更した。COORDINATE:ToStringLLDMSへLL_Accuracy=2を明示し、MOOSE全体の表示設定から独立させた。座標と地表標高ft MSLの同一行・5行のブリーフィング・受注時とStatusの本文一致を維持する。CAP/SEAD/DEADは従来のDDM・分の小数3桁のまま。

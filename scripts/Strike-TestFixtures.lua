@@ -1,5 +1,22 @@
 -- MOOSE static boundary fixture; production mission code is always bundled unchanged.
 return function(s, env, options, newUnit)
+    s.smokes, s.activeSmokes, s.smokeStops = {}, {}, {}
+    env.SMOKECOLOR = { Green = 0, Red = 1, White = 2, Orange = 3, Blue = 4 }
+    function env.COORDINATE:Smoke(color, duration, delay, name, offset, direction, distance)
+        assert(duration == nil and delay == nil and offset == false and direction == 0 and distance == 0)
+        if s.failSmokeBefore then error('smoke unavailable') end
+        local mark = { point = self:GetVec3(), color = color, name = name }
+        s.smokes[#s.smokes + 1], s.activeSmokes[name] = mark, mark
+        if s.failSmokeAfter then error('post-emission failure') end
+        return self
+    end
+    function env.COORDINATE:StopSmoke(name)
+        if s.smokeStopFailures and s.smokeStopFailures > 0 then
+            s.smokeStopFailures = s.smokeStopFailures - 1; error('smoke stop unavailable')
+        end
+        s.smokeStops[#s.smokeStops + 1] = name
+        s.activeSmokes[name] = nil
+    end
     s.staticTemplates, s.statics, s.staticSpawns, s.airbases = {}, {}, {}, {}
     local config = dofile("src/config.lua").strike
     for index, site in ipairs(config.sites) do

@@ -284,11 +284,16 @@ local function scenario(options)
         scheduleFunction = function(callback, arg, due)
             table.insert(s.timers, { callback = callback, arg = arg, due = due })
         end }
-    env.MENU_GROUP = { New = function(_, group)
-        local gname = group:GetName(); s.commands[gname] = {}
-        return { Remove = function() s.commands[gname] = nil end }
+    env.MENU_GROUP = { New = function(_, group, title, parent)
+        local gname = group:GetName()
+        if not parent then s.commands[gname] = {}; s.menuPages = s.menuPages or {}; s.menuPages[gname] = {} end
+        local menu = { title = title, parent = parent, entries = 0, Remove = function() s.commands[gname] = nil end }
+        if parent then parent.entries = parent.entries + 1 end
+        table.insert(s.menuPages[gname], menu)
+        return menu
     end }
     env.MENU_GROUP_COMMAND = { New = function(_, group, title, menu, callback)
+        menu.entries = menu.entries + 1
         s.commands[group:GetName()][title] = callback
     end }
     env.EVENTS = { Crash = 1, Dead = 2, PilotDead = 3, Ejection = 4, UnitLost = 5,

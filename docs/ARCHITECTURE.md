@@ -91,3 +91,5 @@ training-3では実行入口をmain.luaへ改名し、Interceptの敵削除再�
 `Missions.strikeBases[airbaseName]` に基地の使用予約を一元管理する。StrikeのテンプレートカタログはMEのStaticから取得し、座標をConfigへ複製しない。生成物はplan.objects、採点対象のIDと喪失状態はplan.targetsに保持する。任務ロック解放後も削除が未完了なら基地予約を維持し、全削除を確認して解除する。SPAWNSTATICの再配置機能を使わず、ME位置・向きと任務別の名前／新規IDで生成する。詳細は[STRIKE.md](STRIKE.md)。
 
 保存schema3は末尾へstrikeScoreを追加。schema1/2は既存列を厳密検証して読み、未収録項目を0で補う。missionとHookを同時更新する。
+
+Strikeの任意スモークはstrike.luaのMark/StopMark/Sweepで管理する。plan.smokeは最後の要求、Strike.marksは停止待ちの視覚効果だけを保持する。MOOSE COORDINATE:Smoke/StopSmokeを使い、予約・Static削除・採点と寿命を分離する。main.luaでACTIVE・受注Wing・操縦中未精算参加者を照合し、成功/連打/失敗の通常通知を出す。公開ブリーフィングの再表示用キャッシュは変更しない。F10項目は9件ごとにMoreを作って次ページへ送り、MP2と任意項目を含め各ページ10件以内に保つ。

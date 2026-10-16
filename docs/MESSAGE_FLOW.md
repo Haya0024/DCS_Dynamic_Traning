@@ -531,3 +531,14 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
 Statusは達成前にSTRIKE-02を同じ本文で再表示し、達成後はSTRIKE-03だけを20秒表示する。現在残数・未選択施設・抽選候補・予約を追加しない。途中撃破・全員離陸・生成待ちの自動通知はない。精算は6章の共通通知でカテゴリ名Strikeを使用する。全員終了後の削除失敗は予約を維持して再試行し、精算通知を繰り返さない。詳細は[STRIKE.md](STRIKE.md)。
+
+### 11A. Strikeの任意スモーク
+
+| ID | タイミング | 本文 | 秒 |
+|---|---|---|---:|
+| STRIKE-06 | ACTIVE中のMark Strike Target選択で点煙成功 | `Strike target marked with RED smoke.`＋改行＋`Smoke is 50 m north of the target; lasts 120 seconds.` | 10 |
+| STRIKE-07 | 煙の停止前に再要求 | `Strike target already marked. Try again later.` | 10 |
+| STRIKE-08 | 古いcallback・操作資格喪失 | `Strike target marking is no longer available.` | 10 |
+| STRIKE-09 | 点煙APIの例外・拒否 | `ERROR: Strike target smoke failed. See DCS log; retry later.` | 15 |
+
+色・距離・時間は初期設定。自動点煙はせず、目標の北50 mの地表へ任意要求で赤煙を1本出す。約120秒後・達成・全員終了で無通知停止する。停止後は再要求可能。点煙通知はStatusを上書きせず、座標・得点・対象・基地予約は変えない。他プレイヤーにも見える視覚効果。停止失敗は5秒ごとに再試行し、個人精算・基地解放を妨げない。F10項目が多い場合はMoreから続きへ進む。

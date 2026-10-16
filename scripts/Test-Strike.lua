@@ -255,4 +255,93 @@ test("a base stays unavailable until every ME original has actually been removed
     s:command('Abort Mission'); assert(accept(s).strikePlan.site.id=='SITE01'); s:assertClean()
 end)
 
+test("optional smoke marks each selected facility fifty meters north at ground height", function()
+    for kind=1,3 do
+        local s=scenario(); assert(not s.commands[s.player.group.name]['Mark Strike Target'])
+        s.terrainHeight=function() return 123 end
+        local r=accept(s,1,kind); assert(#s.smokes==0)
+        local draws=#s.randomCalls; s:command('Mark Strike Target')
+        local mark=assert(s.smokes[1]); assert(mark.color==1)
+        assert(mark.point.x==r.strikePlan.point.x+50 and mark.point.z==r.strikePlan.point.y and mark.point.y==123)
+        assert(#s.randomCalls==draws and #s.smokes==1 and r.state=='ACTIVE')
+        assert(s.messages[#s.messages].text=='Strike target marked with RED smoke.\nSmoke is 50 m north of the target; lasts 120 seconds.')
+        assert(s.messages[#s.messages].seconds==10); s:assertClean()
+    end
+end)
+test("smoke requests cannot stack or replace the coordinate briefing and can be renewed after expiry", function()
+    local s=scenario(); accept(s); local brief=s.messages[#s.messages].text
+    s:command('Mark Strike Target'); local old=s.smokes[1].name
+    s:command('Mark Strike Target'); assert(#s.smokes==1)
+    s:lastMessageContains('Strike target already marked. Try again later.')
+    s:command('Mission Status'); assert(s.messages[#s.messages].text==brief)
+    s:tick(119); assert(s.activeSmokes[old]); s:tick(120); assert(not s.activeSmokes[old])
+    s:command('Mark Strike Target'); assert(#s.smokes==2 and s.smokes[2].name~=old); s:assertClean()
+end)
+test("completion stops smoke removes its menu and invalidates a saved callback", function()
+    local s=scenario(); local r=accept(s); local callback=s.commands[s.player.group.name]['Mark Strike Target']
+    s:command('Mark Strike Target'); complete(s,r)
+    assert(not next(s.activeSmokes) and not s.commands[s.player.group.name]['Mark Strike Target'])
+    callback(); s:lastMessageContains('Strike target marking is no longer available.')
+    assert(#s.smokes==1); s:assertClean()
+end)
+test("aborted assignment callbacks cannot mark a replacement Strike sortie", function()
+    local s=scenario(); accept(s); local callback=s.commands[s.player.group.name]['Mark Strike Target']
+    s:command('Mark Strike Target'); s:command('Abort Mission'); assert(not next(s.activeSmokes))
+    accept(s,1,3); callback(); assert(#s.smokes==1)
+    s:lastMessageContains('Strike target marking is no longer available.'); s:assertClean()
+end)
+test("MP2 smoke remains available for the surviving participant after individual abort", function()
+    local s=scenario(); s:occupyWing(); local r=accept(s)
+    s:abortSortie(s.player); assert(s:mission()==r)
+    s:command('Mark Strike Target',s.wingman); assert(#s.smokes==1)
+    s:abortSortie(s.wingman); assert(not next(s.activeSmokes) and not s:mission()); s:assertClean()
+end)
+test("parallel Strike wings mark only their own facilities with unique effect names", function()
+    local s=scenario(); local a=accept(s)
+    local other=s:addPilot('Other','ucid-b',20); s:tick(2); local b=accept(s,1,2,other)
+    s:command('Mark Strike Target'); s:command('Mark Strike Target',other)
+    assert(#s.smokes==2 and s.smokes[1].name~=s.smokes[2].name)
+    assert(s.smokes[1].point.x==a.strikePlan.point.x+50 and s.smokes[2].point.x==b.strikePlan.point.x+50)
+    s:command('Abort Mission'); assert(not s.activeSmokes[s.smokes[1].name] and s.activeSmokes[s.smokes[2].name])
+    s:assertClean()
+end)
+test("smoke API failure preserves assignment score and briefing and allows a retry", function()
+    local s=scenario(); local r=accept(s); local brief=s.messages[#s.messages].text
+    s.failSmokeBefore=true; s:command('Mark Strike Target')
+    assert(s:mission()==r and r.state=='ACTIVE' and #s.errors==1 and not next(s.activeSmokes))
+    s:lastMessageContains('ERROR: Strike target smoke failed. See DCS log; retry later.')
+    s:command('Mission Status'); assert(s.messages[#s.messages].text==brief)
+    s:score(0); s.failSmokeBefore=nil; s:command('Mark Strike Target'); assert(#s.smokes==1)
+end)
+test("post-emission error retains the effect for a failed stop retry without aborting the sortie", function()
+    local s=scenario(); local r=accept(s); s.failSmokeAfter=true; s.smokeStopFailures=1
+    s:command('Mark Strike Target'); local name=s.smokes[1].name
+    assert(s.activeSmokes[name] and s:mission()==r and #s.errors==1)
+    s.failSmokeAfter=nil; s:command('Mark Strike Target'); assert(#s.smokes==1)
+    s:tick(5); assert(not s.activeSmokes[name]); s:command('Mark Strike Target'); assert(#s.smokes==2)
+end)
+test("failed smoke stop retries independently and cannot stop a later sortie's effect", function()
+    local s=scenario(); accept(s); s:command('Mark Strike Target'); local old=s.smokes[1].name
+    s.smokeStopFailures=1; s:command('Abort Mission')
+    assert(s.activeSmokes[old]); local r=accept(s); assert(r.strikePlan.site.id=='SITE01')
+    s:command('Mark Strike Target'); local current=s.smokes[2].name
+    s:tick(5); assert(not s.activeSmokes[old] and s.activeSmokes[current]); s:assertClean()
+end)
+test("a late occupant without controlling registered participants cannot use a stale marker callback", function()
+    local s=scenario(); local r=accept(s); local callback=s.commands[s.player.group.name]['Mark Strike Target']
+    s.player.name=nil; s:occupyWing('Late','ucid-late'); s:tick(2)
+    assert(not s.commands[s.player.group.name]['Mark Strike Target'])
+    callback(); assert(#s.smokes==0 and s:mission()==r)
+    s:lastMessageContains('Strike target marking is no longer available.'); s:assertClean()
+end)
+
+test("MP2 Strike menus keep smoke and both personal aborts reachable within ten entries per page", function()
+    local s=scenario(); s:occupyWing(); accept(s)
+    for _,page in ipairs(s.menuPages[s.player.group.name]) do assert(page.entries<=10) end
+    assert(#s.menuPages[s.player.group.name]==2)
+    assert(s.commands[s.player.group.name]['Mark Strike Target'])
+    s:command('Mark Strike Target'); s:abortSortie(s.player); s:abortSortie(s.wingman)
+    assert(not s:mission()); s:assertClean()
+end)
+
 print(string.format("All %d Strike tests passed (simulated DCS/MOOSE).",count))

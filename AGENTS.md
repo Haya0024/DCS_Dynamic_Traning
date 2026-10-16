@@ -565,3 +565,5 @@ Dynamic Training
 - 燃料3基すべて／弾薬庫・倉庫1棟の破壊でRTB_PENDING。nil・例外・ID不一致を全滅根拠にしない。帰還150・達成後事故90・未達成事故/Abort0、共有達成・個人精算は既存ルール。達成後Statusは座標なしの達成・帰還指示だけ20秒。
 - 全員終了後に生成物を削除する。削除確認までは基地予約を維持し、5秒ごとに再試行する。保持や任務進行の永続化はしない。
 - schema3でstrikeScoreを追加、schema1/2は未収録項目を0として移行。mission/サーバーHookを同時更新・Hook再導入・DCS再起動が必要。Test-Strike.lua、実.mizのTest-StrikeMission.ps1と全10Luaスイート・BUILD/SYNC/INSTALL/ZONESを実行する。
+
+- StrikeのACTIVE中は受注Wingの操縦中未精算参加者向けにMark Strike Targetを表示する。任意操作で案内点の北50 mに赤煙を約120秒出す。Config.strike.smokeへ色・北オフセット・時間を集約し、MOOSE COORDINATE:Smoke/StopSmokeを使用する。自動点煙・連打での重複・Status本文の上書きをしない。達成/全員終了/期限で停止し、停止失敗は基地予約と独立に5秒ごと再試行。古いcallbackは任務・Wing・操作参加者を再照合する。F10項目は9コマンド＋Moreでページ分割し、各ページ10項目以下にする。模擬検証STRIKE-33～43、DCS内確認MAN-61。

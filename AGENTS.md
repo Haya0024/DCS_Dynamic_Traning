@@ -185,7 +185,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - AVAILABLEで使用中assignmentがない状態を `unreservedSince` から連続計測し、`dead.unreservedSiteCleanupSeconds = 1800`（ミッション時刻30分）でCleanupする。RETAIN専用予約中・IN_USE（地上ARMED含む）は計測しない。準備失敗のrollbackは元の開始時刻を復元し、期限を延長しない。候補選定・使用予約時にも期限を確認する。AVAILABLEは元保持者の切断Cleanup対象外。観測不能を全滅とは扱わないが未予約timeoutは適用し、削除失敗はSweepで再試行する。
 - 全員終了時にIN_USEならCLEANUPへ倒す。明示保持・開放済みSite以外はCleanupが標準。専用保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
 - 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
-- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。Lua全9スイートとBuild/Sync/Installテストも通す。
+- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。Lua全10スイートとBuild/Sync/Installテストも通す。
 
 ---
 
@@ -269,7 +269,7 @@ Difficulty ごとに使用可能な Threat Budget を決め、
 - `src/missions.lua` の `Missions.Acquire` を予約・生成より前に使う。ウィング名と登録 UCID で二重受注を拒否する。
 - 参加者が別スロットへ移動しても、元のウィングが終了するまでは新たな受注を拒否する。
 - 任務はカテゴリを問わずウィングごとに同時に1件。別ウィングはそれぞれ別の任務を同時に進められる。BLUE 全体の1件制限は設けない。
-- 状態は `Missions.wings[groupName]` に集約し、`category` で Intercept / CAP / SEAD / DEAD を区別する。Immediate DEADはSEAD内のphase。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
+- 状態は `Missions.wings[groupName]` に集約し、`category` で Intercept / CAP / SEAD / DEAD / Strike を区別する。Immediate DEADはSEAD内のphase。敵・イベント・タイマー・終了処理は対象ウィングの任務だけに適用する。
 - 同じテンプレートから生成する敵は `SPAWN:NewWithAlias` と受注ごとの識別子で名前を分離し、テンプレート名は変更しない。
 - F10 はグループ共有。`Abort Mission` は全体中止、名前・機体を指定する `Abort Sortie` は個人中止。
 - 詳細は `docs/WING.md`。結合後に `scripts/Test-Wing.lua`、`scripts/Test-ParallelWings.lua` と既存の Intercept・採点テストで確認する。
@@ -359,7 +359,7 @@ CAS: 720
 - HookはMissionLoadEnd後にpollを開始しStop後のframeで通信・採番しない。DCSがStop前にSSEを破棄した場合は最終flush不能をログへ残し、直近の保存済みrevisionを維持する。ミッション側はInitializeだけで保存済みと表示せず、有効なAcknowledgeを受けて初めて確認済みとする。初期化はスロット選択やPlayer Statisticsに依存しない。
 - Hookは `scripts/Build-PersistenceHook.ps1` で結合し、`scripts/Install-PersistenceHook.ps1 -SavedGamesPath <DCSユーザーディレクトリ>` で配置する。導入・更新後はDCS再起動が必要。MissionScripting.luaと他Hookを変更しない。
 - ホスト導入時はinstallerに `-ConfigureHost` を付け、autoexec.cfgへ呼出元userhooks・接続先missionのAPI許可を追加する。従来のserver許可と既存設定・他の許可を維持し、変更前にbackup、再実行はidempotent。不完全・重複管理ブロックや不正文字コードでは変更を拒否する。
-- Lua全9スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
+- Lua全10スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
 
 ---
 
@@ -371,7 +371,7 @@ CAS: 720
 - 同じ累計時間30〜120秒から出現時刻を受注時に固定し、Config.intercept.templatesの3候補を暫定使用して1編隊だけ生成する。Zone外周から15〜25NM、15,000〜30,000ft、230m/sで空域へ進入・哨戒する。DT_CAP_<assignmentID>で他任務の敵と分離する。
 - 地上受注でも即ACTIVEで空域への到達待ち。CAPにInterceptの離陸待ち・20秒Spawn待ちを適用しない。個人中止でCAPをARMEDへ戻さない。
 - 既存Wing/UCIDロックと個別帰還を使い、満額150・達成後事故90・未達成事故/Abort0をCAP Scoreへ独立加算。全参加者終了で敵をCleanupし失敗を再試行する。
-- 保存schema2はcapScoreを追加し、schema1の従来成績をCAP=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
+- CAP導入時の保存schema2でcapScoreを追加した。現在はStrikeも含むschema3とし、schema1/2の従来成績を未収録項目=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
 - 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（35ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。CAPとSEADの全90組で円外縁の間隔を最大planningRangeNM（SA-6:15 / SA-8:8 NM）＋cap.samSafetyBufferNM（5 NM）以上とする。配置・飛行経路が円外へ出た場合の安全は保証しない。2026-10-09の旧中心の地形検査は履歴として保持。2026-10-14のユーザー移動後は全10地域・両SAM各50点を単一実行し、適合396/1,000・観測エラー0、全20組の実生成と削除を確認した。Morphou NorthのSA-8は適合1/50・初回43回目で不安定な候補。詳細はdocs/SEAD_PLACEMENT_CHECK.md。HARM交戦・抑制・精算と追加CAP哨戒はDCS内確認待ち。
 
 ---
@@ -460,7 +460,7 @@ Dynamic Training
 - `mission/Persistent_and_Dynamic_FA-18C_Training.miz`: 現在の実ミッション。
 - `vendor/MOOSE/Moose.lua`: 使用版を固定したMOOSE。
 
-将来はdifficulty、Strike、CAS、Anti-Ship等を独立したモジュールで追加する。
+将来はdifficulty、CAS、Anti-Ship等を独立したモジュールで追加する。
 
 ---
 
@@ -555,3 +555,13 @@ Dynamic Training
 - 敵テンプレート3種類の抽選、実際の機種・機数の表示、1機・2機編成それぞれの全滅判定を確認すること（模擬テスト済み）
 - SEAD標準Cleanup、Continueで同SiteのImmediate DEAD、Preserve後の別SortieでFollow-on DEADを確認すること
 - 元SEAD精算後・再武装中も保持元Wing専用のSite予約が残り、別Wingを拒否すること。同Wingの最寄りRETAIN取得、DEAD150/90/0、ImmediateのSEAD＋DEAD採点・任務数1件も確認する。詳細は `docs/DEAD.md` と `docs/TESTING.md` を参照する
+
+## Strike（固定施設、実装済み・DCS内確認待ち）
+
+- 仕様はdocs/STRIKE.md。src/strike.luaにME Staticのカタログ・原本除去・抽選・生成・観測・削除を分離する。
+- Config.strikeのSITE01～05をDamascus / Palmyra / Bassel Al-Assad / Hama / Gecitkaleへ対応付ける。位置・向きはMEのみ。各SiteにTANK_01～03、AMMO_01、WAREHOUSE_01を用意し、実ユニット名は各末尾-1。
+- 受注時の長機位置から近いRED基地2つを固定し、その中の空いている基地を等確率で抽選、燃料・弾薬庫・倉庫を各1/3で抽選。2基地とも使用中なら解除し、3番目へ回さない。Wing/UCIDロックを先に取得し、Missions.strikeBasesで基地単位の予約を保持する。
+- 地上でも即ACTIVE・生成。正確なDDM精度3の座標1組と地表標高ft MSLをTARGET LOCATIONの同一行へカンマ区切りで案内し、燃料は3基中心を使う。ブリーフィングは見出し・LOCATION・OBJECTIVE・報酬・人数の5行とし、基地名・目標名・標高の独立行は出さない。原本25物体を起動時に除去し、任務別の名前・新規IDで選択施設だけ生成する。再配置・座標の誤差追加をしない。
+- 燃料3基すべて／弾薬庫・倉庫1棟の破壊でRTB_PENDING。nil・例外・ID不一致を全滅根拠にしない。帰還150・達成後事故90・未達成事故/Abort0、共有達成・個人精算は既存ルール。達成後Statusは座標なしの達成・帰還指示だけ20秒。
+- 全員終了後に生成物を削除する。削除確認までは基地予約を維持し、5秒ごとに再試行する。保持や任務進行の永続化はしない。
+- schema3でstrikeScoreを追加、schema1/2は未収録項目を0として移行。mission/サーバーHookを同時更新・Hook再導入・DCS再起動が必要。Test-Strike.lua、実.mizのTest-StrikeMission.ps1と全10Luaスイート・BUILD/SYNC/INSTALL/ZONESを実行する。

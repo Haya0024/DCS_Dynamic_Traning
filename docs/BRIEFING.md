@@ -12,7 +12,7 @@ Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨�
 
 ### 出撃準備と任務操作
 
-プレイヤー機の初期兵装は空です。地上で再武装を要請し、訓練内容に合わせて兵装を選んでください。「Task: Intercept」「Task: CAP」「Task: SEAD」「Task: DEAD」で任務を受注し、「Mission Status」で案内済みの任務ブリーフィング・座標・指示を見返せます。目標達成後は座標を外して達成結果と帰還指示だけを表示し、敵残数やレーダー状態などの未公開情報は追加しません。「Abort Mission」はグループ全体の任務中止、「Abort Sortie」は名前と機体を指定した参加者だけの中止です。「Player Statistics」で自分の累計成績と保存状態を確認できます。
+プレイヤー機の初期兵装は空です。地上で再武装を要請し、訓練内容に合わせて兵装を選んでください。「Task: Intercept」「Task: CAP」「Task: SEAD」「Task: DEAD」「Task: Strike」で任務を受注し、「Mission Status」で案内済みの任務ブリーフィング・座標・指示を見返せます。目標達成後は座標を外して達成結果と帰還指示だけを表示し、敵残数やレーダー状態などの未公開情報は追加しません。「Abort Mission」はグループ全体の任務中止、「Abort Sortie」は名前と機体を指定した参加者だけの中止です。「Player Statistics」で自分の累計成績と保存状態を確認できます。
 
 ### Intercept — 迎撃
 
@@ -29,6 +29,10 @@ Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨�
 ### DEAD — 防空サイト破壊
 
 SEADで制圧したサイトの残存車両をすべて破壊してください。「Continue as DEAD」は同じ出撃のまま継続攻撃する選択です。「Preserve Site for DEAD」はサイトを保持してSEADを精算し、帰還・再武装後に同じグループで「Task: DEAD」を受注する選択です。元の敵の損傷と残存車両を引き継ぎ、新しいSAMは生成しません。保持された候補がなければ「Task: DEAD」は受注できません。DEAD開始時の生存対象をすべて破壊すると達成です。保持したサイトは同じグループ専用に予約され、「Release Site Reservation」で他グループへ開放できます。
+
+### Strike — 固定施設への攻撃
+
+受注位置から近い赤基地2か所のうち空いている基地を抽選し、燃料施設・弾薬庫・倉庫の1つを指定します。正確な目標座標1組と地表標高を案内します。燃料施設は3基すべて、弾薬庫・倉庫は指定1棟を破壊して帰還してください。地上受注でも即生成します。近い2基地が使用中なら後で再受注してください。
 
 ### 帰還とポイント
 
@@ -50,7 +54,7 @@ Persistent and Dynamic F/A-18C Training provides repeatable F/A-18C training in 
 
 ### Preparation and mission controls
 
-Player aircraft start without weapons. Request rearming on the ground and choose a loadout suited to your training. Accept a task with "Task: Intercept", "Task: CAP", "Task: SEAD", or "Task: DEAD", and use "Mission Status" to recall the published briefing, coordinates and instructions. After objective completion, only the published result and recovery instruction are recalled, without coordinates; no hidden enemy counts or radar status are added. "Abort Mission" cancels the entire group's mission; "Abort Sortie" cancels only the named participant's sortie. "Player Statistics" displays your accumulated results and their save status.
+Player aircraft start without weapons. Request rearming on the ground and choose a loadout suited to your training. Accept a task with "Task: Intercept", "Task: CAP", "Task: SEAD", "Task: DEAD", or "Task: Strike", and use "Mission Status" to recall the published briefing, coordinates and instructions. After objective completion, only the published result and recovery instruction are recalled, without coordinates; no hidden enemy counts or radar status are added. "Abort Mission" cancels the entire group's mission; "Abort Sortie" cancels only the named participant's sortie. "Player Statistics" displays your accumulated results and their save status.
 
 ### Intercept
 
@@ -67,6 +71,10 @@ Locate the SA-6 or SA-8 site in the assigned region. Complete the objective by d
 ### DEAD — Destruction of Enemy Air Defenses
 
 Destroy all remaining vehicles at a site previously suppressed during SEAD. "Continue as DEAD" continues the attack during the same sortie. "Preserve Site for DEAD" keeps the site for a later sortie: recover and settle SEAD, rearm, then select "Task: DEAD" with the same flight group. The original enemies retain their damage and surviving vehicles; no new SAM is spawned. "Task: DEAD" requires an available preserved site. Destroy every target that was alive when DEAD began to complete the objective. A preserved site is reserved for the same group; "Release Site Reservation" makes it available to other groups.
+
+### Strike — Fixed ground facilities
+
+One of the two nearest RED bases with a free Strike reservation is selected, followed by a fuel facility, ammunition depot, or warehouse. The briefing provides one exact coordinate and ground elevation. Destroy all three assigned fuel tanks, or the single assigned depot or warehouse, then RTB. Targets spawn immediately even for ground acceptance. If both nearest bases are busy, retry later.
 
 ### Recovery and points
 

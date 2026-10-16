@@ -2,6 +2,22 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-16 Strikeブリーフィングを5行へ整理
+
+ユーザー指定により、STRIKE MISSION・TARGET LOCATION（DDM座標と地表標高ft MSLをカンマ区切りで同じ行）・OBJECTIVE・報酬・人数の5行へ変更した。TARGET BASE、TARGET、独立したTARGET ELEVATION行は表示しない。破壊指示は選択施設に応じて燃料3基・弾薬庫・倉庫で切り替える。受注時とMission Statusは同じ本文を使い、達成後の座標除外・表示時間・抽選・生成・採点は維持する。
+
+STRIKE-02/03/12で全施設の本文・座標と標高の同一行・60秒を照合し、Lua全400ケース（10スイート）とBUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2が通過。仕様・メッセージ一覧・タイムライン・TESTING・AGENTSを更新した。実.mizのSync/Check、ZIP CRC、bundle一致と埋め込みDynamicTraining.lua以外の内容不変を確認した。実DCS表示はMAN-60で確認待ち。
+
+## 2026-10-16 Strike固定施設任務を追加（training-9）
+
+ユーザーが赤基地5か所へ配置した燃料3基・弾薬庫1棟・倉庫1棟（25物体、15施設候補）を使用するTask: Strikeを追加した。受注時の長機位置から近いRED基地2か所に限定し、使用可能な基地と3施設を等確率で抽選する。地上でも即生成し、誤差を加えないDDM精度3の座標1組と地表標高ft MSLを案内する。燃料は3基の中心を案内し、3基全滅で達成とする。未選択施設は生成しない。
+
+起動時のME原本除去、SPAWNSTATICによる同位置・同方向の生成、任務別の一意な名前・新規ID、Missions.strikeBasesでの基地単位予約を追加した。両近傍基地が使用中なら解除し、3番目へ変更しない。nil・観測失敗・ID不一致を全滅根拠にせず、static死亡イベントとLife0も扱う。全員終了後に生成物を削除し、削除失敗中は基地予約を維持して再試行する。MOOSE登録前に例外が起きたnative Staticは一意名で直接取得してrollbackする。帰還150・達成後事故90・未達成事故/Abort0、MP2個別精算とStatusの達成後座標除外を共通機構へ接続した。
+
+保存schema3へstrikeScoreを追加し、schema1/2の既存得点・CAPを保持してStrike=0へ移行する。mission/Hook両bundleを更新した。サーバーに導入済みのHookはこの作業では変更しておらず、更新とDCS再起動が必要。実成績データは変更していない。
+
+Lua全400ケース（INT23・CAP35・SCORE26・WING27・PAR17・SEAD71・DEAD105・PERSIST46・MAP18・STRIKE32）とBUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2が通過した。実.mizの25テンプレート・5赤基地を確認し、15施設すべてのME位置での生成・削除を模擬検証した。実.mizのSync/Check、ZIP CRC、埋め込みbundle一致、登録済みDynamicTraining.lua以外の内容不変を確認した。仕様・画面一覧・タイムライン・日英BRIEFING・採点・保存・ARCHITECTURE・TESTINGを更新。DCS内の実射・3Dの埋まり/重なり・実基地中心での距離選定・新Hookでの保存/復元はMAN-60で確認待ち。
+
 ## 2026-10-15 達成後のMission Statusから座標を除外
 
 ユーザー指定により、目標達成前は公開済み座標ブリーフィングと開始指示を再表示し、達成時にStatus用のブリーフィングを外す方式へ変更した。達成後は公開済みの達成結果・帰還指示だけを20秒表示する。SEAD達成後にContinue as DEADを選ぶと新しい実配置座標入り本文へ切り替わり、DEAD達成時に再び座標を外す。任務判定・帰還・採点・Site寿命は維持する。

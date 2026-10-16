@@ -1,14 +1,14 @@
 # テスト仕様書
 
-更新日: 2026-10-15
+更新日: 2026-10-16
 
 ## 目的と対象
 
 訓練任務の受注・生成・目標達成・帰還評価・採点・終了処理が仕様通りに動作し、別プレイヤーや別ウィングへ影響しないことを確認する。
-対象は現在実装されているIntercept、CAP、SEAD、Immediate/Follow-on DEAD、ウィング共有、UCID採点、BLUE陸上Airbase Drawing、Lua結合、`.miz`同期。
+対象は現在実装されているIntercept、CAP、SEAD、Immediate/Follow-on DEAD、Strike、ウィング共有、UCID採点、BLUE陸上Airbase Drawing、Lua結合、`.miz`同期。
 動的Clientスロット、専用保持Siteのtimeout・明示削除・Site永続化は今回の検証対象外。成績の永続保存と予約解除済み共有Siteの未予約30分Cleanupは対象とする。
 
-動作の根拠は [Intercept.md](Intercept.md)、[CAP.md](CAP.md)、[SEAD.md](SEAD.md)、[DEAD.md](DEAD.md)、[WING.md](WING.md)、[SCORING.md](SCORING.md)。
+動作の根拠は [Intercept.md](Intercept.md)、[CAP.md](CAP.md)、[SEAD.md](SEAD.md)、[DEAD.md](DEAD.md)、[STRIKE.md](STRIKE.md)、[WING.md](WING.md)、[SCORING.md](SCORING.md)。
 本書はテスト条件と期待結果を記録し、実装済みの自動テストとDCS内で行う手動確認を区別する。
 
 現在の実.mizにはSOLO（Client ×1）とMP2（Client ×2）だけを置き、AI2は削除済み。AI機の離陸・着陸・事故を参加者として扱わない模擬ケースは、搭乗者検出・採点境界の回帰確認として維持する。AI2の配置や連続出撃を保証するケースではない。
@@ -24,20 +24,22 @@
 | PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 17 | 複数ウィングの並行処理と独立性 |
 | SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 71 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止、全地域50点の診断制御 |
 | DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 105 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
-| PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 44 | schema1→2移行・CAP保存復元・未知schema保護、保存確認、再起動・遅延復元、native I/O、backup、run、Hook/manager/SSE分離、callback寿命、スロット未選択 |
+| PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 46 | schema1/2→3移行・CAP/Strike保存復元・未知schema保護、保存確認、再起動・遅延復元、native I/O、backup、run、Hook/manager/SSE分離、callback寿命、スロット未選択 |
 | MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
+| STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 32 | 近い2赤基地、3施設抽選、ME原本除去、正確な座標・標高、燃料3基全破壊、基地予約、MP2精算、生成失敗・削除再試行 |
+| STRIKEME | [Test-StrikeMission.ps1](../scripts/Test-StrikeMission.ps1) | 2確認グループ | 実.mizの5赤基地・25テンプレート、全15施設の生成位置・削除 |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 | ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 3確認グループ | 実.mizの全Client駐機位置でCAP2〜3・SEAD2〜4候補、全19円のME登録・可視性・半径・名前/IDの一意性、全候補の受注・SEAD生成・解除、MEのみの参照・欠落時解除・再受注、CAP/SEAD全90組でSAM計画射程＋安全余裕の離隔 |
 
-Luaは合計366ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST44＋MAP18）、9スイート。1ケースの中で複数の値・方位・イベント・機種をループ検証するため、assertや試行の総数ではない。Test-PersistenceDisk.luaはINSTALLが3つの別プロセスで実行する専用fixtureであり、44ケースには含めない。Test-ZoneCoverage.luaはZONESが実.mizのmissionデータを前置して実行する結合検証で、366ケースとは別の3確認グループとして数える。
+Luaは合計400ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST46＋MAP18＋STRIKE32）、10スイート。各ケース内のループやassertは別ケースに数えない。Test-PersistenceDisk.luaはINSTALLが別プロセスで実行するfixture。Test-ZoneCoverage.luaとTest-StrikeMission.luaは実.mizのデータを前置する結合検証で、Luaケース数に含めない。
 
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
-共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの4行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
+共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの5行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-15。Lua全366ケース（9スイート）、BUILD2・SYNC3・INSTALL5・ZONES3が通過。INT-23 / CAP-35 / PAR-17 / SEAD-70/71 / DEAD-104/105で公開済み本文だけのStatus再表示・達成前の座標維持／達成後の座標除外・計画中秘匿・複数任務の隔離を確認。実DCSの再表示はMAN-59で確認待ち。
+最新の自動検証: 2026-10-16、training-9。Lua全400ケース（10スイート）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2。Strikeの抽選・施設生成・座標・MP2精算・失敗rollback、schema1/2→3移行とHookでのStrike保存・次セッション復元を模擬検証。実DCSはMAN-60で確認待ち。
 
 前回の自動検証: 2026-10-14。Lua全359ケース（9スイート）、BUILD2、SYNC3、INSTALL5、ZONES3が通過。SEADの任意実生成診断をSEAD-67〜69で確認し、実.mizの全15 ClientでCAP2〜3・SEAD2〜4候補と全90組のSAM離隔を確認。実地形の50点抽選・SAM実生成結果は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。
 同日のIntercept距離変更後にも全件通過。INT-08で90/100/110 NMの配置と抽選上下限、Wingで長機基準を確認し、実.mizへSync/Checkした。実飛行のレーダー検出時間は未確認。
@@ -71,7 +73,7 @@ MOOSE本体や実際のSyria地形・SAM AI・DCSのイベント配信・サー�
 すべてリポジトリのルートから実行する。Lua 5.1互換の実行環境とWindows PowerShellを使用する。
 最初に結合を行い、古い `build/DynamicTraining.lua` をテストしない。
 
-一括実行は次を使う。両bundleの結合、Lua全9スイート、BUILD2、SYNC3、INSTALL5、ZONES3の順に実行し、失敗した段階で停止する。実ミッションへの同期は別途行う。`-LuaPath`はINSTALL内の別プロセス検証とZONESにも引き継ぐ。
+一括実行は次を使う。両bundleの結合、Lua全10スイート、BUILD2、SYNC3、INSTALL5、ZONES3、STRIKEME2の順に実行し、失敗した段階で停止する。実ミッションへの同期は別途行う。`-LuaPath`はINSTALL内の別プロセス検証とZONESにも引き継ぐ。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1
@@ -555,9 +557,11 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 | PERSIST-39 | file write/flush/close・rename/removeが返り値なし。flush methodあり/なし、errnoなし | 呼出結果だけで保存確認せず、再読・同一内容・移動結果を検証。90を保存しrun2で復元。互換性ログは1回 |
 | PERSIST-40 | void-returnでbytes欠落、flush false、close false | 既存primary保持・保存未確認。正常化後に90を一度だけ保存 |
 | PERSIST-41 | rename/removeがnil成功、trueを返すが未実行、例外 | source/destinationの実状態で確認。未実行・例外を成功にせずfileを保持 |
-| PERSIST-42 | 正規schema1、checksum不正、途中欠落 | 正常な旧得点をCAP=0で読み込みschema2へ変換。不正旧fileは拒否 |
+| PERSIST-42 | 正規schema1、checksum不正、途中欠落 | 正常な旧得点をCAP=0・Strike=0で読み込みschema3へ変換。不正旧fileは拒否 |
 | PERSIST-43 | 旧schemaの得点を復元、CAP達成・事故90、次セッション | 内部INT150/SEAD150/CAP90とTotal390を保存・復元、run8→9。Statisticsはカテゴリ非表示・保存済み |
-| PERSIST-44 | 有効checksumの未知schema3 primaryと旧backup | 旧backupへ巻き戻さず、Load/Save拒否でprimary/backup保持 |
+| PERSIST-44 | 正規schema2の既存CAP成績 | 旧成績・CAP75・Total375・Death1を維持し、Strike=0でschema3へ移行 |
+| PERSIST-45 | 旧成績復元→Strike達成・事故90→Hook保存→次セッション | INT150/SEAD150/Strike90・Total390・任務3・Death1を保存・復元、Statisticsの保存済み確認 |
+| PERSIST-46 | 有効checksumの未知schema4 primaryと旧backup | 旧backupへ巻き戻さず、Load/Save拒否でprimary/backup保持 |
 
 ### ビルド・同期・導入（PowerShell）
 
@@ -695,15 +699,15 @@ AIが意図したON/OFFを起こさず再現できない場合は「未実施」
 | player/missions/runtime | WING/PAR | INT/SCORE/SEAD、UCID・F10のマルチ確認 |
 | MOOSE受信者寿命 | CAP-31 | 強参照・GC後の脱出/敵Dead/着陸・重複読み込み。実DCSで長時間飛行後のMAN-53も確認 |
 | air_targets・空中目標観測 | INT-17/18、CAP-10/27 | INT/CAP全体、元実体のイベント・観測不能・死亡後IDなし |
-| Intercept敵削除・再試行 | INT-19〜22 | Lua全9スイート。Abort・精算・生成後設定失敗、5秒間隔・消失確認、旧イベントの非干渉 |
-| mission_report/notifications | INT-16、SEAD-62、SCORE-01、各Statistics確認 | Lua全9スイート、MESSAGESの本文・表示時間・MESSAGE/DEBUG境界、MAN-01/02/05/07/08/27/52 |
+| Intercept敵削除・再試行 | INT-19〜22 | Lua全10スイート。Abort・精算・生成後設定失敗、5秒間隔・消失確認、旧イベントの非干渉 |
+| mission_report/notifications | INT-16、SEAD-62、SCORE-01、各Statistics確認 | Lua全10スイート、MESSAGESの本文・表示時間・MESSAGE/DEBUG境界、MAN-01/02/05/07/08/27/52 |
 | scoring/recovery・採点設定 | SCORE | WING/SEAD、MAN-15〜18/21/22 |
-| 成績永続化・サーバーHook | PERSIST / INSTALL | Lua全9スイート、MAN-22/34/40/41/50/51/55、通信・I/O・callback寿命を別々に確認 |
+| 成績永続化・サーバーHook | PERSIST / INSTALL | Lua全10スイート、MAN-22/34/40/41/50/51/55、通信・I/O・callback寿命を別々に確認 |
 | 結合・同期・Watch | BUILD/SYNC | 実 `.miz` に対する `-Check` |
-| BLUE陸上Airbase Drawing | MAP全18件 | MAN-48/49、青文字・倍率/回転別の見え方、現在の `.miz` のBLUE airport IDと設定保持、Lua全9スイート回帰 |
+| BLUE陸上Airbase Drawing | MAP全18件 | MAN-48/49、青文字・倍率/回転別の見え方、現在の `.miz` のBLUE airport IDと設定保持、Lua全10スイート回帰 |
 | MEのスロット・テンプレート・Zone変更 | 対応するLuaスイート | 実 `.miz` 確認と該当する手動ケース。fixtureだけではME変更を検出できない |
 
-共通モジュールの変更や機能追加の完了時は、両bundleの結合後にLua全9スイートを実行し、既存カテゴリへの回帰を確認する。
+共通モジュールの変更や機能追加の完了時は、両bundleの結合後にLua全10スイートを実行し、既存カテゴリへの回帰を確認する。
 ツール変更ではBUILD/SYNCも実行する。通過後の追加検証は、変更・失敗・未解決の懸念がある場合に行う。
 表のID範囲は重点確認するケースを示す。現在、個別ケースを指定するrunnerはないので、対応するスイート全体を実行する。
 
@@ -723,3 +727,46 @@ DCS内の不具合では任務ID・Group・時刻と、`dcs.log` の `[DynamicTr
 テストを追加・変更したら、本書の対応行と件数、機能仕様書の検証範囲も同じ作業で更新する。
 新しい成功条件は、正常系に加え「成功してはいけない条件」、境界値、イベント順序、別ウィングへの非干渉を確認する。
 仕様とfixtureが同時に誤っていても自動テストは通るため、期待結果は機能仕様書に照らして見直す。
+
+## Strike 自動テスト対応表（training-9）
+
+| ID | 条件・期待結果 |
+|---|---|
+| STRIKE-01 | 起動でME原本25物体を1回ずつ無イベント削除。抽選・敵生成なし |
+| STRIKE-02 | 地上受注で選択施設だけ即ACTIVE。ブリーフィング全文・正確な1座標と標高の同一行・計5行・60秒 |
+| STRIKE-03 | 近い基地1/2と燃料・弾薬庫・倉庫の全6組を選択可能、各5行のブリーフィング全文を照合 |
+| STRIKE-04 | 空中を含む受注位置で近い2基地を決め、移動後に再抽選しない |
+| STRIKE-05 | MP2は機体番号が小さい操縦中長機の位置を使う |
+| STRIKE-06 | 同距離はSite ID順で安定させ、その後に等確率抽選 |
+| STRIKE-07 | 非RED基地を除外し、1赤基地だけならその基地を使う |
+| STRIKE-08 | 赤基地なしでは生成・採点せずWingロック解除 |
+| STRIKE-09 | 並行Wingは同じ基地を共有せず、近い2基地のもう一方を使用 |
+| STRIKE-10 | 近い2基地が使用中なら拒否し、3番目へ回さない |
+| STRIKE-11 | Wing/UCIDロック中の再受注は再抽選・生成なし |
+| STRIKE-12 | 燃料3基の中心座標と地表標高ftへの変換、TARGET LOCATIONの同一行に表示 |
+| STRIKE-13 | ME位置・向き・種類を維持、原本IDを再使用せず任務別名で生成 |
+| STRIKE-14 | 損傷と2基破壊では未達成、3基全滅で達成 |
+| STRIKE-15 | イベント未配信でも同一目標のLife0を観測して達成 |
+| STRIKE-16 | nil・例外・不正Life・ID不一致は残存扱い |
+| STRIKE-17 | IniDCSStaticのID・名前を照合し、無関係な実体を拒否 |
+| STRIKE-18 | Statusは公開時本文だけ。部分撃破後も残数追加なし、達成後は座標なし20秒 |
+| STRIKE-19 | 達成後帰還でStrike150・任務1・帰還1、重複イベントで再加算なし |
+| STRIKE-20 | 達成後事故90、未達成事故0 |
+| STRIKE-21 | 任意Abortは達成後も0、全削除後に同基地を再受注可能 |
+| STRIKE-22 | 未達成で帰還しても任務・基地予約を維持 |
+| STRIKE-23 | MP2の達成前喪失者は0、生存僚機は達成・帰還150 |
+| STRIKE-24 | 途中生成失敗で生成済み目標を削除しWingロック解除 |
+| STRIKE-25 | native生成後の例外でも残存参照を保持して削除 |
+| STRIKE-26 | 削除失敗中は基地予約維持、5秒後の成功で解放 |
+| STRIKE-27 | MOOSE登録前に例外が起きたnative Staticも固定名照合で削除 |
+| STRIKE-28 | Destroyがnilで実体が残る場合は基地予約を解放しない |
+| STRIKE-29 | 次Sortieは新ID・名前を使い、古い死亡イベントで達成しない |
+| STRIKE-30 | テンプレート欠落はStrike基地を無効にするがInterceptを停止しない |
+| STRIKE-31 | 座標整形失敗は生成前に解除、基地・Wingロックを残さない |
+| STRIKE-32 | 起動時の原本削除失敗中は基地使用不可、実体削除を再確認後に候補復帰 |
+
+STRIKEMEは実.mizの25ユニットをMOOSE境界fixtureへ渡して全15施設の生成・削除を検証する。テスト内の基地中心は配置施設の平均座標であり、実DCSの基地中心（MOOSEの滑走路中心）や地形への埋まり・障害物・実際の破壊効果を検証したものではない。
+
+| 手動ID | 条件・期待結果 |
+|---|---|
+| MAN-60 | training-9の.mizとschema3対応HookでDCSを再開始。原本25物体が消えること、地上/空中受注・近い2赤基地の抽選・3施設候補、正確なDDM/地表標高とPB入力、燃料3基全滅、弾薬庫・倉庫1棟、Statusの達成前座標/達成後20秒、3Dの埋まり・重なり、MP2の個人150/90/0、並行Wingの基地予約、全員終了後削除と再受注、Hook保存と次セッションのStrike復元を確認。未実施 |

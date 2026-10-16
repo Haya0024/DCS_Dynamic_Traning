@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-8" }
+DynamicTrainingRuntime = { version = "training-9" }
 Persistence.Publish()
 
 local menus = {}
@@ -36,6 +36,8 @@ local function Close(record)
     if not Missions.Release(record) then return end
     if record.category == "CAP" then
         CAP.Cleanup(record.capPlan and record.capPlan.enemy)
+    elseif record.category == "Strike" then
+        Strike.Close(record.strikePlan)
     elseif record.site then
         SEADSites.CloseAssignment(record.site, record.assignmentID)
     elseif record.spawn then
@@ -113,6 +115,8 @@ local function PrimaryComplete(record, time, result)
         title, objective = "DEAD Objective Complete", "SAM site destroyed.\nReturn to base."
     elseif record.category == "CAP" then
         title, objective = "CAP PRIMARY OBJECTIVE COMPLETE", "Patrol time complete and all hostile aircraft destroyed."
+    elseif record.category == "Strike" then
+        title, objective = "Strike Objective Complete", "Assigned facility destroyed."
     end
     PublishMission(record, "complete", title .. "\n" ..
         objective .. "\nEach pilot: return to a BLUE airfield or carrier.\n" ..
@@ -250,6 +254,34 @@ local function Generate(groupName, category)
     if not acquired then Message(group, blocked); return end
     Notifications.RegisteredAircraft(record)
     if problem then Message(group, problem, 15) end
+    if category == "Strike" then
+        record.owner = roster[1]
+        local ok, problem = pcall(function()
+            record.strikePlan = Strike.Plan(record.owner.unit:GetVec3(), record.assignmentID)
+            if not record.strikePlan then return end
+            record.spawn = Strike.Spawn(record.strikePlan)
+            record.strikeBriefing = Strike.Briefing(record.strikePlan)
+            BeginScoring(record, record.strikePlan.fullReward)
+        end)
+        if not ok or not record.strikePlan then
+            Close(record)
+            if not ok then
+                env.error("[DynamicTraining] Strike setup: " .. tostring(problem))
+                Message(group, "ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.", 20)
+            else
+                Message(group, "No available Strike targets among the two nearest RED bases. Try again later.", 20)
+            end
+            return
+        end
+        record.state = "ACTIVE"
+        Message(group, "Strike mission accepted.", 10)
+        PublishMission(record, "briefing", record.strikeBriefing .. string.format(
+            "\nReward per pilot: %d points.\nRegistered pilots: %d.", record.fullReward, #roster),
+            Config.coordinateBriefingSeconds)
+        DebugLog(record, "Strike started; site=" .. record.strikePlan.site.id ..
+            " targets=" .. #record.strikePlan.targets)
+        return
+    end
     if category == "CAP" then
         record.owner = roster[1]
         local ok, plan = pcall(function() return CAP.Plan(record.owner.unit:GetVec3(), timer.getTime()) end)
@@ -518,7 +550,8 @@ ScanPlayers = function()
                 { "Task: Intercept", Generate },
                 { "Task: CAP", function(groupName) Generate(groupName, "CAP") end },
                 { "Task: SEAD", function(groupName) Generate(groupName, "SEAD") end },
-                { "Task: DEAD", function(groupName) Generate(groupName, "DEAD") end }, { "Mission Status", Status },
+                { "Task: DEAD", function(groupName) Generate(groupName, "DEAD") end },
+                { "Task: Strike", function(groupName) Generate(groupName, "Strike") end }, { "Mission Status", Status },
                 { "Abort Mission", Abort }, { "Player Statistics", Statistics }
             }) do
                 local label, action = command[1], command[2]
@@ -678,6 +711,8 @@ local function TickMission(record, time)
                     Message(record.group, "CAP patrol progress: " .. percent .. "%" .. suffix, 10)
                 end
                 if CAP.Complete(record.capPlan, record.spawn) then PrimaryComplete(record, time) end
+            elseif record.category == "Strike" then
+                if Strike.Remaining(record.strikePlan) == 0 then PrimaryComplete(record, time) end
             elseif record.deadTargets then
                 if DEAD.Remaining(record) == 0 then DeadComplete(record, time) end
             elseif record.category == "SEAD" then
@@ -733,6 +768,8 @@ local function HandleEvent(record, event)
             if record.category == "CAP" then
                 CAP.RecordLoss(record.spawn, event)
                 if CAP.Complete(record.capPlan, record.spawn) then PrimaryComplete(record, time) end
+            elseif record.category == "Strike" then
+                if Strike.RecordLoss(record.strikePlan, event) then PrimaryComplete(record, time) end
             elseif record.deadTargets then
                 if DEAD.RecordLoss(record, event) then DeadComplete(record, time) end
             else
@@ -787,10 +824,12 @@ local function Tick(_, time)
     Safe("SEAD site cleanup", nil, SEADSites.Sweep)
     Safe("Intercept enemy cleanup", nil, function() Intercept.Sweep(time) end)
     Safe("CAP enemy cleanup", nil, function() CAP.Sweep(time) end)
+    Safe("Strike facility cleanup", nil, function() Strike.Sweep(time) end)
     return time + Config.pollSeconds
 end
 
 MapOverlay.RefreshFriendlyAirbases()
+Safe("Strike template initialization", nil, Strike.Initialize)
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
 Log("Runtime initialized; version=" .. DynamicTrainingRuntime.version .. "; MOOSE event subscriber retained.")

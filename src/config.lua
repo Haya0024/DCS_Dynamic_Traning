@@ -5,7 +5,7 @@ return {
     playerScanSeconds = 2,
     takeoffCheckSeconds = 2,
     takeoffDelaySeconds = 20,
-    coordinateBriefingSeconds = 60, -- Coordinate briefings and status recall (SEAD / DEAD / CAP).
+    coordinateBriefingSeconds = 60, -- Coordinate briefings and status recall.
     persistence = { enabled = true }, -- Requires the server-side Saved Games hook.
     mapOverlay = {
         radiusMeters = 2500,
@@ -59,6 +59,24 @@ return {
         attemptsPerTick = 2
     },
     dead = { fullReward = 150, unreservedSiteCleanupSeconds = 1800 },
+    strike = {
+        fullReward = 150, cleanupRetrySeconds = 5,
+        sites = {
+            { id = "SITE01", airbase = "Damascus" },
+            { id = "SITE02", airbase = "Palmyra" },
+            { id = "SITE03", airbase = "Bassel Al-Assad" },
+            { id = "SITE04", airbase = "Hama" },
+            { id = "SITE05", airbase = "Gecitkale" }
+        },
+        targets = {
+            { label = "Fuel facility (3 tanks)", type = "Fuel tank", objective = "Destroy all 3 fuel tanks",
+                suffixes = { "TANK_01", "TANK_02", "TANK_03" } },
+            { label = "Ammunition depot", type = ".Ammunition depot", objective = "Destroy the ammunition depot",
+                suffixes = { "AMMO_01" } },
+            { label = "Warehouse", type = "Warehouse", objective = "Destroy the warehouse",
+                suffixes = { "WAREHOUSE_01" } }
+        }
+    },
     cap = {
         zones = { "CAP_ZONE_CENTRAL_COAST", "CAP_ZONE_GOLAN", "CAP_ZONE_NORTH_COAST", "CAP_ZONE_LATAKIA_SOUTH",
             "CAP_ZONE_CYPRUS_WEST", "CAP_ZONE_CYPRUS_EAST", "CAP_ZONE_LEVANT_SOUTH",

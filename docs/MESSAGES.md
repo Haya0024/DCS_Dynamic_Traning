@@ -1,6 +1,6 @@
 # Mission messages and DCS logs
 
-Updated: 2026-10-15
+Updated: 2026-10-16
 
 日本語の任務別・分岐別タイムラインと表示見直し用の参照IDは [任務メッセージのタイミング・分岐一覧](MESSAGE_FLOW.md) を参照。このページは英語の全文例とログの詳細カタログ。
 
@@ -8,7 +8,7 @@ The separate placement diagnostic mission logs `[SEADPlacementCheck] START`, one
 
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
 
-The four F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, and `Task: DEAD`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the existing behavior.
+The five F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, `Task: DEAD`, and `Task: Strike`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the feature specifications.
 
 ## Output channels
 
@@ -317,6 +317,7 @@ Intercept: Idle.
 SEAD: Idle.
 DEAD: Idle.
 CAP: Idle.
+Strike: Idle.
 ```
 
 ### Intercept waiting / active / complete
@@ -439,7 +440,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 `Mission Status` recalls the accepted CAP briefing, including coordinates, objectives, registered count and reward, for its published duration (default 60 seconds). After completion it removes that briefing and recalls only the published objective-complete / RTB message for 20 seconds. No patrol clock, exact progress, hostile count or spawn status is appended. It does not redraw or reroll the area.
 CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant messages, points, totals and persistence status. Setup failure shows `ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.` for 20 seconds. A monitor/spawn failure settles each registered participant with `CAP setup/spawn failed. No reward.` for 20 seconds.
 Acceptance selection and actual spawn details are DEBUG only: `CAP accepted; zone=<name> template=<name> enemy at on-station second <n>` and `CAP enemy spawned; template=<name> units=<n> altitude=<n> ft`. No separate hostile spawn message appears on screen. Normal CAP group messages are mirrored to the DCS MESSAGE log.
-Idle Status and Abort Mission use the same Intercept / SEAD / DEAD / CAP list, including `CAP: Idle.`.
+Idle Status and Abort Mission use the same Intercept / SEAD / DEAD / CAP / Strike list, including `CAP: Idle.`.
 
 When no CAP center is within the configured acceptance distance, show the requesting group `No CAP areas within 40-100 NM. Change position and retry.` for 20 seconds and mirror it to the MESSAGE log. The limits come from Config.cap. Release the Wing/UCID lock without starting scoring, spawning enemies, or displaying acceptance/briefing messages. Out-of-range selection is a normal refusal; missing/malformed zones and position API exceptions still use the setup error above.
 
@@ -715,7 +716,7 @@ Raw identity methods may fail after destruction; these fields then show UNAVAILA
 
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-8; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-9; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 
@@ -818,3 +819,30 @@ Diagnostics inspect SSE types only, do not log account/score data, and do not cr
 - [Testing](TESTING.md): INT-16 and SEAD-62 verify visible/debug separation, repetition, coordinates and durations.
 
 Implementation and mock tests are distinct from live DCS verification.
+
+## Screen: Strike acceptance, briefing and completion
+
+`Task: Strike` spawns the selected fixed facility immediately, including on the ground. Acceptance is `Strike mission accepted.` for 10 seconds, followed once by this briefing for `coordinateBriefingSeconds` (default 60):
+
+```text
+STRIKE MISSION
+TARGET LOCATION: <exact DDM, 3 decimal places in minutes>, <ground elevation> ft MSL
+OBJECTIVE: Destroy all 3 fuel tanks; then RTB.
+Reward per pilot: 150 points.
+Registered pilots: 1.
+```
+
+Ammunition uses `OBJECTIVE: Destroy the ammunition depot; then RTB.`. Warehouse uses `OBJECTIVE: Destroy the warehouse; then RTB.`. The five-line briefing omits TARGET BASE, TARGET, and a separate TARGET ELEVATION line; coordinate and ground elevation share the TARGET LOCATION line. Tank coordinates are the center of the three selected tanks; the other facilities use the object's ME position. Only one coordinate pair is published.
+
+All assigned objects destroyed — 20 seconds:
+
+```text
+Strike Objective Complete
+Assigned facility destroyed.
+Each pilot: return to a BLUE airfield or carrier.
+Reward per pilot: 150 points; recovery failure: 90 points.
+```
+
+Status recalls the exact briefing until completion, then only the published result / RTB body for 20 seconds. It appends no live count, base reservation, candidate list or unselected facility. No takeoff, countdown or partial-destruction notice is added. Settlements use the existing `Strike RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant bodies for 20 seconds.
+
+If the nearest two RED bases are unavailable, display `No available Strike targets among the two nearest RED bases. Try again later.` for 20 seconds. A setup failure displays `ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Incomplete static cleanup keeps the base reservation for retries and is not reported as a new mission failure. Setup/initialization details and accepted Site ID / count are logged; screen bodies use the existing MESSAGE mirror.

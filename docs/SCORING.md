@@ -188,7 +188,7 @@ SEADは受注時にIDを計画へ保存し、生成成功後も同じIDで精算
 - `Death Count`: 墜落・死亡・脱出などによる出撃喪失数。
 - 全員分の末尾に保存状態を1回表示する。保存済み／保存待ち／Hook未接続／保存無効／保存エラーを区別する。
 
-Intercept / CAP / SEAD / DEADのカテゴリ別Scoreは画面に表示しない。カテゴリ別の加算・永続保存・復元は継続する。
+Intercept / CAP / SEAD / DEAD / Strikeのカテゴリ別Scoreは画面に表示しない。カテゴリ別の加算・永続保存・復元は継続する。
 UCIDを照合できない搭乗者はプレイヤー名と `UCID unavailable; unscored.` を表示し、成績値は表示しない。
 通常の画面メッセージと同じ本文をDCSログのMESSAGEへ記録する。表示例は [MESSAGES.md](MESSAGES.md#screen-player-statistics--25-seconds-requested-manually) を参照する。
 この表示変更は実装済み、DCS内の画面確認は未実施。
@@ -226,7 +226,7 @@ DCS のミッション環境で `require` や外部ファイル読み込みを�
 
 ## 検証とゲーム内確認
 
-`scripts/Test-All.ps1`で両bundleを結合し、Lua全9スイートとBuild/Sync/Installテストを実行する。個別コマンドと検証範囲は [TESTING.md](TESTING.md)、全体の責務と用語は [ARCHITECTURE.md](ARCHITECTURE.md) を参照する。
+`scripts/Test-All.ps1`で両bundleを結合し、Lua全10スイートとBuild/Sync/Installテストを実行する。個別コマンドと検証範囲は [TESTING.md](TESTING.md)、全体の責務と用語は [ARCHITECTURE.md](ARCHITECTURE.md) を参照する。
 結合済みの本番コードを読み込み、DCS / MOOSE の呼び出し先だけを模擬する。
 計算、UCID・スロットの照合、名前変更、再スポーン、着陸確認、動く空母、重複事故、Abort、複数任務の累積を自動検証する。
 Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カテゴリ別集計・復元の維持も既存テストで検証する。現在の自動テスト結果は [TESTING.md](TESTING.md)、過去の実測記録は [HISTORY.md](HISTORY.md) を参照する。新表示のDCS内確認は未実施。
@@ -248,3 +248,7 @@ Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カ�
 
 実機確認前の制約: UCID が取得できること、飛行場・空母のイベント発火条件と着地判定、
 イベント配信順序、各 Client スロットのメニューの挙動は自動テストだけでは保証しない。
+
+## Strike
+
+Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strikeScore・Total Score・Career Pointsを更新する。燃料施設は指定3基すべての破壊が必要。目標達成前の帰還は精算せず、受注を維持する。個人事故・Abort・MP2の共有達成と個別精算は既存ルールを使う。カテゴリ別ScoreはPlayer Statisticsへ追加表示しない。schema3で保存し、schema1/2のStrikeは0として復元する。

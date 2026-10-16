@@ -16,7 +16,7 @@ $LuaPath = (Resolve-Path -LiteralPath $LuaPath).Path
 $suites = @(
     'Test-Intercept.lua', 'Test-CAP.lua', 'Test-Scoring.lua',
     'Test-Wing.lua', 'Test-ParallelWings.lua', 'Test-SEAD.lua',
-    'Test-DEAD.lua', 'Test-Persistence.lua', 'Test-MapOverlay.lua'
+    'Test-DEAD.lua', 'Test-Persistence.lua', 'Test-MapOverlay.lua', 'Test-Strike.lua'
 )
 Push-Location -LiteralPath $projectRoot
 try {
@@ -35,6 +35,7 @@ try {
     }
     & (Join-Path $PSScriptRoot 'Test-PersistenceInstall.ps1') -LuaPath $LuaPath
     & (Join-Path $PSScriptRoot 'Test-ZoneCoverage.ps1') -LuaPath $LuaPath
+    & (Join-Path $PSScriptRoot 'Test-StrikeMission.ps1') -LuaPath $LuaPath
     Write-Output 'All Lua and integration tests passed. Actual mission sync is a separate step.'
 } finally {
     Pop-Location

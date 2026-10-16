@@ -680,7 +680,7 @@ test("version one accounts migrate CAP to zero while preserving all original cou
     local p = saved.players["ucid-a"]
     assert(saved.counter == 7 and saved.revision == 3 and p.capScore == 0)
     assert(p.totalScore == 300 and p.interceptScore == 150 and p.seadScore == 150 and p.missionCount == 2)
-    local updated = Data.Encode(saved); assert(updated:find("DT_SCORE\t2\t", 1, true) == 1)
+    local updated = Data.Encode(saved); assert(updated:find("DT_SCORE\t3\t", 1, true) == 1)
     assert(Data.Decode(updated).players["ucid-a"].capScore == 0)
     rejected(function() Data.Decode(original:sub(1, -2)) end)
     rejected(function() Data.Decode(original:gsub("300", "301", 1)) end)
@@ -701,8 +701,31 @@ test("CAP settlement persists separately after legacy restoration and survives a
     assert(Data.Decode(fs.files[path]).counter == 9)
 end)
 
+test("schema two preserves CAP and all prior counters while adding Strike at zero", function()
+    local body = "DT_SCORE\t2\t7\t7\t3\nP\t756369642d61\t50696c6f74\t375\t375\t150\t150\t0\t3\t3\t2\t1\t0\t0\t1\t75\n"
+    local checksum=0
+    for i=1,#body do checksum=(checksum*31+body:byte(i))%2147483647 end
+    local text=body.."END\t1\t"..string.format('%.0f',checksum).."\n"
+    local saved=Data.Decode(text); local p=saved.players['ucid-a']
+    assert(p.strikeScore==0 and p.capScore==75 and p.totalScore==375 and p.deathCount==1)
+    assert(Data.Decode(Data.Encode(saved)).players['ucid-a'].capScore==75)
+end)
+
+test("Strike scores survive native hook save and a fresh session alongside earlier categories", function()
+    local fs=filesystem(); fs.files[path]=legacyFile()
+    local s=scenario(); local h=hook(s,fs); h:frame(0)
+    s:command('Task: Strike'); local r=assert(s:mission())
+    for _,target in ipairs(r.strikePlan.targets) do target.unit.alive=false; s:event('Dead',target.unit) end
+    s:event('Ejection',s.player); h:frame(2)
+    local saved=Data.Decode(fs.files[path]); local p=saved.players['ucid-a']
+    assert(p.strikeScore==90 and p.totalScore==390 and p.missionCount==3 and p.deathCount==1)
+    s=scenario(); h=hook(s,fs); h:frame(0); s:score(390)
+    s:categoryScores({strikeScore=90,interceptScore=150,seadScore=150,capScore=0})
+    assert(s.messages[#s.messages].text:find('Persistent scores saved.',1,true))
+end)
+
 test("unsupported future primary schemas cannot be overwritten or rolled back to an older backup", function()
-    local body = Data.Encode(data(450)):match("^(.*\n)END\t%d+\t%d+\n$"):gsub("^DT_SCORE\t2\t", "DT_SCORE\t3\t")
+    local body = Data.Encode(data(450)):match("^(.*\n)END\t%d+\t%d+\n$"):gsub("^DT_SCORE\t3\t", "DT_SCORE\t4\t")
     local checksum = 0
     for i = 1, #body do checksum = (checksum * 31 + body:byte(i)) % 2147483647 end
     local future = body .. "END\t1\t" .. string.format("%.0f", checksum) .. "\n"

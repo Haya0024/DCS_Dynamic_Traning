@@ -205,6 +205,8 @@ Follow-on DEADは受注時、Immediate DEADはContinue時に満額を固定。�
 
 ## Briefing・Status・F10
 
+Strikeは新規固定施設用の独立カテゴリであり、DEADの既存SAM Site継続・保持・帰還・Cleanupの方針は変更しない。Wing/UCIDの受注排他は共有する。
+
 Mission Statusは公開済みブリーフィングと最新の開始／達成通知の再表示に限定する。Follow-onは受注時に公開したSite座標・SAM種類・履歴・目的・報酬・人数の本文を保存し、開始後はその座標に開始指示を添える。達成時にStatus用の座標ブリーフィングを外し、公開済み達成・帰還指示だけを20秒表示する。ImmediateはContinue直後に公開した本文を保存し、DEAD達成後は実配置座標を外し、公開済み達成・帰還指示だけを20秒表示する。Continue本文中のRemaining targetsは公開時の値の再表示であり、現在の残数へ更新しない。
 
 StatusはDEAD.Remaining / DEAD.Briefing / SEADSites.Refreshを呼ばず、未公開の敵残数・Site状態・保持／使用予約・参加者別状態・追加採点状態を付けない。Continue前／Preserveのみでは正確な配置座標を公開しない。切替時の座標取得失敗では元SEADの公開済み達成・帰還通知も維持する。帰還・精算・保持・Cleanup・任務ロックの状態遷移は変更しない。

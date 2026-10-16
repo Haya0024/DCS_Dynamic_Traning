@@ -1,10 +1,10 @@
 # 成績の永続保存
 
-更新日: 2026-10-06
+更新日: 2026-10-16
 
 ## 保存対象と境界
 
-UCIDごとのTotal Score、Career Points、Intercept / CAP / SEAD / DEAD Score、任務数、Primary成功数、帰還成功数、帰還失敗数、未達成失敗数、中止数、Death Countを保存する。
+UCIDごとのTotal Score、Career Points、Intercept / CAP / SEAD / DEAD / Strike Score、任務数、Primary成功数、帰還成功数、帰還失敗数、未達成失敗数、中止数、Death Countを保存する。
 Death Countは登録機の墜落・死亡・脱出・UnitLostによる出撃喪失数。最初の精算時に1回だけ数え、同じ喪失の後続イベントやImmediate DEADの追加採点では増やさない。
 未精算任務、Wingロック、SAM Site、機体や兵装は保存しない。ミッション終了時に未精算だった任務へ推定報酬を与えない。
 既存の150 / 90 / 0、Immediate DEADのSEAD＋DEAD報酬、UCID未照合時の非採点は維持する。
@@ -65,7 +65,7 @@ Stopではpollを無効にし、ホストの接続済みsessionだけ最終snaps
 ## ファイル形式と復旧
 
 保存先はサーバーの `Saved Games/DCS/DynamicTraining/scores.dat`（実際はlfs.writedir配下）。
-version 2の固定schema。version1の従来12数値列を保持し、末尾へcapScoreを追加する。version1も旧列数・checksum・canonical形式を検証して読み込み、CAP=0へ移行する。保存時はversion2。文字列はhex、数値は非負整数、行構成・重複UCID・上限を検証する。個人ごとのファイル名にUCIDを使わない。CAP導入時はmission/Hookを同時更新し、Hook再導入後にDCSを再起動する。移行は通常のHook接続で行い、開発作業で実成績fileを直接書き換えない。
+version 3の固定schema。version1の従来12数値列、version2末尾のcapScoreを維持し、末尾へstrikeScoreを追加する。version1/2も旧列数・checksum・canonical形式を検証して読み込み、未収録のCAP/Strikeを0へ移行する。保存時はversion3。文字列はhex、数値は非負整数、行構成・重複UCID・上限を検証する。個人ごとのファイル名にUCIDを使わない。Strike導入時はmission/Hookを同時更新し、サーバーHook再導入後にDCSを再起動する。移行は通常のHook接続で行い、開発作業で実成績fileを直接書き換えない。
 未知のschemaは通常の破損と区別してLOAD/SAVEを停止する。正常な古いbackupがあっても未知primaryを巻き戻して上書きしない。
 一時ファイルへ書き込み・flush・close・再読検証後に置換し、直前の正常ファイルを `scores.dat.bak` に保持する。置換失敗時は元ファイルを復元し、snapshotを未保存のまま再試行する。
 primaryが欠落・破損なら正常backupから復旧する。primaryが読み取り不能ならbackupが正常でも復旧を進めず、現在の累計の巻き戻りを防ぐ。primaryとbackupがともに不正なら、ゼロの累計で上書きせず保存を停止してログへ記録する。破損データは自動実行しない。

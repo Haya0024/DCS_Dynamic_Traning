@@ -42,7 +42,7 @@ test("ground acceptance spawns only the selected facility with one exact coordin
     assert(r.strikePlan.site.id == "SITE01" and r.strikePlan.target.kind.type == "Warehouse")
     assert(#s.randomCalls == 2 and s.randomCalls[1].maximum == 2 and s.randomCalls[2].maximum == 3)
     local text = s.messages[#s.messages].text
-    assert(text == "STRIKE MISSION\nTARGET LOCATION: LL DDM 100300.000 310.000, 0 ft MSL\n" ..
+    assert(text == "STRIKE MISSION\nTARGET LOCATION: LL DMS 100300.00 310.00, 0 ft MSL\n" ..
         "OBJECTIVE: Destroy the warehouse; then RTB.\nReward per pilot: 150 points.\nRegistered pilots: 1.")
     assert(s.messages[#s.messages].seconds == 60); s:assertClean()
 end)
@@ -106,8 +106,29 @@ test("fuel briefing uses the three-tank center and terrain elevation", function(
     local s=scenario(); s.terrainHeight=function() return 304.8 end
     local r=accept(s)
     assert(r.strikePlan.point.x==100100 and r.strikePlan.point.y==320)
-    s:lastMessageContains("TARGET LOCATION: LL DDM 100100.000 320.000, 1000 ft MSL\n")
+    s:lastMessageContains("TARGET LOCATION: LL DMS 100100.00 320.00, 1000 ft MSL\n")
     s:assertClean()
+    -- Exercise the bundled MOOSE formatter itself, beyond the boundary mock.
+    local file=assert(io.open('vendor/MOOSE/Moose.lua','rb'))
+    local source=file:read('*a'):gsub('\r\n','\n'); file:close()
+    local real=scenario(); real.terrainHeight=function() return 304.8 end
+    local scope=setmetatable({UTILS={}, COORDINATE=real.env.COORDINATE,
+        _SETTINGS={LL_Accuracy=5}, coord={LOtoLL=function()
+            return 33 + 23.4/60, 36 + 30.3/60
+        end}}, {__index=_G})
+    for _,pattern in ipairs({'function UTILS%.Round.-\nend', 'UTILS%.tostringLL = function.-\nend',
+        'function COORDINATE:ToStringLLDMS.-\n  end'}) do
+        setfenv(assert(loadstring(assert(source:match(pattern)))),scope)()
+    end
+    real.env.COORDINATE.ToStringLLDDM=function() error('Strike must use DMS') end
+    accept(real)
+    local degree=string.char(194,176) -- UTF-8; native PowerShell pipes can replace non-ASCII literals.
+    real:lastMessageContains('TARGET LOCATION: LL DMS 033'..degree..'23\'24.00"N 036'..degree..'30\'18.00"E, 1000 ft MSL\n')
+    real:command('Abort Mission')
+    scope.coord.LOtoLL=function() return 33 + 23/60 + 4.5/3600, 36 + 30/60 + 7.89/3600 end
+    accept(real)
+    real:lastMessageContains('TARGET LOCATION: LL DMS 033'..degree..'23\'04.50"N 036'..degree..'30\'07.89"E, 1000 ft MSL\n')
+    real:assertClean()
 end)
 test("spawn preserves each ME position heading type and clears original IDs", function()
     local s=scenario(); local r=accept(s)
@@ -222,7 +243,7 @@ test("missing templates fail only that base without stopping other mission categ
     s.player.airborne=true; s.generate(); assert(s:mission().category=='Intercept' and #s.errors==5)
 end)
 test("coordinate formatting failure rolls back before any static spawn", function()
-    local s=scenario(); s.env.COORDINATE.ToStringLLDDM=function() error('coordinate unavailable') end
+    local s=scenario(); s.env.COORDINATE.ToStringLLDMS=function() error('coordinate unavailable') end
     s:command('Task: Strike'); assert(not s:mission() and #s.staticSpawns==0 and #s.errors==1)
 end)
 

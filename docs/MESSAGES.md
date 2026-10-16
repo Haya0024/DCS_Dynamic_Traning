@@ -24,7 +24,7 @@ Screen durations: default 10 seconds, coordinate briefings 60 seconds, settlemen
 
 Durations are display lifetimes, not delays between messages. Acceptance and briefing calls can occur in the same operation; airborne activation can immediately follow a coordinate briefing. The script does not wait for the previous message to expire.
 
-The supplied MOOSE returns DDM on one line, with the `LL DDM` prefix and three decimal places in minutes. The coordinate examples below use that exact format.
+CAP / SEAD / DEAD use one-line DDM with the `LL DDM` prefix and three decimal places in minutes. Strike uses one-line DMS with the `LL DMS` prefix and two decimal places in seconds for JDAM/JSOW PP entry. Both explicitly set their precision, independently of global MOOSE display settings.
 
 ## Screen: Intercept
 
@@ -826,7 +826,7 @@ Implementation and mock tests are distinct from live DCS verification.
 
 ```text
 STRIKE MISSION
-TARGET LOCATION: <exact DDM, 3 decimal places in minutes>, <ground elevation> ft MSL
+TARGET LOCATION: <exact DMS, 2 decimal places in seconds>, <ground elevation> ft MSL
 OBJECTIVE: Destroy all 3 fuel tanks; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: 1.

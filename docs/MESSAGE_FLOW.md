@@ -515,7 +515,7 @@ STRIKE-02（見出し・座標と標高の同一行・指示・報酬・人数�
 
 ```text
 STRIKE MISSION
-TARGET LOCATION: <誤差なしのDDM、分の小数3桁>, <地表標高> ft MSL
+TARGET LOCATION: <誤差なしのDMS、秒の小数2桁>, <地表標高> ft MSL
 OBJECTIVE: <Destroy all 3 fuel tanks / Destroy the ammunition depot / Destroy the warehouse>; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <人数>.

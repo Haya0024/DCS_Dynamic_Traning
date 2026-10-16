@@ -112,7 +112,10 @@ local function scenario(options)
     function coordinate:IsSurfaceTypeLand()
         return not s.surfaceLand or s.surfaceLand({ x = self.x, y = self.z })
     end
-    function coordinate:ToStringLLDMS() return string.format("LL %d %d", self.x, self.z) end
+    function coordinate:ToStringLLDMS(settings)
+        assert(settings and settings.LL_Accuracy == 2, "Expected two decimal places in DMS seconds")
+        return string.format("LL DMS %.2f %.2f", self.x, self.z)
+    end
     function coordinate:ToStringLLDDM(settings)
         assert(settings and settings.LL_Accuracy == 3, "Expected three decimal places in DDM minutes")
         return string.format("LL DDM %.3f %.3f", self.x, self.z)

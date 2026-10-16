@@ -2,6 +2,12 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-16 Strike座標をJDAM/JSOWのPP入力向けDMSへ変更
+
+ユーザー指定によりStrikeのTARGET LOCATIONをDMS（度・分・秒、秒の小数2桁）へ変更した。COORDINATE:ToStringLLDMSへLL_Accuracy=2を明示し、MOOSE全体の表示設定から独立させた。座標と地表標高ft MSLの同一行・5行のブリーフィング・受注時とStatusの本文一致を維持する。CAP/SEAD/DEADは従来のDDM・分の小数3桁のまま。
+
+STRIKE-02/03/12/31を更新。STRIKE-12では同梱MOOSEの実ToStringLLDMS・tostringLL・Roundを読み、既知座標の23.400分→23分24.00秒、秒の0埋め・2桁、全体精度設定5でも明示2桁になることを検証した。Lua全400ケース（10スイート）とBUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2が通過した。仕様・README・日英BRIEFING・メッセージ一覧・タイムライン・TESTING・AGENTSを更新し、実.mizのSync/Check・ZIP CRC・bundle一致・登録済みLua以外の内容不変を確認。実DCSでのPP入力・命中・表示はMAN-60で確認待ち。
+
 ## 2026-10-16 Strikeブリーフィングを5行へ整理
 
 ユーザー指定により、STRIKE MISSION・TARGET LOCATION（DDM座標と地表標高ft MSLをカンマ区切りで同じ行）・OBJECTIVE・報酬・人数の5行へ変更した。TARGET BASE、TARGET、独立したTARGET ELEVATION行は表示しない。破壊指示は選択施設に応じて燃料3基・弾薬庫・倉庫で切り替える。受注時とMission Statusは同じ本文を使い、達成後の座標除外・表示時間・抽選・生成・採点は維持する。

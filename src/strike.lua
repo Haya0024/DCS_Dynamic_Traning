@@ -93,7 +93,7 @@ function Strike.Plan(position, assignmentID)
     for _, t in ipairs(target.templates) do center.x, center.y = center.x + t.x, center.y + t.y end
     center.x, center.y = center.x / #target.templates, center.y / #target.templates
     local coordinate = COORDINATE:NewFromVec2(center)
-    local location, elevation = coordinate:ToStringLLDDM({ LL_Accuracy = 3 }), coordinate:GetLandHeight()
+    local location, elevation = coordinate:ToStringLLDMS({ LL_Accuracy = 2 }), coordinate:GetLandHeight()
     assert(type(location) == "string" and location ~= "" and finite(elevation), "Strike briefing unavailable.")
     local plan = { site = site, target = target, point = center, location = location,
         elevation = math.floor(elevation / 0.3048 + 0.5), assignmentID = assignmentID,

@@ -561,7 +561,7 @@ Dynamic Training
 - 仕様はdocs/STRIKE.md。src/strike.luaにME Staticのカタログ・原本除去・抽選・生成・観測・削除を分離する。
 - Config.strikeのSITE01～05をDamascus / Palmyra / Bassel Al-Assad / Hama / Gecitkaleへ対応付ける。位置・向きはMEのみ。各SiteにTANK_01～03、AMMO_01、WAREHOUSE_01を用意し、実ユニット名は各末尾-1。
 - 受注時の長機位置から近いRED基地2つを固定し、その中の空いている基地を等確率で抽選、燃料・弾薬庫・倉庫を各1/3で抽選。2基地とも使用中なら解除し、3番目へ回さない。Wing/UCIDロックを先に取得し、Missions.strikeBasesで基地単位の予約を保持する。
-- 地上でも即ACTIVE・生成。正確なDDM精度3の座標1組と地表標高ft MSLをTARGET LOCATIONの同一行へカンマ区切りで案内し、燃料は3基中心を使う。ブリーフィングは見出し・LOCATION・OBJECTIVE・報酬・人数の5行とし、基地名・目標名・標高の独立行は出さない。原本25物体を起動時に除去し、任務別の名前・新規IDで選択施設だけ生成する。再配置・座標の誤差追加をしない。
+- 地上でも即ACTIVE・生成。JDAM/JSOWのPP入力用に正確なDMS（秒の小数2桁、ToStringLLDMSへLL_Accuracy=2を明示）の座標1組と地表標高ft MSLをTARGET LOCATIONの同一行へカンマ区切りで案内し、燃料は3基中心を使う。ブリーフィングは見出し・LOCATION・OBJECTIVE・報酬・人数の5行とし、基地名・目標名・標高の独立行は出さない。原本25物体を起動時に除去し、任務別の名前・新規IDで選択施設だけ生成する。再配置・座標の誤差追加をしない。
 - 燃料3基すべて／弾薬庫・倉庫1棟の破壊でRTB_PENDING。nil・例外・ID不一致を全滅根拠にしない。帰還150・達成後事故90・未達成事故/Abort0、共有達成・個人精算は既存ルール。達成後Statusは座標なしの達成・帰還指示だけ20秒。
 - 全員終了後に生成物を削除する。削除確認までは基地予約を維持し、5秒ごとに再試行する。保持や任務進行の永続化はしない。
 - schema3でstrikeScoreを追加、schema1/2は未収録項目を0として移行。mission/サーバーHookを同時更新・Hook再導入・DCS再起動が必要。Test-Strike.lua、実.mizのTest-StrikeMission.ps1と全10Luaスイート・BUILD/SYNC/INSTALL/ZONESを実行する。

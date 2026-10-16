@@ -16,6 +16,8 @@
 | SITE04 | Hama | TPL_STRIKE_SITE04_TANK_01～03 / AMMO_01 / WAREHOUSE_01 |
 | SITE05 | Gecitkale | TPL_STRIKE_SITE05_TANK_01～03 / AMMO_01 / WAREHOUSE_01 |
 
+Strikeの座標はJDAM/JSOWのPP直接入力用にDMS（度・分・秒、秒の小数2桁）とする。COORDINATE:ToStringLLDMSへLL_Accuracy=2を明示し、全体の表示設定に依存させない。CAP/SEAD/DEADのDDMは変更しない。
+
 位置・向き・種類はMEだけを正とし、Luaには座標を複製しない。起動時にMOOSEのStaticテンプレートを取得し、25個の原本をイベントなしで除去する。原本除去が確認できるまでその基地は使用しない。欠落・不正なテンプレートの基地は使用不可とし、他カテゴリを停止しない。
 
 受注時に選んだ施設だけを同位置・同方向にSPAWNSTATICで生成する。生成物は任務別の一意な名前・IDを使い、元テンプレート名を変更しない。座標を合わせるための移動・地形への再配置は行わない。生成途中の失敗でも生成済み参照を保持して削除を再試行する。
@@ -40,7 +42,7 @@ Strike mission accepted.
 
 ```text
 STRIKE MISSION
-TARGET LOCATION: <誤差を加えないDDM・分の小数3桁>, <地表標高> ft MSL
+TARGET LOCATION: <誤差を加えないDMS・秒の小数2桁>, <地表標高> ft MSL
 OBJECTIVE: Destroy all 3 fuel tanks; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: 1.

@@ -32,7 +32,7 @@ SEADで制圧したサイトの残存車両をすべて破壊してください�
 
 ### Strike — 固定施設への攻撃
 
-受注位置から近い赤基地2か所のうち空いている基地を抽選し、燃料施設・弾薬庫・倉庫の1つを指定します。正確な目標座標1組と地表標高を案内します。燃料施設は3基すべて、弾薬庫・倉庫は指定1棟を破壊して帰還してください。地上受注でも即生成します。近い2基地が使用中なら後で再受注してください。
+受注位置から近い赤基地2か所のうち空いている基地を抽選し、燃料施設・弾薬庫・倉庫の1つを指定します。JDAM/JSOWのPP入力に使える正確なDMS座標1組（秒の小数2桁）と地表標高を案内します。燃料施設は3基すべて、弾薬庫・倉庫は指定1棟を破壊して帰還してください。地上受注でも即生成します。近い2基地が使用中なら後で再受注してください。
 
 ### 帰還とポイント
 
@@ -74,7 +74,7 @@ Destroy all remaining vehicles at a site previously suppressed during SEAD. "Con
 
 ### Strike — Fixed ground facilities
 
-One of the two nearest RED bases with a free Strike reservation is selected, followed by a fuel facility, ammunition depot, or warehouse. The briefing provides one exact coordinate and ground elevation. Destroy all three assigned fuel tanks, or the single assigned depot or warehouse, then RTB. Targets spawn immediately even for ground acceptance. If both nearest bases are busy, retry later.
+One of the two nearest RED bases with a free Strike reservation is selected, followed by a fuel facility, ammunition depot, or warehouse. The briefing provides one exact DMS coordinate (seconds to two decimal places) for JDAM/JSOW PP entry, plus ground elevation. Destroy all three assigned fuel tanks, or the single assigned depot or warehouse, then RTB. Targets spawn immediately even for ground acceptance. If both nearest bases are busy, retry later.
 
 ### Recovery and points
 

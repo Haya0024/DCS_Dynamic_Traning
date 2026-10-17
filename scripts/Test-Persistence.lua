@@ -680,7 +680,7 @@ test("version one accounts migrate CAP to zero while preserving all original cou
     local p = saved.players["ucid-a"]
     assert(saved.counter == 7 and saved.revision == 3 and p.capScore == 0)
     assert(p.totalScore == 300 and p.interceptScore == 150 and p.seadScore == 150 and p.missionCount == 2)
-    local updated = Data.Encode(saved); assert(updated:find("DT_SCORE\t3\t", 1, true) == 1)
+    local updated = Data.Encode(saved); assert(updated:find("DT_SCORE\t4\t", 1, true) == 1)
     assert(Data.Decode(updated).players["ucid-a"].capScore == 0)
     rejected(function() Data.Decode(original:sub(1, -2)) end)
     rejected(function() Data.Decode(original:gsub("300", "301", 1)) end)
@@ -725,7 +725,7 @@ test("Strike scores survive native hook save and a fresh session alongside earli
 end)
 
 test("unsupported future primary schemas cannot be overwritten or rolled back to an older backup", function()
-    local body = Data.Encode(data(450)):match("^(.*\n)END\t%d+\t%d+\n$"):gsub("^DT_SCORE\t3\t", "DT_SCORE\t4\t")
+    local body = Data.Encode(data(450)):match("^(.*\n)END\t%d+\t%d+\n$"):gsub("^DT_SCORE\t4\t", "DT_SCORE\t5\t")
     local checksum = 0
     for i = 1, #body do checksum = (checksum * 31 + body:byte(i)) % 2147483647 end
     local future = body .. "END\t1\t" .. string.format("%.0f", checksum) .. "\n"
@@ -733,6 +733,30 @@ test("unsupported future primary schemas cannot be overwritten or rolled back to
     local store = Store.New(path, fs)
     rejected(store.Load); rejected(function() store.Save(data(150)) end)
     assert(fs.files[path] == future and fs.files[path .. ".bak"] == legacyFile())
+end)
+
+test("schema three preserves Strike while adding Air Interdiction at zero", function()
+    local body="DT_SCORE\t3\t7\t7\t3\nP\t756369642d61\t50696c6f74\t465\t465\t150\t150\t0\t4\t4\t2\t2\t0\t0\t2\t75\t90\n"
+    local checksum=0
+    for i=1,#body do checksum=(checksum*31+body:byte(i))%2147483647 end
+    local saved=Data.Decode(body.."END\t1\t"..string.format('%.0f',checksum).."\n")
+    local p=saved.players['ucid-a']
+    assert(p.airInterdictionScore==0 and p.strikeScore==90 and p.capScore==75 and p.totalScore==465 and p.deathCount==2)
+    local encoded=Data.Encode(saved); assert(encoded:find('DT_SCORE\t4\t',1,true)==1)
+    assert(Data.Decode(encoded).players['ucid-a'].strikeScore==90)
+end)
+
+test("Air Interdiction scores save through the hook and restore independently after restart", function()
+    local fs=filesystem(); fs.files[path]=legacyFile()
+    local s=scenario(); local h=hook(s,fs); h:frame(0)
+    s:command('Task: Air Interdiction'); local r=assert(s:mission())
+    for _,target in ipairs(r.interdictionPlan.targets) do target.unit.alive=false; s:event('Dead',target.unit) end
+    s:event('Ejection',s.player); h:frame(2)
+    local p=Data.Decode(fs.files[path]).players['ucid-a']
+    assert(p.airInterdictionScore==90 and p.totalScore==390 and p.missionCount==3 and p.deathCount==1)
+    s=scenario(); h=hook(s,fs); h:frame(0); s:score(390)
+    s:categoryScores({airInterdictionScore=90,strikeScore=0,interceptScore=150,seadScore=150,capScore=0})
+    statistics(s,'Persistent scores saved.')
 end)
 
 print(string.format("All %d persistence tests passed (simulated filesystem/DCS hooks).", count))

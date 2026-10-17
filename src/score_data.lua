@@ -2,9 +2,9 @@
 local ScoreData = {}
 ScoreData.fields = { "totalScore", "careerPoints", "interceptScore", "seadScore", "deadScore",
     "missionCount", "primarySuccessCount", "rtbSuccessCount", "recoveryFailureCount",
-    "failedCount", "abortCount", "deathCount", "capScore", "strikeScore" }
-local versionFields = { {}, {}, ScoreData.fields }
-for version = 1, 2 do
+    "failedCount", "abortCount", "deathCount", "capScore", "strikeScore", "airInterdictionScore" }
+local versionFields = { {}, {}, {}, ScoreData.fields }
+for version = 1, 3 do
     for i = 1, 11 + version do versionFields[version][i] = ScoreData.fields[i] end
 end
 local function integer(n)
@@ -56,7 +56,7 @@ local function encode(data, version)
     assert(#text <= 4 * 1024 * 1024, "Score file exceeds limit")
     return text
 end
-function ScoreData.Encode(data) return encode(data, 3) end
+function ScoreData.Encode(data) return encode(data, 4) end
 function ScoreData.Decode(text)
     assert(type(text) == "string" and #text <= 4 * 1024 * 1024, "Invalid score file size")
     local body, rows, expected = text:match("^(.*\n)END\t(%d+)\t(%d+)\n$")
@@ -77,7 +77,7 @@ function ScoreData.Decode(text)
         assert(#parts == 3 + #fields and parts[1] == "P", "Invalid score row")
         local ucid, name = unhex(parts[2]), unhex(parts[3])
         assert(not data.players[ucid], "Duplicate score identity")
-        local p = { lastKnownName = name, capScore = 0, strikeScore = 0 }
+        local p = { lastKnownName = name, capScore = 0, strikeScore = 0, airInterdictionScore = 0 }
         for i, field in ipairs(fields) do
             assert(parts[i + 3]:match("^%d+$"), "Invalid score number")
             p[field] = tonumber(parts[i + 3])

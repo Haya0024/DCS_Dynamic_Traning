@@ -1,8 +1,8 @@
 # プレイヤー採点・帰還評価仕様
 
-更新日: 2026-10-13
+更新日: 2026-10-17
 
-現在の採点対象は Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続30秒、DEADは開始時の残存対象全滅でクリアとする。CAPはzone内累計120秒と敵航空機全滅の両方でクリア。詳細は [CAP.md](CAP.md)。
+現在の採点対象は Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続30秒、DEADは開始時の残存対象全滅でクリアとする。CAPはzone内累計120秒と敵航空機全滅の両方でクリア。詳細は [CAP.md](CAP.md)。
 Immediate DEADは同じSEAD sortie内のphaseとして、SEADのID・達成結果・報酬を維持し、独立したDEAD報酬を追加する。詳細は [DEAD.md](DEAD.md)。
 SEAD の対象レーダーと配置の仕様は [SEAD.md](SEAD.md) を参照する。SEAD の採点は模擬テスト済みで、ゲーム内確認は未実施。
 
@@ -188,7 +188,7 @@ SEADは受注時にIDを計画へ保存し、生成成功後も同じIDで精算
 - `Death Count`: 墜落・死亡・脱出などによる出撃喪失数。
 - 全員分の末尾に保存状態を1回表示する。保存済み／保存待ち／Hook未接続／保存無効／保存エラーを区別する。
 
-Intercept / CAP / SEAD / DEAD / Strikeのカテゴリ別Scoreは画面に表示しない。カテゴリ別の加算・永続保存・復元は継続する。
+Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionのカテゴリ別Scoreは画面に表示しない。カテゴリ別の加算・永続保存・復元は継続する。
 UCIDを照合できない搭乗者はプレイヤー名と `UCID unavailable; unscored.` を表示し、成績値は表示しない。
 通常の画面メッセージと同じ本文をDCSログのMESSAGEへ記録する。表示例は [MESSAGES.md](MESSAGES.md#screen-player-statistics--25-seconds-requested-manually) を参照する。
 この表示変更は実装済み、DCS内の画面確認は未実施。
@@ -226,7 +226,7 @@ DCS のミッション環境で `require` や外部ファイル読み込みを�
 
 ## 検証とゲーム内確認
 
-`scripts/Test-All.ps1`で両bundleを結合し、Lua全10スイートとBuild/Sync/Installテストを実行する。個別コマンドと検証範囲は [TESTING.md](TESTING.md)、全体の責務と用語は [ARCHITECTURE.md](ARCHITECTURE.md) を参照する。
+`scripts/Test-All.ps1`で両bundleを結合し、Lua全11スイートとBuild/Sync/Installテストを実行する。個別コマンドと検証範囲は [TESTING.md](TESTING.md)、全体の責務と用語は [ARCHITECTURE.md](ARCHITECTURE.md) を参照する。
 結合済みの本番コードを読み込み、DCS / MOOSE の呼び出し先だけを模擬する。
 計算、UCID・スロットの照合、名前変更、再スポーン、着陸確認、動く空母、重複事故、Abort、複数任務の累積を自動検証する。
 Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カテゴリ別集計・復元の維持も既存テストで検証する。現在の自動テスト結果は [TESTING.md](TESTING.md)、過去の実測記録は [HISTORY.md](HISTORY.md) を参照する。新表示のDCS内確認は未実施。
@@ -251,4 +251,8 @@ Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カ�
 
 ## Strike
 
-Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strikeScore・Total Score・Career Pointsを更新する。燃料施設は指定3基すべての破壊が必要。目標達成前の帰還は精算せず、受注を維持する。個人事故・Abort・MP2の共有達成と個別精算は既存ルールを使う。カテゴリ別ScoreはPlayer Statisticsへ追加表示しない。schema3で保存し、schema1/2のStrikeは0として復元する。
+Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strikeScore・Total Score・Career Pointsを更新する。攻撃対象はコンテナ4個のうち任意2個／司令部1個／トラック2両の必要数破壊とし、周辺設備の破壊を必須にしない。目標達成前の帰還は精算せず、受注を維持する。個人事故・Abort・MP2の共有達成と個別精算は既存ルールを使う。カテゴリ別ScoreはPlayer Statisticsへ追加表示しない。schema4で保存し、schema1/2のStrikeは0として復元する。
+
+## Air Interdiction
+
+今回生成した車列3両の全滅で共有達成とする。損傷だけでは達成せず、未達成で帰還しても任務を維持する。各自150／達成後事故90／達成前事故・Abort0をairInterdictionScore・Total Score・Career Pointsへ加算し、共通の任務・帰還・喪失統計を1回更新する。MP2は共有達成と個人精算、第三者の対象撃破も数える。カテゴリ別Scoreは画面へ追加しない。schema4で保存し、schema1/2/3のAir Interdictionは0として復元する。満額はairInterdiction.fullReward。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。

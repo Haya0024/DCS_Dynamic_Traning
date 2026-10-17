@@ -2,6 +2,24 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-17 Air Interdiction追加（training-11）
+
+ユーザー保存済みのTPL_AI_01～06を確認。各RED/Russia・Late Activation・Tigr/BTR-70/Ural各1両、全8WPがOn Road・9.25 m/s、最終WPからWP0へ戻る指示あり。全体のMEグループ/ユニット名とIDは一意。WP0のOption30・60.96は車間距離約61 mであり、Disperse under fireの設定と混同しない。TPL_AI_04内の複製元名TPL_AI_03-1-*も有効な一意名として維持した。ME位置・経路・設定は変更しない。
+
+受注時の長機から近い2周回中心のうち使用可能な1地域を抽選し、ME経路を使う3両を即生成するTask: Air Interdictionを追加。周回中心は全WPの外接矩形中心、DDM分小数3桁でTOO捜索を案内し、3両全滅で達成。Statusは公開済み本文、達成後は座標なし20秒。共有達成と個人150/90/0、地域排他・削除再試行を実装。schema4へairInterdictionScoreを追加し、schema1/2/3の移行と独立保存/復元を確認する。サーバーHook更新・DCS再起動が必要。
+
+Lua全459ケース（11スイート、Air Interdiction39・Persistence48）とBUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME2を検証。実.mizの全6中心から近い2候補の12選択で元経路保持・生成・中心・3両破壊・削除を模擬確認し、既定先へSync/Checkする。実走行・橋・散開後復帰・実射・実サーバー保存はMAN-62として未実施。
+
+## 2026-10-17 Strikeを6施設のTOO捜索・攻撃へ変更（training-10）
+
+ユーザーがMEで旧飛行場の25物体を削除し、SITE01～06へ司令部1個・コンテナ4個・Staticトラック2両の7個セットを配置した保存済み.mizを確認した。MEグループ名はTPL_CMD / TPL_CONT / TPL_TRUCKで、実ユニット名の末尾-1の有無が混在するためMOOSE登録済みStaticNameから解決する。ME名・座標・向き・物体は変更しない。
+
+受注時の長機から司令部配置点までの距離で近い2施設を固定し、使用可能な1施設と3種類の攻撃対象を等確率抽選する。ユーザー確認により、倉庫任務は4コンテナの任意2個、司令部任務は1個、トラック任務は2両の破壊。原本42個を起動時に除去し、受注時は選択施設の7個をすべて生成する。対象候補4/1/2個と必要数2/1/2個を分離し、周辺設備を達成必須にしない。Missions.strikeSitesで施設予約し、全員終了後は全7個の削除を確認して解除する。
+
+ブリーフィングを施設基準点のTARGET AREA・DDM分小数3桁へ変更し、PP用DMS・標高を除いた5行でTOO捜索を案内する。Statusは公開済み本文だけ、達成後は座標なし20秒を維持。任意スモークは施設案内点北50 m・赤・約120秒、連打防止・停止再試行・旧callback拒否を維持した。採点150/90/0・MP2・schema3・サーバーHookは変更しない。
+
+全10Luaスイート418ケース（Strike50）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2が通過。任意2コンテナの全6組、損傷・重複死亡・観測不能、周辺設備の生成/残存/削除、6施設×3種類の全18選択を模擬検証した。実.mizへSync/Checkし、ZIP CRC・bundle一致・同期直前backup一致・登録済みDynamicTraining.lua以外の全内容不変を確認した。実DCSのTOO捜索、Command Centerを破壊する兵装・信管、3D配置・煙の見え方・MP2実射精算はMAN-60/61で確認待ち。
+
 ## 2026-10-16 Strikeの任意目標スモークを追加
 
 ユーザー指定により、受注Wingに操縦中・未精算の登録者がいるACTIVE StrikeへF10のMark Strike Targetを追加した。要求時だけ案内点の北50 mの地表へ赤煙を1本出し、約120秒後・達成・全員終了時に停止する。色・北オフセット・時間はConfig.strike.smoke、点煙・停止はMOOSE COORDINATE:Smoke/StopSmokeを使用する。グローバルSmokeOffsetの影響と追加乱数を避け、効果名は任務・要求ごとに分離する。

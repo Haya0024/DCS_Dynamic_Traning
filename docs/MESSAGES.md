@@ -8,7 +8,7 @@ The separate placement diagnostic mission logs `[SEADPlacementCheck] START`, one
 
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
 
-The five F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, `Task: DEAD`, and `Task: Strike`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the feature specifications.
+The six F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, `Task: DEAD`, `Task: Strike`, and `Task: Air Interdiction`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the feature specifications.
 
 ## Output channels
 
@@ -24,7 +24,7 @@ Screen durations: default 10 seconds, coordinate briefings 60 seconds, settlemen
 
 Durations are display lifetimes, not delays between messages. Acceptance and briefing calls can occur in the same operation; airborne activation can immediately follow a coordinate briefing. The script does not wait for the previous message to expire.
 
-CAP / SEAD / DEAD use one-line DDM with the `LL DDM` prefix and three decimal places in minutes. Strike uses one-line DMS with the `LL DMS` prefix and two decimal places in seconds for JDAM/JSOW PP entry. Both explicitly set their precision, independently of global MOOSE display settings.
+CAP / SEAD / DEAD / Strike / Air Interdiction use one-line DDM with the `LL DDM` prefix and three decimal places in minutes. Each explicitly sets its precision independently of global MOOSE display settings. Strike publishes the facility reference for TOO search, without individual PP coordinates or elevation.
 
 ## Screen: Intercept
 
@@ -318,6 +318,7 @@ SEAD: Idle.
 DEAD: Idle.
 CAP: Idle.
 Strike: Idle.
+Air Interdiction: Idle.
 ```
 
 ### Intercept waiting / active / complete
@@ -440,7 +441,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 `Mission Status` recalls the accepted CAP briefing, including coordinates, objectives, registered count and reward, for its published duration (default 60 seconds). After completion it removes that briefing and recalls only the published objective-complete / RTB message for 20 seconds. No patrol clock, exact progress, hostile count or spawn status is appended. It does not redraw or reroll the area.
 CAP settlement uses the existing `CAP RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant messages, points, totals and persistence status. Setup failure shows `ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.` for 20 seconds. A monitor/spawn failure settles each registered participant with `CAP setup/spawn failed. No reward.` for 20 seconds.
 Acceptance selection and actual spawn details are DEBUG only: `CAP accepted; zone=<name> template=<name> enemy at on-station second <n>` and `CAP enemy spawned; template=<name> units=<n> altitude=<n> ft`. No separate hostile spawn message appears on screen. Normal CAP group messages are mirrored to the DCS MESSAGE log.
-Idle Status and Abort Mission use the same Intercept / SEAD / DEAD / CAP / Strike list, including `CAP: Idle.`.
+Idle Status and Abort Mission use the same Intercept / SEAD / DEAD / CAP / Strike / Air Interdiction list, including `CAP: Idle.`.
 
 When no CAP center is within the configured acceptance distance, show the requesting group `No CAP areas within 40-100 NM. Change position and retry.` for 20 seconds and mirror it to the MESSAGE log. The limits come from Config.cap. Release the Wing/UCID lock without starting scoring, spawning enemies, or displaying acceptance/briefing messages. Out-of-range selection is a normal refusal; missing/malformed zones and position API exceptions still use the setup error above.
 
@@ -716,7 +717,7 @@ Raw identity methods may fail after destruction; these fields then show UNAVAILA
 
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-9; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-11; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 
@@ -822,34 +823,34 @@ Implementation and mock tests are distinct from live DCS verification.
 
 ## Screen: Strike acceptance, briefing and completion
 
-`Task: Strike` spawns the selected fixed facility immediately, including on the ground. Acceptance is `Strike mission accepted.` for 10 seconds, followed once by this briefing for `coordinateBriefingSeconds` (default 60):
+`Task: Strike` spawns all seven objects at the selected facility immediately, including on the ground. The two nearest facility references are used; airport ownership is irrelevant. Acceptance is `Strike mission accepted.` for 10 seconds, followed once by this briefing for `coordinateBriefingSeconds` (default 60):
 
 ```text
 STRIKE MISSION
-TARGET LOCATION: <exact DMS, 2 decimal places in seconds>, <ground elevation> ft MSL
-OBJECTIVE: Destroy all 3 fuel tanks; then RTB.
+TARGET AREA: <facility DDM, 3 decimal places in minutes>
+OBJECTIVE: Destroy any 2 of the 4 storage containers; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: 1.
 ```
 
-Ammunition uses `OBJECTIVE: Destroy the ammunition depot; then RTB.`. Warehouse uses `OBJECTIVE: Destroy the warehouse; then RTB.`. The five-line briefing omits TARGET BASE, TARGET, and a separate TARGET ELEVATION line; coordinate and ground elevation share the TARGET LOCATION line. Tank coordinates are the center of the three selected tanks; the other facilities use the object's ME position. Only one coordinate pair is published.
+Command uses `OBJECTIVE: Destroy the command center; then RTB.`. Trucks use `OBJECTIVE: Destroy both trucks; then RTB.`. The five-line briefing provides only the facility reference coordinate, with no target base, individual PP coordinates or elevation. Storage completion accepts any two distinct containers out of four; no hidden pair is selected. Other object types do not count toward the assigned objective.
 
-All assigned objects destroyed — 20 seconds:
+Objective complete — 20 seconds:
 
 ```text
 Strike Objective Complete
-Assigned facility destroyed.
+Assigned targets destroyed.
 Each pilot: return to a BLUE airfield or carrier.
 Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
-Status recalls the exact briefing until completion, then only the published result / RTB body for 20 seconds. It appends no live count, base reservation, candidate list or unselected facility. No takeoff, countdown or partial-destruction notice is added. Settlements use the existing `Strike RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant bodies for 20 seconds.
+Status recalls the exact briefing until completion, then only the published result / RTB body for 20 seconds. It appends no live count, site reservation, candidate list or unselected facility. No takeoff, countdown or partial-destruction notice is added. Settlements use the existing `Strike RTB_SUCCESS` / `RTB_FAILURE` / `FAILED` / `ABORT` participant bodies for 20 seconds.
 
-If the nearest two RED bases are unavailable, display `No available Strike targets among the two nearest RED bases. Try again later.` for 20 seconds. A setup failure displays `ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Incomplete static cleanup keeps the base reservation for retries and is not reported as a new mission failure. Setup/initialization details and accepted Site ID / count are logged; screen bodies use the existing MESSAGE mirror.
+If the nearest two sites are unavailable, display `No available Strike targets among the two nearest sites. Try again later.` for 20 seconds. A setup failure displays `ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Incomplete static cleanup keeps the site reservation for retries and is not reported as a new mission failure. Setup/initialization details and accepted Site ID / count are logged; screen bodies use the existing MESSAGE mirror.
 
 ### Optional Strike target smoke
 
-Only while Strike is ACTIVE and its accepting Wing contains a controlling, unsettled registered participant, F10 includes `Mark Strike Target`. Selecting it emits one red smoke effect at ground level 50 m north of the published target point. It is stopped after about 120 mission seconds, on objective completion, or when all participants finish. There is no automatic emission. Repeated requests while the effect is still tracked do not create another effect. After it stops, another request is allowed. Smoke is a world effect visible to other players as well.
+Only while Strike is ACTIVE and its accepting Wing contains a controlling, unsettled registered participant, F10 includes `Mark Strike Target`. Selecting it emits one red smoke effect at ground level 50 m north of the published facility reference. It is stopped after about 120 mission seconds, on objective completion, or when all participants finish. There is no automatic emission. Repeated requests while the effect is still tracked do not create another effect. After it stops, another request is allowed. Smoke is a world effect visible to other players as well.
 
 | Trigger | Body | Seconds |
 |---|---|---:|
@@ -859,3 +860,26 @@ Only while Strike is ACTIVE and its accepting Wing contains a controlling, unset
 | Smoke API failure | `ERROR: Strike target smoke failed. See DCS log; retry later.` | 15 |
 
 Values follow Config.strike.smoke. These messages do not replace the coordinate briefing recalled by Mission Status. No additional score, current target count, or spawn information is shown. Stop failures retry through the existing mission clock without blocking assignment settlement or base reuse. F10 menus paginate through `More` after nine commands so optional actions and MP2 personal aborts remain reachable.
+
+## Screen: Air Interdiction acceptance, briefing and completion
+
+`Task: Air Interdiction` fixes the two nearest ME route centers at acceptance and chooses one available route equally. The three-vehicle convoy spawns immediately, on the ground or in flight, preserving its ME road route, speed, spacing and loop. Acceptance is `Air Interdiction mission accepted.` for 10 seconds, followed once by:
+
+```text
+AIR INTERDICTION MISSION
+TARGET AREA: <DDM route bounding-box center, minutes to three decimal places>
+OBJECTIVE: Destroy all 3 convoy vehicles; then RTB.
+Reward per pilot: 150 points.
+Registered pilots: <count>.
+```
+
+Display time is `coordinateBriefingSeconds`, default 60 seconds. `TARGET AREA` stays fixed and does not track the convoy. Status recalls exactly this briefing until all three assigned vehicles are destroyed. No live count, vehicle position, heading, route reservation or partial-kill notice is added. After completion, Status recalls only this published body for 20 seconds:
+
+```text
+Air Interdiction Objective Complete
+All 3 convoy vehicles destroyed.
+Each pilot: return to a BLUE airfield or carrier.
+Reward per pilot: 150 points; recovery failure: 90 points.
+```
+
+If both nearest routes are unavailable, show `No available Air Interdiction routes among the two nearest sites. Try again later.` for 20 seconds. Setup failure shows `ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Cleanup failure retains the route reservation and retries without repeating settlement. Existing participant result messages use the category `Air Interdiction`. Initialization / setup / cleanup failures go to ERROR logs, accepted template names to DEBUG, and observation failures are logged only on transitions. Ordinary screen messages retain the MESSAGE log mirror.

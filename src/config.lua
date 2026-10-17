@@ -59,23 +59,32 @@ return {
         attemptsPerTick = 2
     },
     dead = { fullReward = 150, unreservedSiteCleanupSeconds = 1800 },
+    airInterdiction = {
+        fullReward = 150, cleanupRetrySeconds = 5,
+        templates = { "TPL_AI_01", "TPL_AI_02", "TPL_AI_03", "TPL_AI_04", "TPL_AI_05", "TPL_AI_06" }
+    },
     strike = {
         fullReward = 150, cleanupRetrySeconds = 5,
         smoke = { color = "Red", northOffsetMeters = 50, durationSeconds = 120 },
         sites = {
-            { id = "SITE01", airbase = "Damascus" },
-            { id = "SITE02", airbase = "Palmyra" },
-            { id = "SITE03", airbase = "Bassel Al-Assad" },
-            { id = "SITE04", airbase = "Hama" },
-            { id = "SITE05", airbase = "Gecitkale" }
+            { id = "SITE01" }, { id = "SITE02" }, { id = "SITE03" },
+            { id = "SITE04" }, { id = "SITE05" }, { id = "SITE06" }
+        },
+        -- Index 1 is the facility/search reference. Geometry comes only from ME.
+        members = {
+            { prefix = "TPL_CMD", suffix = "01", type = ".Command Center" },
+            { prefix = "TPL_CONT", suffix = "02", type = "container_20ft" },
+            { prefix = "TPL_CONT", suffix = "03", type = "container_20ft" },
+            { prefix = "TPL_CONT", suffix = "04", type = "container_20ft" },
+            { prefix = "TPL_CONT", suffix = "05", type = "container_20ft" },
+            { prefix = "TPL_TRUCK", suffix = "06", type = "Ural-375" },
+            { prefix = "TPL_TRUCK", suffix = "07", type = "Ural-375" }
         },
         targets = {
-            { label = "Fuel facility (3 tanks)", type = "Fuel tank", objective = "Destroy all 3 fuel tanks",
-                suffixes = { "TANK_01", "TANK_02", "TANK_03" } },
-            { label = "Ammunition depot", type = ".Ammunition depot", objective = "Destroy the ammunition depot",
-                suffixes = { "AMMO_01" } },
-            { label = "Warehouse", type = "Warehouse", objective = "Destroy the warehouse",
-                suffixes = { "WAREHOUSE_01" } }
+            { label = "Storage containers", objective = "Destroy any 2 of the 4 storage containers",
+                members = { 2, 3, 4, 5 }, requiredCount = 2 },
+            { label = "Command center", objective = "Destroy the command center", members = { 1 } },
+            { label = "Trucks", objective = "Destroy both trucks", members = { 6, 7 } }
         }
     },
     cap = {

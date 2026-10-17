@@ -2,7 +2,7 @@
 local MissionReport = {}
 
 function MissionReport.Idle()
-    return "Intercept: Idle.\nSEAD: Idle.\nDEAD: Idle.\nCAP: Idle.\nStrike: Idle."
+    return "Intercept: Idle.\nSEAD: Idle.\nDEAD: Idle.\nCAP: Idle.\nStrike: Idle.\nAir Interdiction: Idle."
 end
 
 function MissionReport.Statistics(roster)

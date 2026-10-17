@@ -1,9 +1,9 @@
 # 任務メッセージのタイミング・分岐一覧
 
-更新: 2026-10-16。現在の `training-9` の実装を読み取った、表示を見直すための一覧。
+更新: 2026-10-17。現在の `training-11` の実装を読み取った、表示を見直すための一覧。
 本文・タイミングは現在の実装に合わせる。実画面のキャプチャではない。2026-10-15の変更でPBのTHREAT AREAを推定座標へ統一し、抑制条件を30秒へ短縮した。DEADの座標をラベルと同じ行へまとめ、受注本文の並び順も更新した。
 
-対象は実装済みの Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike。
+対象は実装済みの Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。
 CAS / Anti-Ship は未実装なので、現在の受注通知やクリア通知はない。
 画面の英語本文とDCSログの詳細例は [MESSAGES.md](MESSAGES.md) も参照。
 
@@ -259,7 +259,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 通常は次の本文を元任務Groupへ送る。MP2なら各人の精算が別々に表示される。
 
 ```text
-<Intercept / CAP / SEAD / DEAD / Strike> <結果>: <参加者名>
+<Intercept / CAP / SEAD / DEAD / Strike / Air Interdiction> <結果>: <参加者名>
 <理由>
 Points: +<今回加算>
 Total Score: <累計>
@@ -318,12 +318,14 @@ UCID不明の精算ではPoints・Total Score・保存状態・SEAD/DEAD内訳�
 
 | 対象・段階 | 再表示する本文 | 秒（初期設定） |
 |---|---|---|
-| 有効任務なし | `Intercept: Idle.` / `SEAD: Idle.` / `DEAD: Idle.` / `CAP: Idle.` / `Strike: Idle.` の5行 | 10 |
+| 有効任務なし | `Intercept: Idle.` / `SEAD: Idle.` / `DEAD: Idle.` / `CAP: Idle.` / `Strike: Idle.` / `Air Interdiction: Idle.` の6行 | 10 |
 | Intercept離陸待ち・生成待ち | INT-01の公開済み待機通知。生成カウントダウンは付けない | 10 |
 | Intercept開始後 | INT-02の `Intercept MISSION START` | 15 |
 | Intercept達成後 | INT-03の達成結果と帰還指示 | 20 |
-| Strike受注後・攻撃中 | STRIKE-02の正確な座標・標高・破壊指示・報酬・人数 | 60 |
+| Strike受注後・攻撃中 | STRIKE-02の施設DDM座標・破壊指示・報酬・人数 | 60 |
 | Strike達成後 | STRIKE-03の達成・帰還指示だけ（座標なし） | 20 |
+| Air Interdiction受注後・攻撃中 | AI-02の周回中心DDM・3両破壊指示・報酬・人数 | 60 |
+| Air Interdiction達成後 | AI-03の達成・帰還指示だけ（座標なし） | 20 |
 | CAP受注後・哨戒中 | CAP-02の空域座標・目的・人数・報酬。進捗・出現有無・残敵を追加しない | 60 |
 | CAP達成後 | CAP-08の達成結果と帰還指示だけ（座標なし） | 20 |
 | SEAD計画中 | SEAD-01の受注・`Mission planning in progress.`。MODE・SAM機種・PBコード・検査回数はまだ出さない | 10 |
@@ -420,7 +422,7 @@ UCID警告は各人の警告行を改行で結合し、任務受注通知より�
 保護呼出の汎用ERRORには同一原因を1回に抑える仕組みがなく、監視で例外が続くと1秒ごと、メニュー走査なら走査のたびに再表示され得る。Groupなしの内部操作はログだけとなる。
 Follow-on DEADの開始前予約解除では、各人に6AのFAILED精算を出した後、共通の予約取消通知も出す。
 有効なFollow-on判定後でも保持者を取得できない／Preserve処理がfalseになる場合、Preserveには失敗専用の通知がない。
-任務なしのAbort Missionは、7AのIdleの5行を10秒表示する。
+任務なしのAbort Missionは、7AのIdleの6行を10秒表示する。
 
 ### SEAD配置候補50回不適合（25秒）
 
@@ -507,16 +509,16 @@ Select 'Task: SEAD' to retry.
 |---|---|---|---:|
 | STRIKE-01 | 抽選・生成成功時。地上／空中共通 | `Strike mission accepted.` | 10 |
 | STRIKE-02 | STRIKE-01直後に1回 | 下記ブリーフィング | 60 |
-| STRIKE-03 | 指定対象全破壊。燃料は3基すべて | 下記達成・帰還通知 | 20 |
-| STRIKE-04 | 近い2赤基地で使用可能な施設なし | `No available Strike targets among the two nearest RED bases. Try again later.` | 20 |
+| STRIKE-03 | コンテナ任意2個／司令部1個／トラック2両の必要数破壊 | 下記達成・帰還通知 | 20 |
+| STRIKE-04 | 近い2施設が使用不可 | `No available Strike targets among the two nearest sites. Try again later.` | 20 |
 | STRIKE-05 | 受注準備・生成・座標整形の失敗 | `ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.` | 20 |
 
-STRIKE-02（見出し・座標と標高の同一行・指示・報酬・人数の5行。基地名・目標名の独立行は出さない）:
+STRIKE-02（見出し・施設の捜索座標・指示・報酬・人数の5行。PP用DMS・個別目標座標・標高は出さない）:
 
 ```text
 STRIKE MISSION
-TARGET LOCATION: <誤差なしのDMS、秒の小数2桁>, <地表標高> ft MSL
-OBJECTIVE: <Destroy all 3 fuel tanks / Destroy the ammunition depot / Destroy the warehouse>; then RTB.
+TARGET AREA: <施設基準点のDDM、分の小数3桁>
+OBJECTIVE: <Destroy any 2 of the 4 storage containers / Destroy the command center / Destroy both trucks>; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <人数>.
 ```
@@ -525,7 +527,7 @@ STRIKE-03:
 
 ```text
 Strike Objective Complete
-Assigned facility destroyed.
+Assigned targets destroyed.
 Each pilot: return to a BLUE airfield or carrier.
 Reward per pilot: 150 points; recovery failure: 90 points.
 ```
@@ -542,3 +544,30 @@ Statusは達成前にSTRIKE-02を同じ本文で再表示し、達成後はSTRIK
 | STRIKE-09 | 点煙APIの例外・拒否 | `ERROR: Strike target smoke failed. See DCS log; retry later.` | 15 |
 
 色・距離・時間は初期設定。自動点煙はせず、目標の北50 mの地表へ任意要求で赤煙を1本出す。約120秒後・達成・全員終了で無通知停止する。停止後は再要求可能。点煙通知はStatusを上書きせず、座標・得点・対象・基地予約は変えない。他プレイヤーにも見える視覚効果。停止失敗は5秒ごとに再試行し、個人精算・基地解放を妨げない。F10項目が多い場合はMoreから続きへ進む。
+
+## 12. Air Interdiction（移動車列）
+
+| ID | タイミング・分岐 | 本文 | 秒 |
+|---|---|---|---:|
+| AI-01 | 近い2地域からの抽選・生成成功。地上／空中共通 | `Air Interdiction mission accepted.` | 10 |
+| AI-02 | AI-01直後、1回だけ | 下記の中心座標ブリーフィング | 60 |
+| AI-03 | 今回生成した3両すべての破壊 | 下記の達成・帰還指示 | 20 |
+| AI-04 | 近い2地域が使用不可 | `No available Air Interdiction routes among the two nearest sites. Try again later.` | 20 |
+| AI-05 | 準備・生成・座標整形に失敗 | `ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.` | 20 |
+
+```text
+AIR INTERDICTION MISSION
+TARGET AREA: <周回WPの外接矩形中心DDM・分の小数3桁>
+OBJECTIVE: Destroy all 3 convoy vehicles; then RTB.
+Reward per pilot: 150 points.
+Registered pilots: <人数>.
+```
+
+```text
+Air Interdiction Objective Complete
+All 3 convoy vehicles destroyed.
+Each pilot: return to a BLUE airfield or carrier.
+Reward per pilot: 150 points; recovery failure: 90 points.
+```
+
+AI-02はcoordinateBriefingSeconds設定を使う。攻撃中のStatusはAI-02と同じ本文、達成後は座標を外したAI-03だけ20秒。部分撃破・移動開始・周回・散開の自動通知はなく、車列の現在位置・方向・残数は追加しない。個別精算は共通通知にカテゴリ名Air Interdictionを使う。削除再試行中も精算通知を繰り返さない。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。

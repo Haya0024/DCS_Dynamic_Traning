@@ -307,6 +307,7 @@ local function scenario(options)
         end }
     end }
     dofile("scripts/Strike-TestFixtures.lua")(s, env, options, newUnit)
+    dofile("scripts/AirInterdiction-TestFixtures.lua")(s, env, options, newUnit)
     local function runBundle()
         local chunk = assert(loadfile("build/DynamicTraining.lua")); setfenv(chunk, env)()
     end
@@ -388,7 +389,7 @@ local function scenario(options)
         self:command("Player Statistics", player)
         local text = self.messages[#self.messages].text
         assert(self.messages[#self.messages].seconds == 25)
-        for _, category in ipairs({ "Intercept", "CAP", "SEAD", "DEAD", "Strike" }) do
+        for _, category in ipairs({ "Intercept", "CAP", "SEAD", "DEAD", "Strike", "Air Interdiction" }) do
             assert(not string.find(text, category .. " Score:", 1, true), text)
         end
         local first = assert(string.find(text, "PLAYER STATISTICS: " .. player.name .. " [" .. player.unitName .. "]", 1, true))

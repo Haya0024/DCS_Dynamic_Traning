@@ -1,50 +1,55 @@
 -- Test-StrikeMission.ps1 prepends unchanged tables from the actual .miz.
 local scenario = dofile('scripts/Intercept-TestHarness.lua')
 local config = dofile('src/config.lua').strike
-local templates, units, ids, groups = {}, {}, {}, {}
+local templates, units, ids, groups, groupIDs = {}, {}, {}, {}, {}
 for side, co in pairs(mission.coalition) do for _, country in pairs(co.country or {}) do
     for _, group in pairs((country.static or {}).group or {}) do
-        if group.name:find('^TPL_STRIKE_') then
+        assert(not group.name:find('^TPL_STRIKE_'), 'Obsolete airport Strike template remains')
+        if group.name:find('^TPL_CMD_') or group.name:find('^TPL_CONT_') or group.name:find('^TPL_TRUCK_') then
             assert(side=='red' and country.name=='Russia' and group.dead==false and #group.units==1)
-            assert(not groups[group.name]); groups[group.name]=true
+            assert(not groups[group.name] and not groupIDs[group.groupId])
+            groups[group.name]=group; groupIDs[group.groupId]=true
             local u=group.units[1]
             assert(not units[u.name] and not ids[u.unitId]); units[u.name]=true; ids[u.unitId]=true
             templates[u.name]=group
         end
     end
 end end
-local total=0; for _ in pairs(templates) do total=total+1 end; assert(total==25)
--- Airports paired with the five ME sites. Fixture base points are the ME
--- facility centroid; production obtains runway centers from MOOSE AIRBASE.
-local airportIDs={7,39,21,14,50}
-local bases={}
-for index,site in ipairs(config.sites) do
-    assert(warehouses.airports[airportIDs[index]].coalition=='RED')
-    local center={x=0,y=0}; local n=0
-    for _,kind in ipairs(config.targets) do for _,suffix in ipairs(kind.suffixes) do
-        local name='TPL_STRIKE_'..site.id..'_'..suffix..'-1'
-        local group=assert(templates[name],name); local u=group.units[1]
-        assert(group.name=='TPL_STRIKE_'..site.id..'_'..suffix and u.type==kind.type)
-        center.x,center.y,n=center.x+u.x,center.y+u.y,n+1
-    end end
-    center.x,center.y=center.x/n,center.y/n
-    local base={point=center,side=1}
-    function base:GetVec2() return self.point end
-    function base:GetCoalition() return self.side end
-    bases[site.airbase]=base
+local total=0; for _ in pairs(templates) do total=total+1 end; assert(total==42)
+local centers={}
+for _,site in ipairs(config.sites) do
+    for i,member in ipairs(config.members) do
+        local name=member.prefix..'_'..site.id..'_'..member.suffix
+        local group=assert(groups[name],name); local u=group.units[1]
+        assert(u.type==member.type and (u.name==name or u.name==name..'-1'))
+        if i==1 then centers[site.id]={x=u.x,y=u.y} end
+    end
 end
-print('PASS: actual .miz has five RED bases and 25 uniquely named Strike templates')
+print('PASS: actual .miz has six complete RED seven-member facilities and no old airport targets')
 for _,site in ipairs(config.sites) do for kind=1,3 do
-    local s=scenario({strikeTemplates=templates,strikeAirbases=bases})
-    local p=bases[site.airbase].point
+    local s=scenario({strikeTemplates=templates})
+    local p=centers[site.id]
     s.player.position={x=p.x,y=300,z=p.y}; s.randomValues={1,kind}
     s:command('Task: Strike'); local r=assert(s:mission())
-    assert(r.strikePlan.site.id==site.id and #s.staticSpawns==(kind==1 and 3 or 1))
-    for i,t in ipairs(r.strikePlan.targets) do
-        local me=r.strikePlan.target.templates[i]
-        assert(t.unit.position.x==me.x and t.unit.position.z==me.y)
+    assert(r.strikePlan.site.id==site.id and #s.staticSpawns==7)
+    assert(#r.strikePlan.targets==(kind==1 and 4 or kind==2 and 1 or 2))
+    assert(s.messages[#s.messages].text:find('TARGET AREA: LL DDM ',1,true))
+    for i,o in ipairs(s.staticSpawns) do
+        local member=config.members[i]
+        local me=groups[member.prefix..'_'..site.id..'_'..member.suffix].units[1]
+        assert(o.position.x==me.x and o.position.z==me.y and o.heading==me.heading and o.kind==me.type)
     end
+    -- Scenery losses cannot complete a selected objective. Target losses can.
+    for i,o in ipairs(s.staticSpawns) do
+        if not r.strikePlan.target.selected[i] then o.alive=false; s:event('Dead',o) end
+    end
+    assert(r.state=='ACTIVE')
+    for i=1,r.strikePlan.requiredCount do
+        local t=r.strikePlan.targets[i]; t.unit.alive=false; s:event('Dead',t.unit)
+        assert(r.state==(i<r.strikePlan.requiredCount and 'ACTIVE' or 'RTB_PENDING'))
+    end
+    assert(r.state=='RTB_PENDING')
     s:command('Abort Mission'); for _,o in ipairs(s.staticSpawns) do assert(not o.alive) end
     assert(not s:mission()); s:assertClean()
 end end
-print('PASS: all 15 actual Strike facilities spawn at their ME positions and clean up in simulation')
+print('PASS: all 18 actual Strike choices spawn seven ME members, count selected targets only and clean up')

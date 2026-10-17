@@ -17,23 +17,19 @@ return function(s, env, options, newUnit)
         s.smokeStops[#s.smokeStops + 1] = name
         s.activeSmokes[name] = nil
     end
-    s.staticTemplates, s.statics, s.staticSpawns, s.airbases = {}, {}, {}, {}
+    s.staticTemplates, s.statics, s.staticSpawns = {}, {}, {}
     local config = dofile("src/config.lua").strike
     for index, site in ipairs(config.sites) do
-        local base = { name = site.airbase, side = 1, point = { x = index * 100000, y = 300 } }
-        function base:GetCoalition() return self.side end
-        function base:GetVec2() return self.point end
-        function base:GetName() return self.name end
-        s.airbases[site.airbase] = base
-        for k, kind in ipairs(config.targets) do for i, suffix in ipairs(kind.suffixes) do
-            local name = "TPL_STRIKE_" .. site.id .. "_" .. suffix .. "-1"
-            local data = { name = name, type = kind.type, x = base.point.x + k * 100,
-                y = base.point.y + i * 10, heading = 0.8, unitId = 5000 + index * 100 + k * 10 + i }
-            s.staticTemplates[name] = { name = name:sub(1, -3), units = { data }, dead = false }
-        end end
+        for i, member in ipairs(config.members) do
+            local groupName = member.prefix .. "_" .. site.id .. "_" .. member.suffix
+            -- Real ME statics contain both bare unit names and '-1' suffixes.
+            local name = groupName .. ((index + i) % 2 == 0 and "-1" or "")
+            local data = { name = name, type = member.type, x = index * 100000 + (i - 1) * 10,
+                y = 300 + (i - 1) * 10, heading = 0.8, unitId = 5000 + index * 100 + i }
+            s.staticTemplates[name] = { name = groupName, units = { data }, dead = false }
+        end
     end
     if options.strikeTemplates then s.staticTemplates = options.strikeTemplates end
-    if options.strikeAirbases then s.airbases = options.strikeAirbases end
     function s:static(data, generated)
         local u = newUnit(data.name, data.unitId, nil, nil, 1, data.type)
         u.position = { x = data.x, y = 0, z = data.y }; u.heading = data.heading
@@ -57,18 +53,20 @@ return function(s, env, options, newUnit)
     end
     for _, group in pairs(s.staticTemplates) do s:static(group.units[1]) end
     if options.strikeOriginalCleanupFailures then
-        s.statics['TPL_STRIKE_SITE01_TANK_01-1'].cleanupFailures = options.strikeOriginalCleanupFailures
+        s.statics['TPL_CMD_SITE01_01-1'].cleanupFailures = options.strikeOriginalCleanupFailures
     end
     env.STATIC = { FindByName = function(_, name) return s.statics[name] end }
     env.StaticObject = { getByName = function(name)
         local object = s.statics[name]
         return object and object.alive and object.raw or nil
     end }
-    env.AIRBASE = { FindByName = function(_, name) return s.airbases[name] end }
-    env._DATABASE = { GetStaticGroupTemplate = function(_, name)
+    env._DATABASE = { Templates = { Statics = {} }, GetStaticGroupTemplate = function(_, name)
         local group = s.staticTemplates[name]
         return group, group and (group.coalition or 1), nil, 0
     end }
+    for name, group in pairs(s.staticTemplates) do
+        env._DATABASE.Templates.Statics[name] = { StaticName = group.name }
+    end
     env.SPAWNSTATIC = { NewFromStatic = function(_, name)
         local data = assert(s.staticTemplates[name]).units[1]
         local copied = {}; for k,v in pairs(data) do copied[k]=v end

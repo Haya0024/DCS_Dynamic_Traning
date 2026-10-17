@@ -10,7 +10,7 @@ local function module(s, wanted)
     error("Missing module: " .. wanted)
 end
 local function accept(s, base, kind, player)
-    s.randomValues = { base or 1, kind or 1 }
+    s.randomValues = { base or 1, kind or 3 }
     s:command("Task: Strike", player)
     return assert(s:mission(player))
 end
@@ -32,28 +32,28 @@ end
 test("initialization caches and silently removes every ME original", function()
     local s = scenario(); local n = 0
     for name, static in pairs(s.statics) do
-        assert(name:find("TPL_STRIKE_", 1, true) == 1 and not static.alive and static.destroyCalls == 1); n=n+1
+        assert(name:find("TPL_", 1, true) == 1 and not static.alive and static.destroyCalls == 1); n=n+1
     end
-    assert(n == 25 and #s.staticSpawns == 0 and #s.randomCalls == 0); s:assertClean()
+    assert(n == 42 and #s.staticSpawns == 0 and #s.randomCalls == 0); s:assertClean()
 end)
-test("ground acceptance spawns only the selected facility with one exact coordinate", function()
+test("ground acceptance spawns the complete selected site with one search coordinate", function()
     local s = scenario(); local r = accept(s, 1, 3)
-    assert(r.category == "Strike" and r.state == "ACTIVE" and #s.staticSpawns == 1)
-    assert(r.strikePlan.site.id == "SITE01" and r.strikePlan.target.kind.type == "Warehouse")
+    assert(r.category == "Strike" and r.state == "ACTIVE" and #s.staticSpawns == 7)
+    assert(r.strikePlan.site.id == "SITE01" and r.strikePlan.target.kind.label == "Trucks")
     assert(#s.randomCalls == 2 and s.randomCalls[1].maximum == 2 and s.randomCalls[2].maximum == 3)
     local text = s.messages[#s.messages].text
-    assert(text == "STRIKE MISSION\nTARGET LOCATION: LL DMS 100300.00 310.00, 0 ft MSL\n" ..
-        "OBJECTIVE: Destroy the warehouse; then RTB.\nReward per pilot: 150 points.\nRegistered pilots: 1.")
+    assert(text == "STRIKE MISSION\nTARGET AREA: LL DDM 100000.000 300.000\n" ..
+        "OBJECTIVE: Destroy both trucks; then RTB.\nReward per pilot: 150 points.\nRegistered pilots: 1.")
     assert(s.messages[#s.messages].seconds == 60); s:assertClean()
 end)
-test("either nearest base and all three target classes are selectable", function()
+test("either nearest site and all three target classes are selectable", function()
     for base=1,2 do for kind=1,3 do
         local s=scenario(); local r=accept(s,base,kind)
         assert(r.strikePlan.site.id == string.format("SITE%02d",base))
-        assert(#s.staticSpawns == (kind==1 and 3 or 1)); s:assertClean()
+        assert(#s.staticSpawns == 7 and #r.strikePlan.targets == (kind==1 and 4 or kind==2 and 1 or 2)); s:assertClean()
         local plan = r.strikePlan
-        assert(s.messages[#s.messages].text == "STRIKE MISSION\nTARGET LOCATION: " ..
-            plan.location .. ", " .. plan.elevation .. " ft MSL\nOBJECTIVE: " ..
+        assert(s.messages[#s.messages].text == "STRIKE MISSION\nTARGET AREA: " ..
+            plan.location .. "\nOBJECTIVE: " ..
             plan.target.kind.objective .. "; then RTB.\nReward per pilot: 150 points.\nRegistered pilots: 1.")
     end end
 end)
@@ -68,83 +68,85 @@ test("wing leader is the occupied participant with the lowest flight number", fu
     s.wingman.position.x=499900; local r=accept(s)
     assert(r.owner.unit==s.wingman and r.strikePlan.site.id=="SITE05"); s:assertClean()
 end)
-test("base distance ties are deterministic before the equal random draw", function()
+test("site distance ties are deterministic before the equal random draw", function()
     local s=scenario(); s.player.position.x=150000
     local r=accept(s,1); assert(r.strikePlan.site.id=="SITE01"); s:assertClean()
 end)
-test("non-RED bases are excluded and a single RED candidate still works", function()
-    local s=scenario()
-    for name,b in pairs(s.airbases) do if name~="Hama" then b.side=2 end end
-    local r=accept(s); assert(r.strikePlan.site.id=="SITE04" and s.randomCalls[1].maximum==1)
-    s:assertClean()
+test("site selection is independent of airport ownership and runtime AIRBASE", function()
+    local s=scenario(); s.env.AIRBASE={FindByName=function() error('no airport lookup') end}
+    local r=accept(s); assert(r.strikePlan.site.id=="SITE01"); s:assertClean()
 end)
-test("no RED base rejects without scoring or retaining wing locks", function()
-    local s=scenario(); for _,b in pairs(s.airbases) do b.side=2 end
+
+test("non-RED facility members invalidate their site without creating targets", function()
+    local templates=scenario().staticTemplates
+    for _,g in pairs(templates) do g.coalition=2 end
+    local s=scenario({strikeTemplates=templates})
     s:command("Task: Strike"); assert(not s:mission() and #s.staticSpawns==0)
-    s:lastMessageContains("No available Strike targets"); s.generate(); assert(s:mission()); s:assertClean()
+    s:lastMessageContains("No available Strike targets"); s.generate(); assert(s:mission())
 end)
-test("base reservation keeps parallel wings on distinct nearest bases", function()
+
+test("site reservation keeps parallel wings on distinct nearest sites", function()
     local s=scenario(); local a=accept(s)
     local other=s:addPilot("Other","ucid-b",20); s:tick(2)
     local b=accept(s,1,2,other)
     assert(a.strikePlan.site.id=="SITE01" and b.strikePlan.site.id=="SITE02")
     assert(s.randomCalls[3].maximum==1); s:assertClean()
 end)
-test("both nearest bases busy rejects instead of silently choosing a third", function()
+test("both nearest sites busy rejects instead of silently choosing a third", function()
     local s=scenario(); accept(s)
     local other=s:addPilot("Other","ucid-b",20); s:tick(2); accept(s,1,2,other)
     local third=s:addPilot("Third","ucid-c",30); s:tick(4)
-    s:command("Task: Strike",third); assert(not s:mission(third) and #s.staticSpawns==4)
+    s:command("Task: Strike",third); assert(not s:mission(third) and #s.staticSpawns==14)
     s:lastMessageContains("No available Strike targets"); s:assertClean()
 end)
 test("existing wing and UCID locks prevent spawning or redrawing", function()
     local s=scenario(); local r=accept(s); local draws=#s.randomCalls
     s:command("Task: Strike"); s.generate()
-    assert(s:mission()==r and #s.randomCalls==draws and #s.staticSpawns==3); s:assertClean()
+    assert(s:mission()==r and #s.randomCalls==draws and #s.staticSpawns==7); s:assertClean()
 end)
-test("fuel briefing uses the three-tank center and terrain elevation", function()
+test("TOO briefing uses the facility reference and explicit three-place DDM without elevation", function()
     local s=scenario(); s.terrainHeight=function() return 304.8 end
     local r=accept(s)
-    assert(r.strikePlan.point.x==100100 and r.strikePlan.point.y==320)
-    s:lastMessageContains("TARGET LOCATION: LL DMS 100100.00 320.00, 1000 ft MSL\n")
-    s:assertClean()
-    -- Exercise the bundled MOOSE formatter itself, beyond the boundary mock.
+    assert(r.strikePlan.point.x==100000 and r.strikePlan.point.y==300)
+    s:lastMessageContains("TARGET AREA: LL DDM 100000.000 300.000\n")
+    assert(not s.messages[#s.messages].text:find('ft MSL',1,true)); s:assertClean()
     local file=assert(io.open('vendor/MOOSE/Moose.lua','rb'))
     local source=file:read('*a'):gsub('\r\n','\n'); file:close()
-    local real=scenario(); real.terrainHeight=function() return 304.8 end
+    local real=scenario()
     local scope=setmetatable({UTILS={}, COORDINATE=real.env.COORDINATE,
         _SETTINGS={LL_Accuracy=5}, coord={LOtoLL=function()
             return 33 + 23.4/60, 36 + 30.3/60
         end}}, {__index=_G})
     for _,pattern in ipairs({'function UTILS%.Round.-\nend', 'UTILS%.tostringLL = function.-\nend',
-        'function COORDINATE:ToStringLLDMS.-\n  end'}) do
+        'function COORDINATE:ToStringLLDDM.-\n  end'}) do
         setfenv(assert(loadstring(assert(source:match(pattern)))),scope)()
     end
-    real.env.COORDINATE.ToStringLLDDM=function() error('Strike must use DMS') end
+    real.env.COORDINATE.ToStringLLDMS=function() error('Strike must use DDM') end
     accept(real)
-    local degree=string.char(194,176) -- UTF-8; native PowerShell pipes can replace non-ASCII literals.
-    real:lastMessageContains('TARGET LOCATION: LL DMS 033'..degree..'23\'24.00"N 036'..degree..'30\'18.00"E, 1000 ft MSL\n')
-    real:command('Abort Mission')
-    scope.coord.LOtoLL=function() return 33 + 23/60 + 4.5/3600, 36 + 30/60 + 7.89/3600 end
-    accept(real)
-    real:lastMessageContains('TARGET LOCATION: LL DMS 033'..degree..'23\'04.50"N 036'..degree..'30\'07.89"E, 1000 ft MSL\n')
+    local degree=string.char(194,176)
+    real:lastMessageContains('TARGET AREA: LL DDM 033'..degree.." 23.400'N   036"..degree.." 30.300'E\n")
     real:assertClean()
 end)
-test("spawn preserves each ME position heading type and clears original IDs", function()
+
+test("all seven members preserve ME position heading type and receive fresh IDs", function()
     local s=scenario(); local r=accept(s)
+    assert(#s.staticSpawns==7 and #r.strikePlan.objects==7 and #r.strikePlan.targets==2)
     for i,o in ipairs(s.staticSpawns) do
-        assert(o.position.x==100100 and o.position.z==300+i*10 and o.heading==0.8)
-        assert(o.id~=s.staticTemplates["TPL_STRIKE_SITE01_TANK_0"..i.."-1"].units[1].unitId)
-        assert(o.unitName=="DT_STRIKE_"..r.assignmentID.."_"..i)
+        assert(o.position.x==100000+(i-1)*10 and o.position.z==300+(i-1)*10 and o.heading==0.8)
+        assert(o.id>10000 and o.unitName=="DT_STRIKE_"..r.assignmentID.."_"..i)
+        assert(o.kind==dofile('src/config.lua').strike.members[i].type)
     end
     s:assertClean()
 end)
-test("fuel requires all three tanks; partial damage and two losses are insufficient", function()
+
+test("both trucks must be destroyed; damage and unrelated component losses are insufficient", function()
     local s=scenario(); local r=accept(s); local targets=r.strikePlan.targets
     targets[1].unit.life=1; s:tick(1); assert(r.state=="ACTIVE")
-    destroy(s,targets[1].unit); destroy(s,targets[2].unit); s:tick(2); assert(r.state=="ACTIVE")
-    destroy(s,targets[3].unit); assert(r.state=="RTB_PENDING"); s:assertClean()
+    destroy(s,s.staticSpawns[1]); destroy(s,s.staticSpawns[2]); s:tick(2); assert(r.state=="ACTIVE")
+    destroy(s,targets[1].unit); assert(r.state=="ACTIVE")
+    destroy(s,targets[2].unit); assert(r.state=="RTB_PENDING"); s:assertClean()
 end)
+
 test("polling detects zero life without a delivered death event", function()
     local s=scenario(); local r=accept(s,1,2); r.strikePlan.targets[1].unit.life=0
     s:tick(1); assert(r.state=="RTB_PENDING"); s:assertClean()
@@ -173,7 +175,7 @@ test("status recalls exact published coordinates then completion only for twenty
     s:command('Mission Status'); assert(s.messages[#s.messages].text==brief)
     complete(s,r); local done=s.messages[#s.messages].text
     s:command('Mission Status'); assert(s.messages[#s.messages].text==done and s.messages[#s.messages].seconds==20)
-    assert(not done:find('TARGET LOCATION:',1,true)); s:assertClean()
+    assert(not done:find('TARGET AREA:',1,true)); s:assertClean()
 end)
 test("completed recovery awards Strike150 once and preserves statistics", function()
     local s=scenario(); local r=accept(s,1,2); complete(s,r); recover(s)
@@ -194,7 +196,7 @@ test("abort always awards zero, removes statics and permits another sortie", fun
 end)
 test("RTB before completion keeps the active facility and lock", function()
     local s=scenario(); local r=accept(s); recover(s)
-    assert(s:mission()==r and r.state=='ACTIVE' and #s.staticSpawns==3); s:score(0); s:assertClean()
+    assert(s:mission()==r and r.state=='ACTIVE' and #s.staticSpawns==7); s:score(0); s:assertClean()
 end)
 test("MP2 pre-clear loss stays at zero while its wingmate completes and recovers", function()
     local s=scenario(); s:occupyWing(); local r=accept(s)
@@ -212,7 +214,7 @@ test("a throw after native creation still retains and cleans the object", functi
     for _,o in ipairs(s.staticSpawns) do assert(not o.alive) end
     assert(#s.errors==1)
 end)
-test("cleanup failure retains the base reservation until successful retry", function()
+test("cleanup failure retains the site reservation until successful retry", function()
     local s=scenario(); local r=accept(s); local old=r.strikePlan.targets[1].unit
     old.cleanupFailures=1; s:command('Abort Mission'); assert(old.alive and not s:mission())
     local next=accept(s); assert(next.strikePlan.site.id=='SITE02')
@@ -224,9 +226,9 @@ test("native statics created before MOOSE registration are cleaned by the rollba
     s.env.STATIC.FindByName=function() return nil end
     s:command('Task: Strike')
     assert(not s:mission() and #s.staticSpawns==1 and not s.staticSpawns[1].alive and #s.errors==1)
-    assert(not next(module(s,'Missions').strikeBases))
+    assert(not next(module(s,'Missions').strikeSites))
 end)
-test("no-effect deletion cannot release a base even when Destroy returns nil", function()
+test("no-effect deletion cannot release a site even when Destroy returns nil", function()
     local s=scenario(); local r=accept(s); local old=r.strikePlan.targets[1].unit
     old.cleanupNoEffect=true; s:command('Abort Mission'); s:tick(10)
     assert(old.alive and accept(s).strikePlan.site.id=='SITE02'); s:assertClean()
@@ -237,19 +239,19 @@ test("new sorties use fresh static identities and stale death events do not comp
     s:event('Dead',old); assert(r.state=='ACTIVE')
     assert(r.strikePlan.targets[1].objectID~=old.id); s:assertClean()
 end)
-test("missing templates fail only that base without stopping other mission categories", function()
+test("missing templates fail only that site without stopping other mission categories", function()
     local s=scenario({strikeTemplates={}})
     s:command('Task: Strike'); assert(not s:mission())
-    s.player.airborne=true; s.generate(); assert(s:mission().category=='Intercept' and #s.errors==5)
+    s.player.airborne=true; s.generate(); assert(s:mission().category=='Intercept' and #s.errors==42)
 end)
 test("coordinate formatting failure rolls back before any static spawn", function()
-    local s=scenario(); s.env.COORDINATE.ToStringLLDMS=function() error('coordinate unavailable') end
+    local s=scenario(); s.env.COORDINATE.ToStringLLDDM=function() error('coordinate unavailable') end
     s:command('Task: Strike'); assert(not s:mission() and #s.staticSpawns==0 and #s.errors==1)
 end)
 
-test("a base stays unavailable until every ME original has actually been removed", function()
+test("a site stays unavailable until every ME original has actually been removed", function()
     local s=scenario({strikeOriginalCleanupFailures=1})
-    local original=s.statics['TPL_STRIKE_SITE01_TANK_01-1']; assert(original.alive)
+    local original=s.statics['TPL_CMD_SITE01_01-1']; assert(original.alive)
     local r=accept(s); assert(r.strikePlan.site.id=='SITE02')
     s:tick(1); assert(not original.alive)
     s:command('Abort Mission'); assert(accept(s).strikePlan.site.id=='SITE01'); s:assertClean()
@@ -342,6 +344,67 @@ test("MP2 Strike menus keep smoke and both personal aborts reachable within ten 
     assert(s.commands[s.player.group.name]['Mark Strike Target'])
     s:command('Mark Strike Target'); s:abortSortie(s.player); s:abortSortie(s.wingman)
     assert(not s:mission()); s:assertClean()
+end)
+
+test("the sixth site can be selected from the current leader position", function()
+    local s=scenario(); s.player.position.x=600000
+    assert(accept(s).strikePlan.site.id=='SITE06'); s:assertClean()
+end)
+
+test("command objective ignores all six scenery objects and completion leaves surviving scenery", function()
+    local s=scenario(); local r=accept(s,1,2)
+    assert(#r.strikePlan.targets==1 and r.strikePlan.targets[1].member==1)
+    complete(s,r)
+    for i=2,7 do assert(s.staticSpawns[i].alive) end
+    s:command('Abort Mission')
+    for _,o in ipairs(s.staticSpawns) do assert(not o.alive) end
+    s:assertClean()
+end)
+
+test("failed scenery cleanup holds the site reservation just like failed target cleanup", function()
+    local s=scenario(); local r=accept(s,1,2); local scenery=s.staticSpawns[7]
+    scenery.cleanupFailures=1; s:command('Abort Mission')
+    assert(scenery.alive and module(s,'Missions').strikeSites.SITE01==r.strikePlan)
+    assert(accept(s).strikePlan.site.id=='SITE02')
+    s:tick(5); assert(not scenery.alive and not module(s,'Missions').strikeSites.SITE01)
+    s:assertClean()
+end)
+
+test("a missing non-reference member invalidates only its site and removes the other originals", function()
+    local templates=scenario().staticTemplates; templates['TPL_CONT_SITE01_03-1']=nil
+    local s=scenario({strikeTemplates=templates}); local r=accept(s)
+    assert(r.strikePlan.site.id=='SITE02' and #s.errors==1)
+    for name,o in pairs(s.statics) do if name:find('SITE01',1,true) then assert(not o.alive) end end
+end)
+
+test("mixed actual unit names resolve through their stable ME group names", function()
+    local s=scenario()
+    assert(s.staticTemplates['TPL_CMD_SITE01_01-1'] and s.staticTemplates['TPL_CONT_SITE01_02'])
+    local r=accept(s,1,2); assert(#r.strikePlan.objects==7); s:assertClean()
+end)
+
+test("any two of four containers complete the objective for all six pairs without another random draw", function()
+    for a=1,3 do for b=a+1,4 do
+        local s=scenario(); local r=accept(s,1,1); local targets=r.strikePlan.targets
+        assert(#targets==4 and r.strikePlan.requiredCount==2 and #s.randomCalls==2)
+        s:lastMessageContains('OBJECTIVE: Destroy any 2 of the 4 storage containers; then RTB.')
+        destroy(s,targets[a].unit); assert(r.state=='ACTIVE')
+        destroy(s,targets[a].unit); assert(r.state=='ACTIVE')
+        destroy(s,targets[b].unit); assert(r.state=='RTB_PENDING')
+        local alive=0; for _,t in ipairs(targets) do if t.unit.alive then alive=alive+1 end end
+        assert(alive==2 and s.staticSpawns[1].alive and s.staticSpawns[6].alive)
+        recover(s); s:score(150); for _,o in ipairs(s.staticSpawns) do assert(not o.alive) end
+        s:assertClean()
+    end end
+end)
+
+test("container polling needs two confirmed losses and unknown or damaged members cannot fill the quota", function()
+    local s=scenario(); local r=accept(s,1,1); local targets=r.strikePlan.targets
+    targets[1].unit.life=0; targets[2].unit.life=1
+    targets[3].unit.IsAlive=function() return nil end
+    targets[4].unit.GetLife=function() error('unavailable') end
+    s:tick(1); assert(r.state=='ACTIVE')
+    targets[2].unit.life=0; s:tick(2); assert(r.state=='RTB_PENDING'); s:assertClean()
 end)
 
 print(string.format("All %d Strike tests passed (simulated DCS/MOOSE).",count))

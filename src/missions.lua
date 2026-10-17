@@ -1,6 +1,6 @@
 -- Shared assignment state. Every mission category must acquire this blocker
 -- before reserving or spawning; locks survive individual participant settlement.
-local Missions = { wings = {}, pilots = {}, sites = {}, strikeBases = {}, sequence = 0 }
+local Missions = { wings = {}, pilots = {}, sites = {}, strikeSites = {}, interdictionSites = {}, sequence = 0 }
 
 function Missions.Blocker(groupName, roster)
     local record = Missions.wings[groupName]

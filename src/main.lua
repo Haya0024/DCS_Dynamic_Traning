@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-9" }
+DynamicTrainingRuntime = { version = "training-11" }
 Persistence.Publish()
 
 local menus = {}
@@ -38,6 +38,8 @@ local function Close(record)
         CAP.Cleanup(record.capPlan and record.capPlan.enemy)
     elseif record.category == "Strike" then
         Strike.Close(record.strikePlan)
+    elseif record.category == "Air Interdiction" then
+        AirInterdiction.Close(record.interdictionPlan)
     elseif record.site then
         SEADSites.CloseAssignment(record.site, record.assignmentID)
     elseif record.spawn then
@@ -117,7 +119,9 @@ local function PrimaryComplete(record, time, result)
     elseif record.category == "CAP" then
         title, objective = "CAP PRIMARY OBJECTIVE COMPLETE", "Patrol time complete and all hostile aircraft destroyed."
     elseif record.category == "Strike" then
-        title, objective = "Strike Objective Complete", "Assigned facility destroyed."
+        title, objective = "Strike Objective Complete", "Assigned targets destroyed."
+    elseif record.category == "Air Interdiction" then
+        title, objective = "Air Interdiction Objective Complete", "All 3 convoy vehicles destroyed."
     end
     PublishMission(record, "complete", title .. "\n" ..
         objective .. "\nEach pilot: return to a BLUE airfield or carrier.\n" ..
@@ -255,6 +259,33 @@ local function Generate(groupName, category)
     if not acquired then Message(group, blocked); return end
     Notifications.RegisteredAircraft(record)
     if problem then Message(group, problem, 15) end
+    if category == "Air Interdiction" then
+        record.owner = roster[1]
+        local ok, problem = pcall(function()
+            record.interdictionPlan = AirInterdiction.Plan(record.owner.unit:GetVec3(), record.assignmentID)
+            if not record.interdictionPlan then return end
+            record.spawn = AirInterdiction.Spawn(record.interdictionPlan)
+            record.interdictionBriefing = AirInterdiction.Briefing(record.interdictionPlan)
+            BeginScoring(record, record.interdictionPlan.fullReward)
+        end)
+        if not ok or not record.interdictionPlan then
+            Close(record)
+            if not ok then
+                env.error("[DynamicTraining] Air Interdiction setup: " .. tostring(problem))
+                Message(group, "ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.", 20)
+            else
+                Message(group, "No available Air Interdiction routes among the two nearest sites. Try again later.", 20)
+            end
+            return
+        end
+        record.state = "ACTIVE"
+        Message(group, "Air Interdiction mission accepted.", 10)
+        PublishMission(record, "briefing", record.interdictionBriefing .. string.format(
+            "\nReward per pilot: %d points.\nRegistered pilots: %d.", record.fullReward, #roster),
+            Config.coordinateBriefingSeconds)
+        DebugLog(record, "Air Interdiction started; route=" .. record.interdictionPlan.site.name)
+        return
+    end
     if category == "Strike" then
         record.owner = roster[1]
         local ok, problem = pcall(function()
@@ -270,7 +301,7 @@ local function Generate(groupName, category)
                 env.error("[DynamicTraining] Strike setup: " .. tostring(problem))
                 Message(group, "ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.", 20)
             else
-                Message(group, "No available Strike targets among the two nearest RED bases. Try again later.", 20)
+                Message(group, "No available Strike targets among the two nearest sites. Try again later.", 20)
             end
             return
         end
@@ -590,7 +621,9 @@ ScanPlayers = function()
                 { "Task: CAP", function(groupName) Generate(groupName, "CAP") end },
                 { "Task: SEAD", function(groupName) Generate(groupName, "SEAD") end },
                 { "Task: DEAD", function(groupName) Generate(groupName, "DEAD") end },
-                { "Task: Strike", function(groupName) Generate(groupName, "Strike") end }, { "Mission Status", Status },
+                { "Task: Strike", function(groupName) Generate(groupName, "Strike") end },
+                { "Task: Air Interdiction", function(groupName) Generate(groupName, "Air Interdiction") end },
+                { "Mission Status", Status },
                 { "Abort Mission", Abort }, { "Player Statistics", Statistics }
             }) do
                 local label, action = command[1], command[2]
@@ -758,6 +791,8 @@ local function TickMission(record, time)
                 if CAP.Complete(record.capPlan, record.spawn) then PrimaryComplete(record, time) end
             elseif record.category == "Strike" then
                 if Strike.Remaining(record.strikePlan) == 0 then PrimaryComplete(record, time) end
+            elseif record.category == "Air Interdiction" then
+                if AirInterdiction.Remaining(record.interdictionPlan) == 0 then PrimaryComplete(record, time) end
             elseif record.deadTargets then
                 if DEAD.Remaining(record) == 0 then DeadComplete(record, time) end
             elseif record.category == "SEAD" then
@@ -815,6 +850,8 @@ local function HandleEvent(record, event)
                 if CAP.Complete(record.capPlan, record.spawn) then PrimaryComplete(record, time) end
             elseif record.category == "Strike" then
                 if Strike.RecordLoss(record.strikePlan, event) then PrimaryComplete(record, time) end
+            elseif record.category == "Air Interdiction" then
+                if AirInterdiction.RecordLoss(record.interdictionPlan, event) then PrimaryComplete(record, time) end
             elseif record.deadTargets then
                 if DEAD.RecordLoss(record, event) then DeadComplete(record, time) end
             else
@@ -870,11 +907,13 @@ local function Tick(_, time)
     Safe("Intercept enemy cleanup", nil, function() Intercept.Sweep(time) end)
     Safe("CAP enemy cleanup", nil, function() CAP.Sweep(time) end)
     Safe("Strike facility cleanup", nil, function() Strike.Sweep(time) end)
+    Safe("Air Interdiction cleanup", nil, function() AirInterdiction.Sweep(time) end)
     return time + Config.pollSeconds
 end
 
 MapOverlay.RefreshFriendlyAirbases()
 Safe("Strike template initialization", nil, Strike.Initialize)
+Safe("Air Interdiction template initialization", nil, AirInterdiction.Initialize)
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
 Log("Runtime initialized; version=" .. DynamicTrainingRuntime.version .. "; MOOSE event subscriber retained.")

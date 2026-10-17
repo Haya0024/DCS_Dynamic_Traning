@@ -1,12 +1,12 @@
 # 実装構成と設計上の約束
 
-更新日: 2026-10-15
+更新日: 2026-10-17
 
 ## 対象
 
-Intercept / CAP / SEAD / DEAD / Strikeの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
+Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
-この構成は`training-9`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-11`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
 実ミッションのプレイヤー配置は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、合計10グループ・15 Clientスロット。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
 
@@ -14,11 +14,12 @@ Intercept / CAP / SEAD / DEAD / Strikeの現在の実装を説明する。訓練
 
 | 層 | モジュール | 責務 |
 |---|---|---|
-| 設定 | `config.lua` | 訓練値・時間・候補・報酬。各任務の設定は`intercept` / `cap` / `sead` / `dead`に置く |
+| 設定 | `config.lua` | 訓練値・時間・候補・報酬。各任務の設定は`intercept` / `cap` / `sead` / `dead` / `strike` / `airInterdiction`に置く |
 | 搭乗者 | `player.lua` | BLUE Hornetの動的列挙、UCID・機体・イベント照合 |
 | 任務台帳 | `missions.lua` | Wing/UCIDロック、受注順、活動中任務とSiteの参照 |
 | 訓練地域 | 実ミッションのME Trigger Zone | 全19円の中心・半径の唯一の定義元。各任務はZONE:FindByNameで参照し、Configの候補名・距離制限で選定 |
-| 固定施設 | `strike.lua` | ME Static取得・原本除去、近い2赤基地の抽選、施設生成・破壊観測、基地予約・削除再試行 |
+| 固定施設 | `strike.lua` | ME Static取得・42原本除去、近い2施設の抽選、一式7物体生成・必要数破壊、施設予約・削除再試行 |
+| 移動車列 | `air_interdiction.lua` | ME周回中心の算出、近い2経路の抽選、3両生成・破壊観測、地域予約・削除再試行 |
 | 空中目標 | `air_targets.lua` | Intercept/CAPの生成済み機体のID固定、喪失イベント、生存観測 |
 | 任務 | `intercept.lua` / `cap.lua` | 敵航空機の生成・経路と削除待ち。CAPは計画・滞在時間・進捗も管理 |
 | 地上目標 | `sead.lua` / `sead_objective.lua` | SAM計画・安全配置と主要レーダーFSMを分離 |
@@ -48,7 +49,7 @@ MissionReportは公開済みブリーフィングと最新の開始／達成通�
 
 任務の`state`は全体phase、参加者の`state`は各人のphase、Siteの`state`は車両の観測状態、`disposition`は保持・使用・削除方針。これらを同じ値として扱わない。特にSEADの`primaryResult`は主要レーダーの達成履歴であり、Site全滅の証拠ではない。
 
-通常はARMED → ACTIVE → RTB_PENDING、地上Intercept/SEADはTAKEOFF_DELAY、SEADの地点選定はPLANNINGを挟む。CAPとStrikeは受注後すぐACTIVE。Immediate DEADは元SEADのRTB_PENDING → DEAD_ACTIVE → RTB_PENDING。参加者だけLANDING_CHECKを持つ。すべての精算・中止後に台帳から解放し、終端状態のrecordを新任務に再利用しない。
+通常はARMED → ACTIVE → RTB_PENDING、地上Intercept/SEADはTAKEOFF_DELAY、SEADの地点選定はPLANNINGを挟む。CAP・Strike・Air Interdictionは受注後すぐACTIVE。Immediate DEADは元SEADのRTB_PENDING → DEAD_ACTIVE → RTB_PENDING。参加者だけLANDING_CHECKを持つ。すべての精算・中止後に台帳から解放し、終端状態のrecordを新任務に再利用しない。
 
 ## 命名とデータ契約
 
@@ -82,14 +83,18 @@ training-3では実行入口をmain.luaへ改名し、Interceptの敵削除再�
 
 ## 開発と検証
 
-全体の確認は`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1`。両bundleを結合し、Lua 10スイートとBUILD/SYNC/INSTALLを使い捨てfixtureで検証する。Luaの場所は`-LuaPath`で指定できる。
+全体の確認は`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1`。両bundleを結合し、Lua 11スイートとBUILD/SYNC/INSTALLを使い捨てfixtureで検証する。Luaの場所は`-LuaPath`で指定できる。
 
 実ミッションへの反映はその後に`Sync-Mission.ps1`、続けて`Sync-Mission.ps1 -Check`。既定先は`mission/Persistent_and_Dynamic_FA-18C_Training.miz`。別ファイルは`-MissionPath`で明示する。既存埋め込みLuaだけを置換し、ZIP内のその他の内容を保持する。詳細はREADMEとTESTINGを参照する。
 
 ## Strikeの状態と保存形式
 
-`Missions.strikeBases[airbaseName]` に基地の使用予約を一元管理する。StrikeのテンプレートカタログはMEのStaticから取得し、座標をConfigへ複製しない。生成物はplan.objects、採点対象のIDと喪失状態はplan.targetsに保持する。任務ロック解放後も削除が未完了なら基地予約を維持し、全削除を確認して解除する。SPAWNSTATICの再配置機能を使わず、ME位置・向きと任務別の名前／新規IDで生成する。詳細は[STRIKE.md](STRIKE.md)。
+StrikeはMEの6施設・42原本をキャッシュ・除去し、受注時の長機から近い2施設の1つへ7物体を生成する。司令部配置点を施設基準とし、空港APIへ依存しない。`Missions.strikeSites`にSite ID単位の予約を置き、`plan.targets`の対象候補4/1/2個と`requiredCount`の必要破壊数2/1/2個を分ける。周辺設備を含む全削除を確認して予約解除する。Statusは施設DDMの公開済み本文だけ。詳細は[STRIKE.md](STRIKE.md)。
 
-保存schema3は末尾へstrikeScoreを追加。schema1/2は既存列を厳密検証して読み、未収録項目を0で補う。missionとHookを同時更新する。
+保存schema4は従来のstrikeScoreの次にairInterdictionScoreを追加。schema1/2/3は各旧列を厳密検証して読み、未収録項目を0で補う。missionとHookを同時更新する。
 
 Strikeの任意スモークはstrike.luaのMark/StopMark/Sweepで管理する。plan.smokeは最後の要求、Strike.marksは停止待ちの視覚効果だけを保持する。MOOSE COORDINATE:Smoke/StopSmokeを使い、予約・Static削除・採点と寿命を分離する。main.luaでACTIVE・受注Wing・操縦中未精算参加者を照合し、成功/連打/失敗の通常通知を出す。公開ブリーフィングの再表示用キャッシュは変更しない。F10項目は9件ごとにMoreを作って次ページへ送り、MP2と任意項目を含め各ページ10件以内に保つ。
+
+## Air Interdictionの状態と地域予約
+
+MEのTPL_AI_01～06はLate Activationのまま保ち、route.pointsの外接矩形中心をキャッシュする。受注時の長機から近い2中心を固定し、使用可能な1経路を抽選する。Missions.interdictionSites[templateName]へplanを予約し、SPAWN:NewWithAliasでME経路と3両を複製して即ACTIVE。3実体のIDと明示死亡を固定して全滅でRTB_PENDING。元のユニット名の連番には依存しない。全員精算後に削除し、削除が確認できるまで予約を維持する。失敗は5秒間隔で再試行し、生成後例外も固有aliasのMOOSE/native参照で回収する。Statusは公開した中心DDMの本文のみ、達成後は座標を外す。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。

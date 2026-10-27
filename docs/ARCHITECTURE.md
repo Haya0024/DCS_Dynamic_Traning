@@ -1,12 +1,12 @@
 # 実装構成と設計上の約束
 
-更新日: 2026-10-17
+更新日: 2026-10-27
 
 ## 対象
 
 Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
-この構成は`training-11`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-12`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
 実ミッションのプレイヤー配置は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、合計10グループ・15 Clientスロット。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
 
@@ -18,7 +18,7 @@ Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を�
 | 搭乗者 | `player.lua` | BLUE Hornetの動的列挙、UCID・機体・イベント照合 |
 | 任務台帳 | `missions.lua` | Wing/UCIDロック、受注順、活動中任務とSiteの参照 |
 | 訓練地域 | 実ミッションのME Trigger Zone | 全19円の中心・半径の唯一の定義元。各任務はZONE:FindByNameで参照し、Configの候補名・距離制限で選定 |
-| 固定施設 | `strike.lua` | ME Static取得・42原本除去、近い2施設の抽選、一式7物体生成・必要数破壊、施設予約・削除再試行 |
+| 固定施設 | `strike.lua` | ME Static取得・54原本除去、PB/TOO・近い2施設の抽選、TOO7/PB9物体生成、DDM/DMS・標高、施設予約・削除再試行 |
 | 移動車列 | `air_interdiction.lua` | ME周回中心の算出、近い2経路の抽選、3両生成・破壊観測、地域予約・削除再試行 |
 | 空中目標 | `air_targets.lua` | Intercept/CAPの生成済み機体のID固定、喪失イベント、生存観測 |
 | 任務 | `intercept.lua` / `cap.lua` | 敵航空機の生成・経路と削除待ち。CAPは計画・滞在時間・進捗も管理 |
@@ -89,7 +89,7 @@ training-3では実行入口をmain.luaへ改名し、Interceptの敵削除再�
 
 ## Strikeの状態と保存形式
 
-StrikeはMEの6施設・42原本をキャッシュ・除去し、受注時の長機から近い2施設の1つへ7物体を生成する。司令部配置点を施設基準とし、空港APIへ依存しない。`Missions.strikeSites`にSite ID単位の予約を置き、`plan.targets`の対象候補4/1/2個と`requiredCount`の必要破壊数2/1/2個を分ける。周辺設備を含む全削除を確認して予約解除する。Statusは施設DDMの公開済み本文だけ。詳細は[STRIKE.md](STRIKE.md)。
+Strikeは6施設・54原本をキャッシュ・除去し、受注時にPB/TOOを固定する。最寄り候補は司令部配置点から近い2施設。TOOは従来7物体と4/1/2対象・2/1/2必要数を維持し、PBは9物体を生成して司令部/タンク/弾薬庫から指定1個を対象にする。Missions.strikeSitesの予約を方式間で共有する。TOOのplan.pointは司令部基準点、PBは指定目標そのもののME位置。公開時にDDM3桁またはDMS2桁＋地表標高ft MSLを確定し、Statusでは再計算しない。元7構成の不備は両方式、PB追加構成だけの不備はsite.pbValidでPBだけを無効化する。原本/生成物の削除が未確認なら予約を維持する。詳細は[STRIKE.md](STRIKE.md)。
 
 保存schema4は従来のstrikeScoreの次にairInterdictionScoreを追加。schema1/2/3は各旧列を厳密検証して読み、未収録項目を0で補う。missionとHookを同時更新する。
 

@@ -2,6 +2,16 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-27 StrikeのPB/TOO分岐（training-12）
+
+ユーザーが各SITE01～06へTPL_TANK_SITE##_01（Tank 3）とTPL_AMMO_SITE##_01（.Ammunition depot）を1個ずつ追加した保存済み.mizを確認した。全12個はRED/Russia・Static・未破壊で、名前/IDの重複なし。追加時にはSITE05のコンテナ2個の移動とME保存に伴うoptions/warehouses更新も含まれており、これらユーザー保存内容を維持する。
+
+受注時にTOO/PBを各1/2、近い2施設の使用可能な1施設、その方式の3対象を各1/3で抽選・固定する。TOOは見出しだけSTRIKE MISSION (TOO)にし、従来の司令部DDM3桁・7個生成・任意2コンテナ/司令部/トラックの条件を維持。PBは司令部・燃料タンク・弾薬庫から1個を選び、9個生成・指定1個破壊。座標の意味をユーザーに確認し、共通施設基準点ではなく、抽選した目標そのもののDMS秒小数2桁＋その地点の地表標高ft MSLをTARGET AREAの同じ行に表示することを確定した。
+
+原本54個を起動時に除去。方式間で施設予約を共有し、PB追加構成の不備はPBだけ無効化する。Statusは公開済み本文を再表示し、達成後は座標/標高なし20秒。スモークはTOO基準点/PB目標の北50 m。両方式は既存strikeScoreと150/90/0、schema4を共有しHookは変更しない。
+
+Lua全476ケース（11スイート、Strike67）・BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME2が通過。実.mizの全36選択でTOO7/PB9個の生成位置・対象・達成・削除を模擬確認した。実DCSの地表標高・PP入力・実射・信管/耐久はMAN-63として未実施。既定.mizへSync/Check成功。ZIP CRC・結合Lua一致・直前版と同一のbackupを確認し、変更は埋め込みDynamicTraining.luaのみ。他8エントリ（mission設定、warehouses、options、MOOSE、リソース等）は同期直前のユーザー保存版と同一。
+
 ## 2026-10-17 Air Interdiction追加（training-11）
 
 ユーザー保存済みのTPL_AI_01～06を確認。各RED/Russia・Late Activation・Tigr/BTR-70/Ural各1両、全8WPがOn Road・9.25 m/s、最終WPからWP0へ戻る指示あり。全体のMEグループ/ユニット名とIDは一意。WP0のOption30・60.96は車間距離約61 mであり、Disperse under fireの設定と混同しない。TPL_AI_04内の複製元名TPL_AI_03-1-*も有効な一意名として維持した。ME位置・経路・設定は変更しない。

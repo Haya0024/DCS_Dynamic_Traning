@@ -5,7 +5,8 @@ local templates, units, ids, groups, groupIDs = {}, {}, {}, {}, {}
 for side, co in pairs(mission.coalition) do for _, country in pairs(co.country or {}) do
     for _, group in pairs((country.static or {}).group or {}) do
         assert(not group.name:find('^TPL_STRIKE_'), 'Obsolete airport Strike template remains')
-        if group.name:find('^TPL_CMD_') or group.name:find('^TPL_CONT_') or group.name:find('^TPL_TRUCK_') then
+        if group.name:find('^TPL_CMD_') or group.name:find('^TPL_CONT_') or group.name:find('^TPL_TRUCK_')
+            or group.name:find('^TPL_TANK_') or group.name:find('^TPL_AMMO_') then
             assert(side=='red' and country.name=='Russia' and group.dead==false and #group.units==1)
             assert(not groups[group.name] and not groupIDs[group.groupId])
             groups[group.name]=group; groupIDs[group.groupId]=true
@@ -15,7 +16,7 @@ for side, co in pairs(mission.coalition) do for _, country in pairs(co.country o
         end
     end
 end end
-local total=0; for _ in pairs(templates) do total=total+1 end; assert(total==42)
+local total=0; for _ in pairs(templates) do total=total+1 end; assert(total==54)
 local centers={}
 for _,site in ipairs(config.sites) do
     for i,member in ipairs(config.members) do
@@ -25,15 +26,24 @@ for _,site in ipairs(config.sites) do
         if i==1 then centers[site.id]={x=u.x,y=u.y} end
     end
 end
-print('PASS: actual .miz has six complete RED seven-member facilities and no old airport targets')
-for _,site in ipairs(config.sites) do for kind=1,3 do
+print('PASS: actual .miz has six complete RED nine-member facilities including six tanks and six ammunition depots')
+for _,site in ipairs(config.sites) do for mode=1,2 do for kind=1,3 do
     local s=scenario({strikeTemplates=templates})
     local p=centers[site.id]
-    s.player.position={x=p.x,y=300,z=p.y}; s.randomValues={1,kind}
+    s.player.position={x=p.x,y=300,z=p.y}; s.randomValues={mode,1,kind}
     s:command('Task: Strike'); local r=assert(s:mission())
-    assert(r.strikePlan.site.id==site.id and #s.staticSpawns==7)
-    assert(#r.strikePlan.targets==(kind==1 and 4 or kind==2 and 1 or 2))
-    assert(s.messages[#s.messages].text:find('TARGET AREA: LL DDM ',1,true))
+    assert(r.strikePlan.site.id==site.id and #s.staticSpawns==(mode==1 and 7 or 9))
+    assert(r.strikePlan.attackMode==config.modes[mode])
+    assert(#r.strikePlan.targets==(mode==2 and 1 or kind==1 and 4 or kind==2 and 1 or 2))
+    local text=s.messages[#s.messages].text
+    assert(text:find('STRIKE MISSION ('..config.modes[mode]..')',1,true))
+    assert(text:find(mode==1 and 'TARGET AREA: LL DDM ' or 'TARGET AREA: LL DMS ',1,true))
+    if mode==2 then
+        local member=config.members[({1,8,9})[kind]]
+        local me=groups[member.prefix..'_'..site.id..'_'..member.suffix].units[1]
+        assert(r.strikePlan.point.x==me.x and r.strikePlan.point.y==me.y)
+        assert(text:find(string.format('LL DMS %.2f %.2f, 0 ft MSL',me.x,me.y),1,true))
+    else assert(not text:find('ft MSL',1,true)) end
     for i,o in ipairs(s.staticSpawns) do
         local member=config.members[i]
         local me=groups[member.prefix..'_'..site.id..'_'..member.suffix].units[1]
@@ -51,5 +61,5 @@ for _,site in ipairs(config.sites) do for kind=1,3 do
     assert(r.state=='RTB_PENDING')
     s:command('Abort Mission'); for _,o in ipairs(s.staticSpawns) do assert(not o.alive) end
     assert(not s:mission()); s:assertClean()
-end end
-print('PASS: all 18 actual Strike choices spawn seven ME members, count selected targets only and clean up')
+end end end
+print('PASS: all 36 actual Strike choices retain TOO seven-object DDM and PB nine-object precise target DMS, objectives and cleanup')

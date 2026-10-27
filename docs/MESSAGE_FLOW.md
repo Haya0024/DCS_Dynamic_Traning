@@ -1,6 +1,6 @@
 # 任務メッセージのタイミング・分岐一覧
 
-更新: 2026-10-17。現在の `training-11` の実装を読み取った、表示を見直すための一覧。
+更新: 2026-10-27。現在の `training-12` の実装を読み取った、表示を見直すための一覧。
 本文・タイミングは現在の実装に合わせる。実画面のキャプチャではない。2026-10-15の変更でPBのTHREAT AREAを推定座標へ統一し、抑制条件を30秒へ短縮した。DEADの座標をラベルと同じ行へまとめ、受注本文の並び順も更新した。
 
 対象は実装済みの Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。
@@ -322,7 +322,7 @@ UCID不明の精算ではPoints・Total Score・保存状態・SEAD/DEAD内訳�
 | Intercept離陸待ち・生成待ち | INT-01の公開済み待機通知。生成カウントダウンは付けない | 10 |
 | Intercept開始後 | INT-02の `Intercept MISSION START` | 15 |
 | Intercept達成後 | INT-03の達成結果と帰還指示 | 20 |
-| Strike受注後・攻撃中 | STRIKE-02の施設DDM座標・破壊指示・報酬・人数 | 60 |
+| Strike受注後・攻撃中 | STRIKE-02T/PのTOO施設DDMまたはPB目標DMS＋標高・破壊指示・報酬・人数 | 60 |
 | Strike達成後 | STRIKE-03の達成・帰還指示だけ（座標なし） | 20 |
 | Air Interdiction受注後・攻撃中 | AI-02の周回中心DDM・3両破壊指示・報酬・人数 | 60 |
 | Air Interdiction達成後 | AI-03の達成・帰還指示だけ（座標なし） | 20 |
@@ -508,20 +508,32 @@ Select 'Task: SEAD' to retry.
 | ID | タイミング | 本文 | 秒 |
 |---|---|---|---:|
 | STRIKE-01 | 抽選・生成成功時。地上／空中共通 | `Strike mission accepted.` | 10 |
-| STRIKE-02 | STRIKE-01直後に1回 | 下記ブリーフィング | 60 |
-| STRIKE-03 | コンテナ任意2個／司令部1個／トラック2両の必要数破壊 | 下記達成・帰還通知 | 20 |
+| STRIKE-02T/P | STRIKE-01直後に1回 | 下記の方式別ブリーフィング | 60 |
+| STRIKE-03 | TOOの従来必要数、またはPBの指定司令部/タンク/弾薬庫1個を破壊 | 下記達成・帰還通知 | 20 |
 | STRIKE-04 | 近い2施設が使用不可 | `No available Strike targets among the two nearest sites. Try again later.` | 20 |
 | STRIKE-05 | 受注準備・生成・座標整形の失敗 | `ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.` | 20 |
 
-STRIKE-02（見出し・施設の捜索座標・指示・報酬・人数の5行。PP用DMS・個別目標座標・標高は出さない）:
+STRIKE-02T（従来から見出しだけ変更、座標・目標・7個生成は維持）:
 
 ```text
-STRIKE MISSION
+STRIKE MISSION (TOO)
 TARGET AREA: <施設基準点のDDM、分の小数3桁>
 OBJECTIVE: <Destroy any 2 of the 4 storage containers / Destroy the command center / Destroy both trucks>; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <人数>.
 ```
+
+STRIKE-02P（選んだ目標そのものの座標と地表標高）:
+
+```text
+STRIKE MISSION (PB)
+TARGET AREA: <選んだ目標のDMS、秒の小数2桁>, <整数> ft MSL
+OBJECTIVE: <Destroy the command center / Destroy the fuel tank / Destroy the ammunition depot>; then RTB.
+Reward per pilot: 150 points.
+Registered pilots: <人数>.
+```
+
+TOO/PBは各1/2、近い2施設の使用可能な1つ、その方式の3目標は各1/3。受注後は固定。PBは施設一式9個を生成するが、指定1個だけ破壊が必要。全54原本を起動時に除去する。PB標高が不明なら生成せず解除する。スモーク基準点はTOOでは司令部、PBでは指定目標。
 
 STRIKE-03:
 
@@ -532,7 +544,7 @@ Each pilot: return to a BLUE airfield or carrier.
 Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
-Statusは達成前にSTRIKE-02を同じ本文で再表示し、達成後はSTRIKE-03だけを20秒表示する。現在残数・未選択施設・抽選候補・予約を追加しない。途中撃破・全員離陸・生成待ちの自動通知はない。精算は6章の共通通知でカテゴリ名Strikeを使用する。全員終了後の削除失敗は予約を維持して再試行し、精算通知を繰り返さない。詳細は[STRIKE.md](STRIKE.md)。
+Statusは達成前にSTRIKE-02T/Pを同じ本文で再表示し、達成後はSTRIKE-03だけを20秒表示する。現在残数・未選択施設・抽選候補・予約を追加しない。途中撃破・全員離陸・生成待ちの自動通知はない。精算は6章の共通通知でカテゴリ名Strikeを使用する。全員終了後の削除失敗は予約を維持して再試行し、精算通知を繰り返さない。詳細は[STRIKE.md](STRIKE.md)。
 
 ### 11A. Strikeの任意スモーク
 

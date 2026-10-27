@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-11" }
+DynamicTrainingRuntime = { version = "training-12" }
 Persistence.Publish()
 
 local menus = {}
@@ -311,7 +311,7 @@ local function Generate(groupName, category)
             "\nReward per pilot: %d points.\nRegistered pilots: %d.", record.fullReward, #roster),
             Config.coordinateBriefingSeconds)
         DebugLog(record, "Strike started; site=" .. record.strikePlan.site.id ..
-            " targets=" .. #record.strikePlan.targets)
+            " mode=" .. record.strikePlan.attackMode .. " targets=" .. #record.strikePlan.targets)
         return
     end
     if category == "CAP" then

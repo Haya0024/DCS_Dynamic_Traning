@@ -32,7 +32,7 @@ return function(s, env, options, newUnit)
     if options.strikeTemplates then s.staticTemplates = options.strikeTemplates end
     function s:static(data, generated)
         local u = newUnit(data.name, data.unitId, nil, nil, 1, data.type)
-        u.position = { x = data.x, y = 0, z = data.y }; u.heading = data.heading
+        u.position = { x = data.x, y = 0, z = data.y }; u.heading = data.heading; u.life = 100
         function u:GetDCSObject() return self.alive and self.raw or nil end
         function u:GetVec2() return { x = self.position.x, y = self.position.z } end
         function u:Destroy(events)

@@ -1,4 +1,4 @@
--- TOO facilities: ME geometry, nearest-site selection, objectives and cleanup.
+-- PB/TOO facilities: ME geometry, nearest-site selection, objectives and cleanup.
 local Strike = { sites = {}, templates = {}, marks = {} }
 local function finite(v) return type(v) == "number" and v == v and math.abs(v) < math.huge end
 local function point(p) return type(p) == "table" and finite(p.x) and finite(p.y) end
@@ -37,7 +37,7 @@ function Strike.Initialize()
         elseif groups[groupName] == nil then groups[groupName] = name end
     end
     for _, cfg in ipairs(Config.strike.sites) do
-        local site = { id = cfg.id, members = {}, originals = {}, valid = true }
+        local site = { id = cfg.id, members = {}, originals = {}, valid = true, pbValid = true }
         Strike.sites[#Strike.sites + 1] = site
         for index, member in ipairs(Config.strike.members) do
             local ok, problem = pcall(function()
@@ -61,10 +61,11 @@ function Strike.Initialize()
                 -- Native IDs must be fresh on every sortie; names alone do
                 -- not protect delayed death events after a template is reused.
                 spawner.TemplateStaticUnit.unitId = nil
-                site.members[index] = { spawner = spawner, x = unit.x, y = unit.y }
+                site.members[index] = { spawner = spawner, x = unit.x, y = unit.y, pbOnly = member.pbOnly }
             end)
             if not ok then
-                site.valid = false
+                site.pbValid = false
+                if not member.pbOnly then site.valid = false end
                 env.error("[DynamicTraining] Strike templates " .. cfg.id .. ": " .. tostring(problem))
             end
         end
@@ -76,6 +77,8 @@ function Strike.Plan(position, assignmentID)
     assert(position and finite(position.x) and finite(position.z), "Strike acceptance position unavailable.")
     local cfg, nearest = Config.strike, {}
     assert(finite(cfg.fullReward) and cfg.fullReward >= 0 and cfg.fullReward % 1 == 0, "Invalid Strike reward.")
+    local mode = cfg.modes[math.random(1, #cfg.modes)]
+    assert(mode == "TOO" or mode == "PB", "Invalid Strike attack mode.")
     for _, site in ipairs(Strike.sites) do
         if site.point then
             local p = site.point
@@ -91,20 +94,37 @@ function Strike.Plan(position, assignmentID)
     for i = 1, math.min(2, #nearest) do
         local site, clean = nearest[i].site, true
         for _, object in ipairs(site.originals) do if Strike.templates[object] then clean = false end end
-        if site.valid and clean and not Missions.strikeSites[site.id] then available[#available + 1] = site end
+        if site.valid and (mode ~= "PB" or site.pbValid) and clean and not Missions.strikeSites[site.id] then
+            available[#available + 1] = site
+        end
     end
     if #available == 0 then return nil end
     local site = available[math.random(1, #available)]
-    local kind = cfg.targets[math.random(1, #cfg.targets)]
+    local kinds = mode == "PB" and cfg.pbTargets or cfg.targets
+    local kind = kinds[math.random(1, #kinds)]
     local selected = {}
     for _, index in ipairs(kind.members) do selected[index] = true end
     local requiredCount = kind.requiredCount or #kind.members
     assert(finite(requiredCount) and requiredCount % 1 == 0 and requiredCount > 0
         and requiredCount <= #kind.members, "Invalid Strike target count.")
-    local coordinate = COORDINATE:NewFromVec2(site.point)
-    local location = coordinate:ToStringLLDDM({ LL_Accuracy = 3 })
+    local aimPoint = site.point
+    if mode == "PB" then
+        assert(#kind.members == 1 and requiredCount == 1, "PB requires one target.")
+        local member = assert(site.members[kind.members[1]], "PB target template unavailable.")
+        aimPoint = { x = member.x, y = member.y }
+    end
+    local coordinate = COORDINATE:NewFromVec2(aimPoint)
+    local location, elevation
+    if mode == "PB" then
+        local height = coordinate:GetLandHeight()
+        assert(finite(height), "PB target elevation unavailable.")
+        elevation = math.floor(height / 0.3048 + 0.5)
+        location = coordinate:ToStringLLDMS({ LL_Accuracy = 2 })
+    else location = coordinate:ToStringLLDDM({ LL_Accuracy = 3 }) end
     assert(type(location) == "string" and location ~= "", "Strike briefing unavailable.")
-    local plan = { site = site, target = { kind = kind, selected = selected }, point = site.point, location = location,
+    if mode == "PB" then location = location .. string.format(", %d ft MSL", elevation) end
+    local plan = { site = site, attackMode = mode, target = { kind = kind, selected = selected }, point = aimPoint,
+        location = location, elevationFt = elevation,
         assignmentID = assignmentID,
         objects = {}, targets = {}, requiredCount = requiredCount, fullReward = cfg.fullReward }
     assert(not Missions.strikeSites[site.id], "Strike site already reserved.")
@@ -116,34 +136,36 @@ function Strike.Spawn(plan)
     assert(Missions.strikeSites[plan.site.id] == plan and not plan.spawnAttempted, "Invalid Strike reservation.")
     plan.spawnAttempted = true
     for i, template in ipairs(plan.site.members) do
-        local name = "DT_STRIKE_" .. plan.assignmentID .. "_" .. i
-        template.spawner.TemplateStaticUnit.unitId = nil
-        local ok, object = pcall(function() return template.spawner:Spawn(nil, name) end)
-        if not ok or not object then
-            -- A MOOSE post-spawn failure can leave the native static alive.
-            -- Recover it by its unique name before rolling the assignment back.
-            object = cleanupReference(name)
-            plan.objects[#plan.objects + 1] = object
-            error("Strike static spawn failed: " .. name)
-        end
-        -- Retain the native result even if validation of its identity fails.
-        if object then plan.objects[#plan.objects + 1] = object end
-        assert(object and object:IsAlive() == true, "Strike static spawn failed.")
-        local id = assert(object:GetID(), "Strike static identity unavailable.")
-        assert(object:GetName() == name and object:GetCoalition() == coalition.side.RED, "Unexpected Strike object.")
-        local p = object:GetVec2()
-        assert(point(p) and math.abs(p.x - template.x) < 0.1 and math.abs(p.y - template.y) < 0.1,
-            "Strike static moved from its ME position.")
-        if plan.target.selected[i] then
-            plan.targets[#plan.targets + 1] = { unit = object, objectID = id, unitName = name, member = i }
+        if plan.attackMode == "PB" or not template.pbOnly then
+            local name = "DT_STRIKE_" .. plan.assignmentID .. "_" .. i
+            template.spawner.TemplateStaticUnit.unitId = nil
+            local ok, object = pcall(function() return template.spawner:Spawn(nil, name) end)
+            if not ok or not object then
+                -- A MOOSE post-spawn failure can leave the native static alive.
+                -- Recover it by its unique name before rolling the assignment back.
+                object = cleanupReference(name)
+                plan.objects[#plan.objects + 1] = object
+                error("Strike static spawn failed: " .. name)
+            end
+            -- Retain the native result even if validation of its identity fails.
+            if object then plan.objects[#plan.objects + 1] = object end
+            assert(object and object:IsAlive() == true, "Strike static spawn failed.")
+            local id = assert(object:GetID(), "Strike static identity unavailable.")
+            assert(object:GetName() == name and object:GetCoalition() == coalition.side.RED, "Unexpected Strike object.")
+            local p = object:GetVec2()
+            assert(point(p) and math.abs(p.x - template.x) < 0.1 and math.abs(p.y - template.y) < 0.1,
+                "Strike static moved from its ME position.")
+            if plan.target.selected[i] then
+                plan.targets[#plan.targets + 1] = { unit = object, objectID = id, unitName = name, member = i }
+            end
         end
     end
     return { units = plan.targets }
 end
 
 function Strike.Briefing(plan)
-    return string.format("STRIKE MISSION\nTARGET AREA: %s\nOBJECTIVE: %s; then RTB.",
-        plan.location, plan.target.kind.objective)
+    return string.format("STRIKE MISSION (%s)\nTARGET AREA: %s\nOBJECTIVE: %s; then RTB.",
+        plan.attackMode, plan.location, plan.target.kind.objective)
 end
 
 local function stopMark(mark, time)

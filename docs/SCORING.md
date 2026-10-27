@@ -1,6 +1,6 @@
 # プレイヤー採点・帰還評価仕様
 
-更新日: 2026-10-17
+更新日: 2026-10-27
 
 現在の採点対象は Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続30秒、DEADは開始時の残存対象全滅でクリアとする。CAPはzone内累計120秒と敵航空機全滅の両方でクリア。詳細は [CAP.md](CAP.md)。
 Immediate DEADは同じSEAD sortie内のphaseとして、SEADのID・達成結果・報酬を維持し、独立したDEAD報酬を追加する。詳細は [DEAD.md](DEAD.md)。
@@ -251,7 +251,7 @@ Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カ�
 
 ## Strike
 
-Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strikeScore・Total Score・Career Pointsを更新する。攻撃対象はコンテナ4個のうち任意2個／司令部1個／トラック2両の必要数破壊とし、周辺設備の破壊を必須にしない。目標達成前の帰還は精算せず、受注を維持する。個人事故・Abort・MP2の共有達成と個別精算は既存ルールを使う。カテゴリ別ScoreはPlayer Statisticsへ追加表示しない。schema4で保存し、schema1/2のStrikeは0として復元する。
+Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strikeScore・Total Score・Career Pointsを更新する。TOOはコンテナ4個のうち任意2個／司令部1個／トラック2両、PBは司令部／燃料タンク／弾薬庫から指定1個の破壊とし、周辺設備の破壊を必須にしない。目標達成前の帰還は精算せず、受注を維持する。個人事故・Abort・MP2の共有達成と個別精算は既存ルールを使う。カテゴリ別ScoreはPlayer Statisticsへ追加表示しない。schema4で保存し、schema1/2のStrikeは0として復元する。
 
 ## Air Interdiction
 

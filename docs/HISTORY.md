@@ -2,6 +2,12 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-27 StrikeをPP表記へ統一（training-14）
+
+ユーザー指定により、JDAM/JSOW向けStrikeの方式をPBからPP（Pre-Planned）へ訂正した。STRIKE MISSION (PP)、attackMode、config.strike.ppTargets、ppOnly、ppValid、テストと現行仕様書を揃えた。SEADのHARM PB（Pre-Briefed）は維持する。抽選・対象・座標・標高・報酬・保存schema4は変更しない。過去のPB表記は当時の履歴として残す。
+
+Lua495ケース・12スイートと全結合検証、実.mizの全36 Strike選択を確認。既定.mizへ登録済みLuaのみSync/Check成功。CRC・bundle/backup一致と、他8 ZIPエントリ不変を確認した。Hook更新は不要。実DCSの表示確認は未実施。
+
 ## 2026-10-27 全体点検と異常系の修正（training-13）
 
 現行のmission/server全27 Luaモジュール、関連MOOSE API、結合・同期・導入・配置診断、実.miz整合性、仕様書を点検した。開始時の既存476ケースは通過したが、追加したREL-01〜12は修正前に全件失敗し、削除未確認・部分生成残留・死亡時ID未照合・帰還観測の不備を再現した。追加確認で監視間隔の飛びと基地所属不明の扱いも再現し修正した。

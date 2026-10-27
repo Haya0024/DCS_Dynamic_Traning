@@ -66,7 +66,7 @@ return {
     },
     strike = {
         fullReward = 150, cleanupRetrySeconds = 5,
-        modes = { "TOO", "PB" },
+        modes = { "TOO", "PP" },
         smoke = { color = "Red", northOffsetMeters = 50, durationSeconds = 120 },
         sites = {
             { id = "SITE01" }, { id = "SITE02" }, { id = "SITE03" },
@@ -81,8 +81,8 @@ return {
             { prefix = "TPL_CONT", suffix = "05", type = "container_20ft" },
             { prefix = "TPL_TRUCK", suffix = "06", type = "Ural-375" },
             { prefix = "TPL_TRUCK", suffix = "07", type = "Ural-375" },
-            { prefix = "TPL_TANK", suffix = "01", type = "Tank 3", pbOnly = true },
-            { prefix = "TPL_AMMO", suffix = "01", type = ".Ammunition depot", pbOnly = true }
+            { prefix = "TPL_TANK", suffix = "01", type = "Tank 3", ppOnly = true },
+            { prefix = "TPL_AMMO", suffix = "01", type = ".Ammunition depot", ppOnly = true }
         },
         targets = {
             { label = "Storage containers", objective = "Destroy any 2 of the 4 storage containers",
@@ -90,7 +90,7 @@ return {
             { label = "Command center", objective = "Destroy the command center", members = { 1 } },
             { label = "Trucks", objective = "Destroy both trucks", members = { 6, 7 } }
         },
-        pbTargets = {
+        ppTargets = {
             { label = "Command center", objective = "Destroy the command center", members = { 1 } },
             { label = "Fuel tank", objective = "Destroy the fuel tank", members = { 8 } },
             { label = "Ammunition depot", objective = "Destroy the ammunition depot", members = { 9 } }

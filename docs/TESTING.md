@@ -26,11 +26,11 @@
 | DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 105 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
 | PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 48 | schema1/2/3→4移行・CAP/Strike/Air Interdiction保存復元・未知schema保護、保存確認、再起動・遅延復元、native I/O、backup、run、Hook/manager/SSE分離、callback寿命、スロット未選択 |
 | MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
-| STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 67 | PB/TOO・近い2施設・各3種類抽選、TOO7/PB9物体、DDM/DMS・地表標高、対象判定、予約、MP2・150/90/0、生成失敗・削除再試行・任意スモーク |
+| STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 67 | PP/TOO・近い2施設・各3種類抽選、TOO7/PP9物体、DDM/DMS・地表標高、対象判定、予約、MP2・150/90/0、生成失敗・削除再試行・任意スモーク |
 | AI | [Test-AirInterdiction.lua](../scripts/Test-AirInterdiction.lua) | 39 | 近い2経路・周回中心DDM・3両破壊、ME経路維持、予約、MP2、個別精算、観測不能・生成失敗・削除再試行 |
 | REL | [Test-Reliability.lua](../scripts/Test-Reliability.lua) | 19 | 全点検の異常系：削除未確認、部分生成、死亡ID、帰還観測、監視間隔、不正地形、MP2反復 |
 | INTERDICTIONME | [Test-AirInterdictionMission.ps1](../scripts/Test-AirInterdictionMission.ps1) | 2確認グループ | 実.mizの6車列・道路/周回/名前/ID、全6中心の近い2候補計12選択で経路全体保持・生成・破壊・削除 |
-| STRIKEME | [Test-StrikeMission.ps1](../scripts/Test-StrikeMission.ps1) | 2確認グループ | 実.mizの6施設・54テンプレート、全36選択の生成位置・TOO7/PB9個・DDM/DMS・必要数破壊・全削除 |
+| STRIKEME | [Test-StrikeMission.ps1](../scripts/Test-StrikeMission.ps1) | 2確認グループ | 実.mizの6施設・54テンプレート、全36選択の生成位置・TOO7/PP9個・DDM/DMS・必要数破壊・全削除 |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
@@ -42,7 +42,9 @@ PowerShellは複数のassertをまとめたPASSグループで、Luaのケース
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの6行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-27、training-13。Lua全495ケース（12スイート、REL19）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME2が通過。REL-19は同じMP2で6カテゴリ×20周、120任務を完了・個別帰還し、活動台帳/予約/削除待ちの解放と各人21,000点を検証する。模擬反復は実サーバーの長時間負荷試験ではない。点検範囲と修正一覧は[AUDIT_2026-10-27.md](AUDIT_2026-10-27.md)。
+最新の自動検証: 2026-10-27、training-14。StrikeのPP表記、ppTargets/ppOnly/ppValid、全36施設選択を確認。SEADのHARM PBは維持する。Lua全495ケース（12スイート）と全結合検証が通過。
+
+2026-10-27、training-13。Lua全495ケース（12スイート、REL19）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME2が通過。REL-19は同じMP2で6カテゴリ×20周、120任務を完了・個別帰還し、活動台帳/予約/削除待ちの解放と各人21,000点を検証する。模擬反復は実サーバーの長時間負荷試験ではない。点検範囲と修正一覧は[AUDIT_2026-10-27.md](AUDIT_2026-10-27.md)。
 
 2026-10-27、training-12。Lua全476ケース（11スイート、Strike67）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME2が通過。PB/TOO抽選・PB3目標のDMS/標高・TOO回帰・全54原本管理・7/9個生成と削除を検証。STRIKEMEは実.mizの全36選択を確認。実地形標高・PP入力/実射はMAN-63で確認待ち。
 
@@ -747,7 +749,7 @@ DCS内の不具合では任務ID・Group・時刻と、`dcs.log` の `[DynamicTr
 新しい成功条件は、正常系に加え「成功してはいけない条件」、境界値、イベント順序、別ウィングへの非干渉を確認する。
 仕様とfixtureが同時に誤っていても自動テストは通るため、期待結果は機能仕様書に照らして見直す。
 
-## Strike 自動テスト対応表（training-12）
+## Strike 自動テスト対応表（training-14）
 
 | ID | 条件・期待結果 |
 |---|---|
@@ -801,34 +803,34 @@ DCS内の不具合では任務ID・Group・時刻と、`dcs.log` の `[DynamicTr
 | STRIKE-48 | MEグループ名から末尾-1あり／なし混在の実ユニット名を解決 |
 | STRIKE-49 | コンテナ任意2個の全6組で達成。1個・同一死亡の重複は未達成。追加抽選なし、他2個と周辺設備は生存可能、帰還150後に全削除 |
 | STRIKE-50 | コンテナのLife0観測は2個必要。損傷・nil・例外はquotaに数えず、別の2個の破壊確定で達成 |
-| STRIKE-51 | PBの方式1/2・近い2施設・司令部/タンク/弾薬庫各1/3の抽選境界、対象1個と9個生成 |
-| STRIKE-52 | 全3対象のPB5行全文・受注10秒/座標60秒、実目標DMS＋整数ft MSL |
+| STRIKE-51 | PPの方式1/2・近い2施設・司令部/タンク/弾薬庫各1/3の抽選境界、対象1個と9個生成 |
+| STRIKE-52 | 全3対象のPP5行全文・受注10秒/座標60秒、実目標DMS＋整数ft MSL |
 | STRIKE-53 | 同梱MOOSE実変換関数でDMS秒小数2桁を照合。全体精度5から独立 |
-| STRIKE-54 | PBの地表標高は目標地点から取得し、司令部地点・屋根高で代替しない |
+| STRIKE-54 | PPの地表標高は目標地点から取得し、司令部地点・屋根高で代替しない |
 | STRIKE-55 | 移動・周辺破壊・点煙でも公開本文と抽選固定、達成後は座標/標高なし20秒 |
 | STRIKE-56 | 全8周辺物体の破壊でも未達成、指定1個の破壊で達成 |
-| STRIKE-57 | PBタンク/弾薬庫の損傷・不明Life・ID変更は非達成、同じ実体のLife0で達成 |
-| STRIKE-58/59 | 全PB候補で帰還150と9個削除、達成後事故90・未達成事故/Abort0 |
-| STRIKE-60 | PB/TOOは施設予約を共有し、別施設では独立した目標と7/9個生成 |
-| STRIKE-61/62 | PB構成欠落でもTOO可。PB候補不正では方式変更・3番目への切替なし |
-| STRIKE-63 | PB座標・標高nil/NaNは生成なしでロック解除 |
+| STRIKE-57 | PPタンク/弾薬庫の損傷・不明Life・ID変更は非達成、同じ実体のLife0で達成 |
+| STRIKE-58/59 | 全PP候補で帰還150と9個削除、達成後事故90・未達成事故/Abort0 |
+| STRIKE-60 | PP/TOOは施設予約を共有し、別施設では独立した目標と7/9個生成 |
+| STRIKE-61/62 | PP構成欠落でもTOO可。PP候補不正では方式変更・3番目への切替なし |
+| STRIKE-63 | PP座標・標高nil/NaNは生成なしでロック解除 |
 | STRIKE-64/65 | 追加8/9番目の生成前/後失敗を回収、周辺弾薬庫削除失敗は予約維持と再試行 |
-| STRIKE-66 | PB赤煙は案内した実目標の北50 m、達成時停止 |
-| STRIKE-67 | PBのMP2個人中止0を維持し、生存僚機は達成/帰還150 |
+| STRIKE-66 | PP赤煙は案内した実目標の北50 m、達成時停止 |
+| STRIKE-67 | PPのMP2個人中止0を維持し、生存僚機は達成/帰還150 |
 
-STRIKEMEは保存済み実.mizの54物体をMOOSE境界fixtureへ渡し、6施設×2方式×3目標の全36選択でME位置・向き・種類、TOO7/PB9個生成と必要数の破壊・全削除を確認する。PBの座標は実目標の配置点を照合するが、地表高度は模擬0 mであり実地形の標高を測っていない。地形への埋まり・障害物・ポッド映像・実破壊効果はゲーム内確認が必要。
-
-| 手動ID | 条件・期待結果 |
-|---|---|
-| MAN-60 | training-12の.mizでDCSを再開始。54原本の除去、TOOの地上/空中受注・近い2施設と3種類抽選・7個生成、施設DDM3桁によるTOO捜索、コンテナ任意2個／司令部1個／トラック2両、非対象破壊で未達成、Statusの達成前座標/達成後20秒、3Dの埋まり・重なり、司令部に必要な兵装・信管、MP2個人150/90/0、並行Wingの施設予約、全員終了後全削除と再受注を確認。schema4 Hookの保存・次セッション復元も確認。未実施 |
+STRIKEMEは保存済み実.mizの54物体をMOOSE境界fixtureへ渡し、6施設×2方式×3目標の全36選択でME位置・向き・種類、TOO7/PP9個生成と必要数の破壊・全削除を確認する。PPの座標は実目標の配置点を照合するが、地表高度は模擬0 mであり実地形の標高を測っていない。地形への埋まり・障害物・ポッド映像・実破壊効果はゲーム内確認が必要。
 
 | 手動ID | 条件・期待結果 |
 |---|---|
-| MAN-61 | training-12でStrike受注後、F10 Mark Strike Targetを選ぶ。施設案内点北50 mの赤煙と施設の見分けやすさ、約120秒停止・再要求・連打防止、達成/Abortで停止、他Wingとの非干渉、Statusの座標維持、MP2のMoreと両個人Abortを確認。未実施 |
+| MAN-60 | training-14の.mizでDCSを再開始。54原本の除去、TOOの地上/空中受注・近い2施設と3種類抽選・7個生成、施設DDM3桁によるTOO捜索、コンテナ任意2個／司令部1個／トラック2両、非対象破壊で未達成、Statusの達成前座標/達成後20秒、3Dの埋まり・重なり、司令部に必要な兵装・信管、MP2個人150/90/0、並行Wingの施設予約、全員終了後全削除と再受注を確認。schema4 Hookの保存・次セッション復元も確認。未実施 |
 
 | 手動ID | 条件・期待結果 |
 |---|---|
-| MAN-63 | training-12でPB司令部/タンク/弾薬庫の各候補を受注。追加12原本が未受注時に残らないこと、目標DMS秒小数2桁・地表標高ft MSLをF10と比較しPPへ入力、実射と必要兵装/信管を確認。指定1個だけで達成、PB目標北50 mの煙、Statusの達成前/後、MP2・個人150/90/0・全9個削除とTOO排他/7個維持を確認。実DCS未実施 |
+| MAN-61 | training-14でStrike受注後、F10 Mark Strike Targetを選ぶ。施設案内点北50 mの赤煙と施設の見分けやすさ、約120秒停止・再要求・連打防止、達成/Abortで停止、他Wingとの非干渉、Statusの座標維持、MP2のMoreと両個人Abortを確認。未実施 |
+
+| 手動ID | 条件・期待結果 |
+|---|---|
+| MAN-63 | training-14でPP司令部/タンク/弾薬庫の各候補を受注。追加12原本が未受注時に残らないこと、目標DMS秒小数2桁・地表標高ft MSLをF10と比較しPPへ入力、実射と必要兵装/信管を確認。指定1個だけで達成、PP目標北50 mの煙、Statusの達成前/後、MP2・個人150/90/0・全9個削除とTOO排他/7個維持を確認。実DCS未実施 |
 
 ## Air Interdiction 自動テスト対応表（training-11）
 

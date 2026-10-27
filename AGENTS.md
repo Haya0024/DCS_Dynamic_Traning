@@ -556,16 +556,16 @@ Dynamic Training
 - SEAD標準Cleanup、Continueで同SiteのImmediate DEAD、Preserve後の別SortieでFollow-on DEADを確認すること
 - 元SEAD精算後・再武装中も保持元Wing専用のSite予約が残り、別Wingを拒否すること。同Wingの最寄りRETAIN取得、DEAD150/90/0、ImmediateのSEAD＋DEAD採点・任務数1件も確認する。詳細は `docs/DEAD.md` と `docs/TESTING.md` を参照する
 
-## Strike（PB精密攻撃・TOO捜索攻撃、実装済み・DCS内確認待ち）
+## Strike（PP精密攻撃・TOO捜索攻撃、実装済み・DCS内確認待ち）
 
 - docs/STRIKE.mdを正とする。src/strike.luaがME Staticの取得・原本除去・方式/施設/目標抽選・生成・座標・観測・削除を担う。
 - SITE01～06の9構成はTPL_CMD_SITE##_01（.Command Center）、TPL_CONT_SITE##_02～05（container_20ft）、TPL_TRUCK_SITE##_06～07（Ural-375）、TPL_TANK_SITE##_01（Tank 3）、TPL_AMMO_SITE##_01（.Ammunition depot）。MEの名前・位置・向きは維持し、StaticNameから実ユニット名を解決する。
-- 起動時に全54原本を無イベント除去。受注時にTOO/PBを各1/2、司令部位置から近い2施設の使用可能な1つ、その方式の3目標を各1/3で固定する。方式や3番目施設への自動切替をせず、地上でも即ACTIVE。
+- 起動時に全54原本を無イベント除去。受注時にTOO/PPを各1/2、司令部位置から近い2施設の使用可能な1つ、その方式の3目標を各1/3で固定する。方式や3番目施設への自動切替をせず、地上でも即ACTIVE。
 - TOOは見出しをSTRIKE MISSION (TOO)へ変更するだけ。従来7個生成・司令部基準DDM3桁・標高なし・誤差なし・コンテナ任意2/4、司令部1、トラック2の達成条件を維持する。
-- PBは9個を生成し、司令部/燃料タンク/弾薬庫の指定1個だけが目標。STRIKE MISSION (PB)、TARGET AREAは抽選した目標そのもののDMS秒小数2桁＋その地点の地表標高ft MSL整数を同じ行で表示する。共通司令部位置や屋根高を使わず、標高観測不能は0へ代替しない。OBJECTIVE・報酬・人数を続ける5行、60秒。方式は別行で追加しない。
-- config.strike.modes/targets/pbTargets/membersに対応を集約。元7構成の不備は両方式、pbOnly追加構成の不備はそのSiteのPBだけを無効化し、他カテゴリは継続する。
+- PPは9個を生成し、司令部/燃料タンク/弾薬庫の指定1個だけが目標。STRIKE MISSION (PP)、TARGET AREAは抽選した目標そのもののDMS秒小数2桁＋その地点の地表標高ft MSL整数を同じ行で表示する。共通司令部位置や屋根高を使わず、標高観測不能は0へ代替しない。OBJECTIVE・報酬・人数を続ける5行、60秒。方式は別行で追加しない。
+- config.strike.modes/targets/ppTargets/membersに対応を集約。元7構成の不備は両方式、ppOnly追加構成の不備はそのSiteのPPだけを無効化し、他カテゴリは継続する。
 - Missions.strikeSitesの予約は両方式で共有。全員終了後に周辺設備も含む7/9個を削除し、削除未確認は予約維持と5秒再試行。nil・例外・ID不一致は破壊根拠にしない。共有達成・個人150/90/0、同じstrikeScore/schema4を維持し、この変更でのHook更新は不要。
-- Statusは公開済み本文だけ、達成後は座標/標高なしの達成・帰還指示20秒。Mark Strike TargetはTOO案内点/PB実目標の北50 mの赤煙約120秒、手動のみ。連打防止・期限/達成/終了停止・停止失敗再試行・古いcallback拒否・F10ページ制御を維持。
+- Statusは公開済み本文だけ、達成後は座標/標高なしの達成・帰還指示20秒。Mark Strike TargetはTOO案内点/PP実目標の北50 mの赤煙約120秒、手動のみ。連打防止・期限/達成/終了停止・停止失敗再試行・古いcallback拒否・F10ページ制御を維持。
 - Test-Strike.lua、実.miz54テンプレート・6サイト×2方式×3目標の全36選択を使うTest-StrikeMission.ps1と全12Luaスイート・BUILD/SYNC/INSTALL/ZONES/INTERDICTIONMEを確認。登録済みLuaだけをSync/Checkし、ME設定・座標・経路・トリガー・リソース表を直接変更しない。
 
 ## Air Interdiction（移動車列、実装済み・DCS内確認待ち）

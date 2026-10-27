@@ -1,6 +1,6 @@
 # 任務メッセージのタイミング・分岐一覧
 
-更新: 2026-10-27。現在の `training-13` の実装を読み取った、表示を見直すための一覧。
+更新: 2026-10-27。現在の `training-14` の実装を読み取った、表示を見直すための一覧。
 本文・タイミングは現在の実装に合わせる。実画面のキャプチャではない。2026-10-15の変更でPBのTHREAT AREAを推定座標へ統一し、抑制条件を30秒へ短縮した。DEADの座標をラベルと同じ行へまとめ、受注本文の並び順も更新した。
 
 対象は実装済みの Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。
@@ -322,7 +322,7 @@ UCID不明の精算ではPoints・Total Score・保存状態・SEAD/DEAD内訳�
 | Intercept離陸待ち・生成待ち | INT-01の公開済み待機通知。生成カウントダウンは付けない | 10 |
 | Intercept開始後 | INT-02の `Intercept MISSION START` | 15 |
 | Intercept達成後 | INT-03の達成結果と帰還指示 | 20 |
-| Strike受注後・攻撃中 | STRIKE-02T/PのTOO施設DDMまたはPB目標DMS＋標高・破壊指示・報酬・人数 | 60 |
+| Strike受注後・攻撃中 | STRIKE-02T/PのTOO施設DDMまたはPP目標DMS＋標高・破壊指示・報酬・人数 | 60 |
 | Strike達成後 | STRIKE-03の達成・帰還指示だけ（座標なし） | 20 |
 | Air Interdiction受注後・攻撃中 | AI-02の周回中心DDM・3両破壊指示・報酬・人数 | 60 |
 | Air Interdiction達成後 | AI-03の達成・帰還指示だけ（座標なし） | 20 |
@@ -509,7 +509,7 @@ Select 'Task: SEAD' to retry.
 |---|---|---|---:|
 | STRIKE-01 | 抽選・生成成功時。地上／空中共通 | `Strike mission accepted.` | 10 |
 | STRIKE-02T/P | STRIKE-01直後に1回 | 下記の方式別ブリーフィング | 60 |
-| STRIKE-03 | TOOの従来必要数、またはPBの指定司令部/タンク/弾薬庫1個を破壊 | 下記達成・帰還通知 | 20 |
+| STRIKE-03 | TOOの従来必要数、またはPPの指定司令部/タンク/弾薬庫1個を破壊 | 下記達成・帰還通知 | 20 |
 | STRIKE-04 | 近い2施設が使用不可 | `No available Strike targets among the two nearest sites. Try again later.` | 20 |
 | STRIKE-05 | 受注準備・生成・座標整形の失敗 | `ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.` | 20 |
 
@@ -526,14 +526,14 @@ Registered pilots: <人数>.
 STRIKE-02P（選んだ目標そのものの座標と地表標高）:
 
 ```text
-STRIKE MISSION (PB)
+STRIKE MISSION (PP)
 TARGET AREA: <選んだ目標のDMS、秒の小数2桁>, <整数> ft MSL
 OBJECTIVE: <Destroy the command center / Destroy the fuel tank / Destroy the ammunition depot>; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <人数>.
 ```
 
-TOO/PBは各1/2、近い2施設の使用可能な1つ、その方式の3目標は各1/3。受注後は固定。PBは施設一式9個を生成するが、指定1個だけ破壊が必要。全54原本を起動時に除去する。PB標高が不明なら生成せず解除する。スモーク基準点はTOOでは司令部、PBでは指定目標。
+TOO/PPは各1/2、近い2施設の使用可能な1つ、その方式の3目標は各1/3。受注後は固定。PPは施設一式9個を生成するが、指定1個だけ破壊が必要。全54原本を起動時に除去する。PP標高が不明なら生成せず解除する。スモーク基準点はTOOでは司令部、PPでは指定目標。
 
 STRIKE-03:
 

@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-13" }
+DynamicTrainingRuntime = { version = "training-14" }
 Persistence.Publish()
 
 local menus = {}

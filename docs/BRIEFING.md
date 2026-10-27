@@ -36,7 +36,7 @@ SEADで制圧したサイトの残存車両をすべて破壊してください�
 
 ### Strike — 固定施設への攻撃
 
-TOO/PBを等確率で抽選し、近い2施設のうち空いている施設を選びます。TOOは従来のDDM案内でコンテナ任意2個・司令部1個・トラック2両のいずれかを捜索・攻撃。PBは司令部・燃料タンク・弾薬庫の1個を指定し、その目標のDMS（秒の小数2桁）＋地表標高ft MSLをPP入力向けに案内します。地上でも即生成し、近い2施設が使用不可なら再受注してください。F10のMark Strike TargetはTOO案内点/PB目標の北50 mに赤煙を約120秒出します。
+TOO/PPを等確率で抽選し、近い2施設のうち空いている施設を選びます。TOOは従来のDDM案内でコンテナ任意2個・司令部1個・トラック2両のいずれかを捜索・攻撃。PPは司令部・燃料タンク・弾薬庫の1個を指定し、その目標のDMS（秒の小数2桁）＋地表標高ft MSLをPP入力向けに案内します。地上でも即生成し、近い2施設が使用不可なら再受注してください。F10のMark Strike TargetはTOO案内点/PP目標の北50 mに赤煙を約120秒出します。
 
 ### 帰還とポイント
 
@@ -82,7 +82,7 @@ One available route is selected from the nearest two of six patrol routes. Searc
 
 ### Strike — Fixed ground facilities
 
-TOO or PB is selected equally at acceptance, followed by one available facility from the nearest two. TOO retains the facility DDM search coordinate and the objective to destroy any two of four containers, the command center, or both trucks. PB assigns one command center, fuel tank or ammunition depot and supplies that target's precise DMS coordinate (seconds to two decimal places) and ground elevation in ft MSL for PP entry. Targets spawn immediately. If both nearest facilities are unavailable, retry later. Mark Strike Target emits red smoke 50 m north of the TOO facility reference or PB target for about 120 seconds.
+TOO or PP is selected equally at acceptance, followed by one available facility from the nearest two. TOO retains the facility DDM search coordinate and the objective to destroy any two of four containers, the command center, or both trucks. PP assigns one command center, fuel tank or ammunition depot and supplies that target's precise DMS coordinate (seconds to two decimal places) and ground elevation in ft MSL for PP entry. Targets spawn immediately. If both nearest facilities are unavailable, retry later. Mark Strike Target emits red smoke 50 m north of the TOO facility reference or PP target for about 120 seconds.
 
 ### Recovery and points
 

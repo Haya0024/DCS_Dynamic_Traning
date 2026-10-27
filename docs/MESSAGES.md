@@ -24,7 +24,7 @@ Screen durations: default 10 seconds, coordinate briefings 60 seconds, settlemen
 
 Durations are display lifetimes, not delays between messages. Acceptance and briefing calls can occur in the same operation; airborne activation can immediately follow a coordinate briefing. The script does not wait for the previous message to expire.
 
-CAP / SEAD / DEAD / Strike TOO / Air Interdiction use one-line DDM with the `LL DDM` prefix and three decimal places in minutes. Each explicitly sets its precision independently of global MOOSE display settings. Strike TOO publishes the facility reference without elevation; Strike PB publishes the selected building DMS with seconds to two decimal places and ground elevation in ft MSL.
+CAP / SEAD / DEAD / Strike TOO / Air Interdiction use one-line DDM with the `LL DDM` prefix and three decimal places in minutes. Each explicitly sets its precision independently of global MOOSE display settings. Strike TOO publishes the facility reference without elevation; Strike PP publishes the selected building DMS with seconds to two decimal places and ground elevation in ft MSL.
 
 ## Screen: Intercept
 
@@ -717,7 +717,7 @@ Raw identity methods may fail after destruction; these fields then show UNAVAILA
 
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-13; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-14; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 
@@ -823,7 +823,7 @@ Implementation and mock tests are distinct from live DCS verification.
 
 ## Screen: Strike acceptance, briefing and completion
 
-`Task: Strike` selects TOO or PB equally, fixes the nearest two facility references, selects one available site and then one of that mode's three objectives equally. Acceptance remains `Strike mission accepted.` for 10 seconds followed once by a five-line briefing for coordinateBriefingSeconds (default 60):
+`Task: Strike` selects TOO or PP equally, fixes the nearest two facility references, selects one available site and then one of that mode's three objectives equally. Acceptance remains `Strike mission accepted.` for 10 seconds followed once by a five-line briefing for coordinateBriefingSeconds (default 60):
 
 ```text
 STRIKE MISSION (TOO)
@@ -836,14 +836,14 @@ Registered pilots: <count>.
 TOO changes only the title: the previous command-center reference, seven spawned objects and three objectives remain. The other objectives are `Destroy the command center` or `Destroy both trucks`.
 
 ```text
-STRIKE MISSION (PB)
+STRIKE MISSION (PP)
 TARGET AREA: <selected target DMS, seconds to two decimal places>, <integer> ft MSL
 OBJECTIVE: Destroy the fuel tank; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <count>.
 ```
 
-PB alternatively assigns `Destroy the command center` or `Destroy the ammunition depot`. Coordinates identify the selected building itself and elevation is the terrain at that location, rather than the common facility reference or roof height. PB spawns nine objects with only the selected one required. All 54 ME originals are removed at startup. Both modes spawn immediately on the ground or in flight, share facility reservations and Strike scoring, and keep their choice/briefing frozen. Coordinate/elevation failure releases acceptance before spawning. Completion remains:
+PP alternatively assigns `Destroy the command center` or `Destroy the ammunition depot`. Coordinates identify the selected building itself and elevation is the terrain at that location, rather than the common facility reference or roof height. PP spawns nine objects with only the selected one required. All 54 ME originals are removed at startup. Both modes spawn immediately on the ground or in flight, share facility reservations and Strike scoring, and keep their choice/briefing frozen. Coordinate/elevation failure releases acceptance before spawning. Completion remains:
 
 ```text
 Strike Objective Complete
@@ -858,7 +858,7 @@ If the nearest two sites are unavailable, display `No available Strike targets a
 
 ### Optional Strike target smoke
 
-Only while Strike is ACTIVE and its accepting Wing contains a controlling, unsettled registered participant, F10 includes `Mark Strike Target`. Selecting it emits one red smoke effect at ground level 50 m north of the published point: the unchanged facility reference in TOO, or the selected building itself in PB. It is stopped after about 120 mission seconds, on objective completion, or when all participants finish. There is no automatic emission. Repeated requests while the effect is still tracked do not create another effect. After it stops, another request is allowed. Smoke is a world effect visible to other players as well.
+Only while Strike is ACTIVE and its accepting Wing contains a controlling, unsettled registered participant, F10 includes `Mark Strike Target`. Selecting it emits one red smoke effect at ground level 50 m north of the published point: the unchanged facility reference in TOO, or the selected building itself in PP. It is stopped after about 120 mission seconds, on objective completion, or when all participants finish. There is no automatic emission. Repeated requests while the effect is still tracked do not create another effect. After it stops, another request is allowed. Smoke is a world effect visible to other players as well.
 
 | Trigger | Body | Seconds |
 |---|---|---:|

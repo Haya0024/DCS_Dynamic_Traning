@@ -62,4 +62,4 @@ for _,site in ipairs(config.sites) do for mode=1,2 do for kind=1,3 do
     s:command('Abort Mission'); for _,o in ipairs(s.staticSpawns) do assert(not o.alive) end
     assert(not s:mission()); s:assertClean()
 end end end
-print('PASS: all 36 actual Strike choices retain TOO seven-object DDM and PB nine-object precise target DMS, objectives and cleanup')
+print('PASS: all 36 actual Strike choices retain TOO seven-object DDM and PP nine-object precise target DMS, objectives and cleanup')

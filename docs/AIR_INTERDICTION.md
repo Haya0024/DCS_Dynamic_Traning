@@ -50,3 +50,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 ## 検証
 
 Test-AirInterdiction.luaで模擬検証、Test-AirInterdictionMission.ps1で保存済み6経路の構成・全候補の生成/中心/周回指示保持/破壊/削除を検証する。実DCSでは2周以上の道路追従、橋・戻り区間、攻撃後の散開と復帰、GMT/FLIR捜索、3両破壊、MP2・並行Wing・帰還・Hook保存を確認する。
+
+## 共通処理との境界（training-13）
+
+既存の固定ID観測・native Group回収・Destroy後確認をObservations/ObjectLifecycleへ共通化した。地域予約、生成済みGroupの所有、5秒再試行はAirInterdictionに残し、ME経路と3両破壊の条件は維持する。REL-19はMP2で他5カテゴリと繰り返して予約・削除待ちが残らないことを確認する。

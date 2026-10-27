@@ -1,6 +1,6 @@
 # Strike（PB精密攻撃・TOO捜索攻撃）
 
-実装仕様: 2026-10-27 / training-12。PB/TOO分岐と追加建物のDCS内生成・実射・精算は確認待ち。
+実装仕様: 2026-10-27 / training-13。PB/TOO分岐と追加建物のDCS内生成・実射・精算は確認待ち。
 
 ## 受注と抽選
 
@@ -89,3 +89,7 @@ StrikeがACTIVEで、受注Wingに操縦中・未精算の登録参加者がい�
 ## 検証
 
 Test-Strike.luaでTOOの回帰とPB3目標・DMS2桁・目標地点標高・Status・排他・採点・失敗回収を模擬検証する。Test-StrikeMission.ps1は実.mizの54テンプレートを読み、6サイト×2方式×3目標の全36選択で生成位置・向き・指定目標・7/9個削除を確認する。地表標高APIは模擬であり、実地形上の標高、建物の3D重なり、PP実入力・実射・耐久・MP2はゲーム内確認待ち。全Luaスイートと結合検証後に既定.mizへSync/Checkし、登録済みLua以外のZIP内容保持を確認する。
+
+## 観測契約の共通化（training-13）
+
+固定済みIDを死亡観測時にも照合する。別IDの死亡は元目標の破壊を証明せず、未達成として待つ。明示死亡でIDだけ消えたwrapperは死亡として扱える。観測はObservations、Destroy後の消失確認はObjectLifecycleを使い、施設予約・Static fallback・削除待ちはStrikeが引き続き所有する。REL-04/19と既存67ケース、実施設36選択で確認する。

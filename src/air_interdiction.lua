@@ -1,6 +1,6 @@
 -- Moving ground convoys retain ME routes, including the final loop task.
 local AirInterdiction = { sites = {} }
-local function finite(n) return type(n) == "number" and n == n and math.abs(n) < math.huge end
+local finite = Observations.Finite
 
 function AirInterdiction.Initialize()
     for _, name in ipairs(Config.airInterdiction.templates) do
@@ -65,24 +65,13 @@ function AirInterdiction.Plan(position, assignmentID)
     return plan
 end
 
-local function rollbackReference(name)
-    local ok, group = pcall(function() return GROUP:FindByName(name) end)
-    if ok and group then return group end
-    -- A native group can exist before MOOSE registers its wrapper. This
-    -- rollback alone uses DCS directly to confirm absence of our unique alias.
-    return {
-        Destroy = function() local raw = Group.getByName(name); if raw then raw:destroy() end end,
-        GetDCSObject = function() return Group.getByName(name) end
-    }
-end
-
 function AirInterdiction.Spawn(plan)
     assert(Missions.interdictionSites[plan.site.name] == plan and not plan.spawnAttempted, "Invalid convoy reservation.")
     local spawner = SPAWN:NewWithAlias(plan.site.name, plan.alias)
     plan.spawnAttempted = true
     local ok, group = pcall(function() return spawner:Spawn() end)
     if not ok or not group then
-        plan.group = rollbackReference(plan.alias .. "#001")
+        plan.group = ObjectLifecycle.GroupReference(plan.alias .. "#001")
         error("Convoy spawn failed.")
     end
     plan.group = group -- Retain before any post-spawn validation can fail.
@@ -107,15 +96,7 @@ function AirInterdiction.Remaining(plan)
     local remaining = 0
     for _, target in ipairs(plan.targets) do
         if not target.lost then
-            local ok, alive = pcall(function()
-                local alive, id = target.unit:IsAlive(), target.unit:GetID()
-                assert(type(alive) == "boolean" and (id == target.objectID or (alive == false and id == nil)),
-                    "Convoy observation unavailable or identity changed.")
-                if alive == false then return false end
-                local life = target.unit:GetLife()
-                assert(finite(life), "Convoy life unavailable.")
-                return life > 0
-            end)
+            local ok, alive = pcall(Observations.TargetAlive, target, true)
             if ok and alive == false then target.lost = true
             else
                 remaining = remaining + 1
@@ -154,9 +135,8 @@ function AirInterdiction.Sweep(time)
         plan.cleaning = true -- Deletion may synchronously emit loss events.
         local ok, problem = pcall(function()
             if plan.group then
-                assert(plan.group:Destroy(false) ~= false, "Convoy deletion refused.")
-                local raw = plan.group:GetDCSObject()
-                assert(raw == nil or raw:isExist() == false, "Convoy deletion unconfirmed.")
+                local removed, problem = ObjectLifecycle.Remove(plan.group)
+                assert(removed, problem)
             else assert(not plan.spawnAttempted, "Convoy cleanup reference unavailable.") end
         end)
         plan.cleaning = nil

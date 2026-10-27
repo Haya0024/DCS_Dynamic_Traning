@@ -1,6 +1,6 @@
 # 任務メッセージのタイミング・分岐一覧
 
-更新: 2026-10-27。現在の `training-12` の実装を読み取った、表示を見直すための一覧。
+更新: 2026-10-27。現在の `training-13` の実装を読み取った、表示を見直すための一覧。
 本文・タイミングは現在の実装に合わせる。実画面のキャプチャではない。2026-10-15の変更でPBのTHREAT AREAを推定座標へ統一し、抑制条件を30秒へ短縮した。DEADの座標をラベルと同じ行へまとめ、受注本文の並び順も更新した。
 
 対象は実装済みの Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。
@@ -583,3 +583,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
 AI-02はcoordinateBriefingSeconds設定を使う。攻撃中のStatusはAI-02と同じ本文、達成後は座標を外したAI-03だけ20秒。部分撃破・移動開始・周回・散開の自動通知はなく、車列の現在位置・方向・残数は追加しない。個別精算は共通通知にカテゴリ名Air Interdictionを使う。削除再試行中も精算通知を繰り返さない。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
+
+## training-13の観測・削除修正
+
+通常の画面本文とStatus再表示は維持。帰還観測失敗は停止計測を再開しログだけへ記録する。同Wingの別参加者は帰還評価を続ける。監視間隔が初期2秒を超えた場合も帰還10秒・SEAD30秒の連続計測を再開する。部分生成後の削除待ちはログと再試行で管理し、失敗した任務のロック解放後に成功・報酬を追加しない。

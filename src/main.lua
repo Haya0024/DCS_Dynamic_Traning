@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-12" }
+DynamicTrainingRuntime = { version = "training-13" }
 Persistence.Publish()
 
 local menus = {}
@@ -908,6 +908,7 @@ local function Tick(_, time)
     Safe("CAP enemy cleanup", nil, function() CAP.Sweep(time) end)
     Safe("Strike facility cleanup", nil, function() Strike.Sweep(time) end)
     Safe("Air Interdiction cleanup", nil, function() AirInterdiction.Sweep(time) end)
+    Safe("Partial group cleanup", nil, function() ObjectLifecycle.Sweep(time) end)
     return time + Config.pollSeconds
 end
 

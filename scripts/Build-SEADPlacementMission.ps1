@@ -26,6 +26,11 @@ $entry = "-- Placement diagnostic only. Normal runtime and persistence are not i
 SEADPlacementCheckResults = PlacementCheck.Start(Config, SEAD, ZONE, timer, function(text)
     env.info("[SEADPlacementCheck] " .. text)
 end, { spawnCheck = __SPAWN_CHECK__ })
+-- Normal main.lua is replaced here; failed partial spawns still need retries.
+timer.scheduleFunction(function(_, time)
+    ObjectLifecycle.Sweep(time)
+    return time + 1
+end, nil, timer.getTime() + 1)
 '@
 $spawnFlag = if ($SpawnCheck) { 'true' } else { 'false' }
 $entry = $entry.Replace('__SPAWN_CHECK__', $spawnFlag)

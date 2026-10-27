@@ -16,7 +16,8 @@ $LuaPath = (Resolve-Path -LiteralPath $LuaPath).Path
 $suites = @(
     'Test-Intercept.lua', 'Test-CAP.lua', 'Test-Scoring.lua',
     'Test-Wing.lua', 'Test-ParallelWings.lua', 'Test-SEAD.lua',
-    'Test-DEAD.lua', 'Test-Persistence.lua', 'Test-MapOverlay.lua', 'Test-Strike.lua', 'Test-AirInterdiction.lua'
+    'Test-DEAD.lua', 'Test-Persistence.lua', 'Test-MapOverlay.lua', 'Test-Strike.lua', 'Test-AirInterdiction.lua',
+    'Test-Reliability.lua'
 )
 Push-Location -LiteralPath $projectRoot
 try {

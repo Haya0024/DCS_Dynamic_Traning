@@ -256,3 +256,7 @@ Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strike
 ## Air Interdiction
 
 今回生成した車列3両の全滅で共有達成とする。損傷だけでは達成せず、未達成で帰還しても任務を維持する。各自150／達成後事故90／達成前事故・Abort0をairInterdictionScore・Total Score・Career Pointsへ加算し、共通の任務・帰還・喪失統計を1回更新する。MP2は共有達成と個人精算、第三者の対象撃破も数える。カテゴリ別Scoreは画面へ追加しない。schema4で保存し、schema1/2/3のAir Interdictionは0として復元する。満額はairInterdiction.fullReward。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
+
+## 観測不能時の帰還（training-13）
+
+Recoveryは位置・速度の有限Vec3、InAirのboolean、基地所属・空母の元IDを確認する。例外・nil・NaN/Infinityでは帰還成功にせず、停止計測だけを解除して同じ着地文脈で再試行する。所属不明も敵基地確定とは分ける。別参加者の評価は継続する。正常観測間隔がpollSecondsの2倍（初期2秒）を超えた場合と時計逆行でも計測をやり直す。BLUE離脱・離陸など確認済みの不適合は従来どおり着地文脈を解除し、再着地を要求する。REL-07〜11/13/16/19、SCORE/PAR/DEADで回帰検証する。

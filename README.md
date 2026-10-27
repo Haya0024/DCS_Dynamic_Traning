@@ -152,6 +152,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 
 | ドキュメント | 内容 |
 |---|---|
+| [2026-10-27 全点検](docs/AUDIT_2026-10-27.md) | 点検範囲、修正した不具合、設計評価、残る実機確認 |
 | [Architecture](docs/ARCHITECTURE.md) | モジュールの責務、状態・識別子・用語、設計上の不変条件と改善候補 |
 | [Intercept](docs/Intercept.md) | 敵生成、開始条件、経路、目標判定 |
 | [Air Interdiction](docs/AIR_INTERDICTION.md) | 近い2周回地域、中心DDM、3両破壊、地域予約・削除 |
@@ -194,7 +195,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Mi
 同期は登録済みの埋め込みLuaを置き換え、その他のミッション内容の保持を検証します。直前の `.miz` は同じ場所に `.miz.bak` として保存します。
 同期後にMEから実行する場合は `.miz` を開き直してください。実行中のDCSミッションへの反映には、更新した `.miz` での再開始が必要です。
 
-全体の検証は次のコマンドで実行できます。両bundleを結合し、Lua全11スイートとBuild/Sync/Installテストを専用fixtureで確認します。実ミッションへの反映は上記Sync/Checkで行います。
+全体の検証は次のコマンドで実行できます。両bundleを結合し、Lua全12スイートとBuild/Sync/Installテストを専用fixtureで確認します。実ミッションへの反映は上記Sync/Checkで行います。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1

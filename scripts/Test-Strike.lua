@@ -26,7 +26,8 @@ local function recover(s, pilot)
     s:land(s:base(), s.time + 1, pilot)
     pilot = pilot or s.player
     pilot.position.y = 0
-    s:tick(s.time + 1); s:tick(s.time + 10)
+    local first = s.time + 1
+    for time = first, first + 10 do s:tick(time) end
 end
 
 test("initialization caches and silently removes every ME original", function()

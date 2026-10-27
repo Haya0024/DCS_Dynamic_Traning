@@ -327,4 +327,10 @@ SA-6 は発射機を残してレーダーだけ破壊し、SA-8 は車両を破�
 完了後のRadar再開・残存車両撃破で結果が変わらず、全員の精算まで残存Groupが保持されることを確認する。
 その後の帰還150、墜落・死亡・脱出90、達成前の事故0、および SEAD Score の加算を確認する。
 
-全地域の実地形で50点ずつ抽選する専用検査は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。通常計画と診断はSEAD.CheckPlacementの同じ配置判定を使い、診断ではSAM生成・採点・保存を行わない。SEAD-63〜66は診断制御の模擬検証であり、実地形の成功率とは分ける。
+全地域の実地形で50点ずつ抽選する専用検査は [SEAD_PLACEMENT_CHECK.md](SEAD_PLACEMENT_CHECK.md)。通常計画と診断はSEAD.CheckPlacementの同じ配置判定を使う。標準診断はSAMを生成せず、明示的な`-SpawnCheck`時だけ適合点で生成・削除を検証する。どちらも採点・保存は行わない。SEAD-63〜66は診断制御の模擬検証であり、実地形の成功率とは分ける。
+
+## 観測と削除の確認（training-13）
+
+連続30秒の抑制は、正常な観測の間隔が`pollSeconds`の2倍を超えた場合と時刻が逆行した場合にも計測を再開する。監視できなかった時間を連続OFFへ含めない。
+
+全点検で、削除APIの返却だけで実体を解放する経路と、死亡観測時に元IDを照合しない経路を修正した。死亡wrapperは元ID一致、または明示死亡かつID消失だけを有効とし、別IDは観測不能扱い。SAM削除はGetDCSObject/isExistの再観測で消失を確認するまでSiteを保持し、生成途中の例外で残ったGroupも固有aliasから回収・再試行する。主要レーダーのACTIVE→SUPPRESSION_PENDING→SUPPRESSED/DESTROYED、DEADの全対象破壊、既存の保持・予約・採点・Statusは維持する。

@@ -206,7 +206,14 @@ test("an exception in one wing's monitor does not interrupt another wing's safe 
     s.player.GetVelocityVec3 = function() error("simulated wing monitor exception") end
     hold(s, 11, 21)
     s:score(150, other); status(s, other, "Idle")
-    assert(#s.errors > 0 and string.find(s.errors[1], "wing monitor exception", 1, true))
+    local observations = 0
+    for _, log in ipairs(s.logs) do
+        if string.find(log, "Recovery observation unavailable", 1, true) then
+            assert(string.find(log, "wing monitor exception", 1, true))
+            observations = observations + 1
+        end
+    end
+    assert(observations == 1 and #s.errors == 0)
     s.player.GetVelocityVec3 = velocity
     hold(s, 22, 32); s:score(150); status(s, s.player, "Idle")
 end)

@@ -342,3 +342,7 @@ Test-Interceptは22ケース。INT-19〜22で、終了時・生成後設定失�
 Lua を変更したら同期ツールを実行し、`-Check` で一致を確認する。
 ME で `.miz` を開き直し、ミッションを再開始して検証する。
 ME と同期処理による同時保存は避ける。詳細は [README.md](../README.md) を参照する。
+
+## 部分生成の回収（training-13）
+
+SPAWNがnative Group作成後に例外/nilになっても、任務固有aliasの#001からMOOSE/native参照を取り直して削除する。削除未確認はObjectLifecycleの待ちへ保持し、5秒で再試行する。通常の敵削除待ちはInterceptが所有し、消失確認には共通ObjectLifecycle.Removeを使う。REL-12/18/19で生成途中の失敗・native fallback・MP2反復を確認する。

@@ -249,3 +249,7 @@ Immediate追加採点はDEAD-67〜76で、事故5種、配点固定、MP2個別�
 自動検証の対応と手動結果は [TESTING.md](TESTING.md) に記録する。
 専用予約解除・共有取得・30分境界・使用中の停止・rollback・観測不能時のtimeout・再試行・古いcallbackはDEAD-91〜103、実機確認はMAN-45/46を参照する。
 Immediate未達成RTB・MP2継続・復行・確認中事故・確認中DEAD達成とFollow-on境界はDEAD-81〜86、実機確認はMAN-42/43を参照する。
+
+## 観測と削除の確認（training-13）
+
+全点検で、削除APIの返却だけで実体を解放する経路と、死亡観測時に元IDを照合しない経路を修正した。死亡wrapperは元ID一致、または明示死亡かつID消失だけを有効とし、別IDは観測不能扱い。SAM削除はGetDCSObject/isExistの再観測で消失を確認するまでSiteを保持し、生成途中の例外で残ったGroupも固有aliasから回収・再試行する。主要レーダーのACTIVE→SUPPRESSION_PENDING→SUPPRESSED/DESTROYED、DEADの全対象破壊、既存の保持・予約・採点・Statusは維持する。

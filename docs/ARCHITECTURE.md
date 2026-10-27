@@ -6,7 +6,7 @@
 
 Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
-この構成は`training-12`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-13`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
 実ミッションのプレイヤー配置は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、合計10グループ・15 Clientスロット。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
 
@@ -20,6 +20,8 @@ Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を�
 | 訓練地域 | 実ミッションのME Trigger Zone | 全19円の中心・半径の唯一の定義元。各任務はZONE:FindByNameで参照し、Configの候補名・距離制限で選定 |
 | 固定施設 | `strike.lua` | ME Static取得・54原本除去、PB/TOO・近い2施設の抽選、TOO7/PB9物体生成、DDM/DMS・標高、施設予約・削除再試行 |
 | 移動車列 | `air_interdiction.lua` | ME周回中心の算出、近い2経路の抽選、3両生成・破壊観測、地域予約・削除再試行 |
+| 観測契約 | `observations.lua` | 有限数・Vec3・固定IDの生死確認、連続観測の時間境界。公開・採点判断は呼出元に残す |
+| 実体削除 | `object_lifecycle.lua` | Destroy後の消失確認、固有aliasの部分生成回収と削除待ち。Site予約は所有しない |
 | 空中目標 | `air_targets.lua` | Intercept/CAPの生成済み機体のID固定、喪失イベント、生存観測 |
 | 任務 | `intercept.lua` / `cap.lua` | 敵航空機の生成・経路と削除待ち。CAPは計画・滞在時間・進捗も管理 |
 | 地上目標 | `sead.lua` / `sead_objective.lua` | SAM計画・安全配置と主要レーダーFSMを分離 |
@@ -64,11 +66,11 @@ MissionReportは公開済みブリーフィングと最新の開始／達成通�
 
 1. Wing/UCIDロックを取得してから計画・予約・生成する。準備失敗時は取得分をrollbackする。
 2. 受注時の人間参加者と元の機体を固定する。空席・AI・途中参加を追加しない。
-3. 対象は生成時またはDEAD受注時に固定する。明示lossイベントを優先し、nil・例外・不正値・別IDを全滅の証拠にしない。明示falseでIDが消えた死亡wrapperは、固定済み空中目標の死亡として扱える。
+3. 対象は生成時またはDEAD受注時に固定する。明示lossイベントを優先し、nil・例外・不正値・別IDを全滅の証拠にしない。明示falseでIDが消えた死亡wrapperは、固定済み目標の死亡として扱える。
 4. 全員終了時は任務ロックを解放してからDestroyする。Destroyに伴うイベントで成功や再採点を発生させない。
 5. Siteの専用予約とassignment使用予約は別。Preserve/Releaseで元の採点・帰還・Wing/UCIDロックを変えない。
 6. 目標達成時には累計へ加算しない。参加者ごとの精算時にだけ更新し、Hookの有効なACK前には保存済みと表示しない。
-7. 1つのタイマーと安定した任務snapshotから各任務を監視する。例外は該当処理でログに残し、他Wingの監視を継続する。
+7. 1つのタイマーと安定した任務snapshotから各任務を監視する。例外は該当処理でログに残し、他Wingの監視を継続する。帰還観測は同Wing内でも参加者ごとに封じ込める。
 8. MOOSEのイベント受信者は`DynamicTrainingRuntime.eventHandler`でミッション終了まで強参照を保持する。同梱MOOSEのEVENT:Initは受信者を弱キーで保存するため、ローカル変数での登録だけではGC後に受信しなくなる。重複読み込みでは元の受信者を保持し、再登録しない。
 
 ## 整理した箇所と残る課題
@@ -83,7 +85,7 @@ training-3では実行入口をmain.luaへ改名し、Interceptの敵削除再�
 
 ## 開発と検証
 
-全体の確認は`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1`。両bundleを結合し、Lua 11スイートとBUILD/SYNC/INSTALLを使い捨てfixtureで検証する。Luaの場所は`-LuaPath`で指定できる。
+全体の確認は`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1`。両bundleを結合し、Lua 12スイートとBUILD/SYNC/INSTALLを使い捨てfixtureで検証する。Luaの場所は`-LuaPath`で指定できる。
 
 実ミッションへの反映はその後に`Sync-Mission.ps1`、続けて`Sync-Mission.ps1 -Check`。既定先は`mission/Persistent_and_Dynamic_FA-18C_Training.miz`。別ファイルは`-MissionPath`で明示する。既存埋め込みLuaだけを置換し、ZIP内のその他の内容を保持する。詳細はREADMEとTESTINGを参照する。
 
@@ -98,3 +100,9 @@ Strikeの任意スモークはstrike.luaのMark/StopMark/Sweepで管理する。
 ## Air Interdictionの状態と地域予約
 
 MEのTPL_AI_01～06はLate Activationのまま保ち、route.pointsの外接矩形中心をキャッシュする。受注時の長機から近い2中心を固定し、使用可能な1経路を抽選する。Missions.interdictionSites[templateName]へplanを予約し、SPAWN:NewWithAliasでME経路と3両を複製して即ACTIVE。3実体のIDと明示死亡を固定して全滅でRTB_PENDING。元のユニット名の連番には依存しない。全員精算後に削除し、削除が確認できるまで予約を維持する。失敗は5秒間隔で再試行し、生成後例外も固有aliasのMOOSE/native参照で回収する。Statusは公開した中心DDMの本文のみ、達成後は座標を外す。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
+
+## training-13の全点検
+
+目標観測と実体削除を共通化し、カテゴリ間の死亡ID照合・削除成功条件の差を解消した。生成が途中で例外/nilになった場合は、固有aliasからMOOSE/native参照を取り直しObjectLifecycle.pendingで保持する。正常に生成できたGroupやStatic、施設/SAM予約は引き続き各任務が所有する。共通タイマーは所有者の削除待ちと部分生成待ちを別々に掃除する。
+
+Observations.HoldStartは正常観測間隔がpollSecondsの2倍を超えた場合と時計逆行で連続計測を再開する。通常1秒の監視下では帰還10秒、SEAD抑制30秒を維持する。不正な地形高・障害物位置/水平boundsは配置承認に使わない。点検結果・再現条件・残る設計課題は[全点検記録](AUDIT_2026-10-27.md)。

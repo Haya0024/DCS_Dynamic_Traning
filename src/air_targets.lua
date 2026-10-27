@@ -27,15 +27,7 @@ function AirTargets.Remaining(spawn)
     local remaining = 0
     for _, target in ipairs(spawn.units) do
         if not target.lost then
-            local ok, alive = pcall(function()
-                local alive = target.unit:IsAlive()
-                assert(type(alive) == "boolean", "Air target life observation unavailable.")
-                local id = target.unit:GetID()
-                -- A destroyed MOOSE wrapper can lose its DCS ID. A different
-                -- ID never proves destruction of the originally tracked target.
-                assert(id == target.objectID or (alive == false and id == nil), "Air target identity changed.")
-                return alive
-            end)
+            local ok, alive = pcall(Observations.TargetAlive, target, false)
             if not ok or alive ~= false then remaining = remaining + 1 end
         end
     end

@@ -2,6 +2,16 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-10-27 全体点検と異常系の修正（training-13）
+
+現行のmission/server全27 Luaモジュール、関連MOOSE API、結合・同期・導入・配置診断、実.miz整合性、仕様書を点検した。開始時の既存476ケースは通過したが、追加したREL-01〜12は修正前に全件失敗し、削除未確認・部分生成残留・死亡時ID未照合・帰還観測の不備を再現した。追加確認で監視間隔の飛びと基地所属不明の扱いも再現し修正した。
+
+Observations/ObjectLifecycleへ有限観測・固定ID生死・連続時間・実体削除確認・部分生成回収を共通化し、各カテゴリの予約/採点の所有権を維持した。帰還例外は参加者単位で封じ込め、監視不能を停止時間に加えない。SEADの不正地形高・障害物位置/boundsも拒否する。通常の画面本文・150/90/0・保存schema4・server Hookは維持。
+
+Lua全495ケース（12スイート、REL19）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME2が通過。REL-19は同じMP2で120任務・240人分帰還を反復し、活動台帳・予約・削除待ちの解放と個人得点を確認する。実DCSの長時間負荷試験・実射・着地は別途未確認。詳細は[全点検記録](AUDIT_2026-10-27.md)。
+
+既定.mizへSync/Check成功。全9エントリのうち埋め込みDynamicTraining.luaだけ変更し、他8内容・ユーザーのME配置/設定を維持。CRC正常・bundle一致・直前backup一致を確認した。配置診断の地域指定SpawnCheck版も結合・構文確認したがDCSは起動していない。server/codecはHEADと同一でHook再導入不要。
+
 ## 2026-10-27 StrikeのPB/TOO分岐（training-12）
 
 ユーザーが各SITE01～06へTPL_TANK_SITE##_01（Tank 3）とTPL_AMMO_SITE##_01（.Ammunition depot）を1個ずつ追加した保存済み.mizを確認した。全12個はRED/Russia・Static・未破壊で、名前/IDの重複なし。追加時にはSITE05のコンテナ2個の移動とME保存に伴うoptions/warehouses更新も含まれており、これらユーザー保存内容を維持する。

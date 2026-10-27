@@ -1,8 +1,6 @@
 -- CAP planning, observed on-station time, enemy wave and cleanup ownership.
-local CAP = { cleanup = {} }
-local function finite(value)
-    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
-end
+local CAP = { cleanup = {}, cleaning = {} }
+local finite = Observations.Finite
 local function integer(value) return finite(value) and value % 1 == 0 end
 function CAP.Plan(playerPosition, time)
     local cfg = Config.cap
@@ -95,9 +93,12 @@ function CAP.Spawn(plan, assignmentID)
     local bearing, altitude = math.random(0, 359), math.random(plan.minAltitudeFt, plan.maxAltitudeFt)
     local center = COORDINATE:NewFromVec2(plan.center):SetAltitude(altitude * 0.3048, true)
     local position = center:Translate(plan.radius + offset * 1852, bearing, true):SetAltitude(altitude * 0.3048, true)
-    local enemy = SPAWN:NewWithAlias(plan.template, "DT_CAP_" .. tostring(assignmentID))
-        :InitHeading(position:HeadingTo(center)):SpawnFromVec3(position:GetVec3())
-    assert(enemy, "CAP enemy spawn failed.")
+    local alias = "DT_CAP_" .. tostring(assignmentID)
+    local enemy, problem = ObjectLifecycle.CreateGroup(alias, function()
+        return SPAWN:NewWithAlias(plan.template, alias)
+            :InitHeading(position:HeadingTo(center)):SpawnFromVec3(position:GetVec3())
+    end, Config.cap.cleanupRetrySeconds)
+    assert(enemy, problem)
     plan.enemy = enemy -- Retained even if route configuration fails.
     local engage = enemy:EnRouteTaskEngageTargets(nil, Config.intercept.targetTypes, 0)
     local orbit = enemy:TaskOrbit(center, altitude * 0.3048, plan.speedMps)
@@ -117,12 +118,17 @@ end
 function CAP.Complete(plan, spawn) return plan.elapsed >= plan.holdSeconds and CAP.Remaining(spawn) == 0 end
 function CAP.Cleanup(group)
     if not group then return end
-    local ok, result = pcall(function() return group:Destroy(false) end)
+    if CAP.cleaning[group] then return end
+    CAP.cleaning[group] = true
+    local ok = ObjectLifecycle.Remove(group)
+    CAP.cleaning[group] = nil
     -- Use the shared runtime's DCS mission clock rather than another scheduler.
-    if ok and result ~= false then CAP.cleanup[group] = nil
+    if ok then CAP.cleanup[group] = nil
     else CAP.cleanup[group] = timer.getTime() + Config.cap.cleanupRetrySeconds end
 end
 function CAP.Sweep(time)
-    for group, due in pairs(CAP.cleanup) do if time >= due then CAP.Cleanup(group) end end
+    local groups = {}
+    for group, due in pairs(CAP.cleanup) do if time >= due then groups[#groups + 1] = group end end
+    for _, group in ipairs(groups) do if CAP.cleanup[group] then CAP.Cleanup(group) end end
 end
 return CAP

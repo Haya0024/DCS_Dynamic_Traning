@@ -32,14 +32,7 @@ function DEAD.Remaining(record)
     local remaining = 0
     for _, target in ipairs(record.deadTargets) do
         if not target.lost then
-            local ok, alive = pcall(function()
-                local alive = target.unit:IsAlive()
-                assert(type(alive) == "boolean", "DEAD target life observation unavailable.")
-                if alive == false then return false end
-                local id = assert(target.unit:GetID(), "DEAD target identity unavailable.")
-                assert(id == target.objectID, "DEAD target identity changed.")
-                return true
-            end)
+            local ok, alive = pcall(Observations.TargetAlive, target, false)
             if not ok then
                 if not target.deadObservationUnavailable then
                     env.info("[DynamicTraining] DEAD target observation unavailable; site=" .. record.site.id ..

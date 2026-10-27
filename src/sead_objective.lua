@@ -24,7 +24,7 @@ local function Observe(record, time, hold)
     if record.lost then return "DESTROYED" end
     -- Use MOOSE's first radar return (emitting), not its optional tracking target.
     local ok, alive, life, radarOn = pcall(function()
-        local alive = record.unit:IsAlive()
+        local alive = Observations.TargetAlive(record, false)
         if alive ~= true then return alive end -- nil is unknown, not confirmed destruction.
         return alive, record.unit:GetLife(), record.unit:GetRadar()
     end)
@@ -47,7 +47,8 @@ local function Observe(record, time, hold)
         return "ACTIVE"
     end
     -- Only damaged + observed OFF time counts; more damage does not restart it.
-    record.offSince = record.offSince and math.min(record.offSince, time) or time
+    record.offSince = Observations.HoldStart(record.offSince, record.lastObservedOffAt, time)
+    record.lastObservedOffAt = time
     return time - record.offSince >= hold and "HELD" or "OFF"
 end
 

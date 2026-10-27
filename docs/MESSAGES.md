@@ -1,6 +1,6 @@
 # Mission messages and DCS logs
 
-Updated: 2026-10-16
+Updated: 2026-10-27
 
 日本語の任務別・分岐別タイムラインと表示見直し用の参照IDは [任務メッセージのタイミング・分岐一覧](MESSAGE_FLOW.md) を参照。このページは英語の全文例とログの詳細カタログ。
 
@@ -717,7 +717,7 @@ Raw identity methods may fail after destruction; these fields then show UNAVAILA
 
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-12; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-13; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 
@@ -891,3 +891,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
 If both nearest routes are unavailable, show `No available Air Interdiction routes among the two nearest sites. Try again later.` for 20 seconds. Setup failure shows `ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Cleanup failure retains the route reservation and retries without repeating settlement. Existing participant result messages use the category `Air Interdiction`. Initialization / setup / cleanup failures go to ERROR logs, accepted template names to DEBUG, and observation failures are logged only on transitions. Ordinary screen messages retain the MESSAGE log mirror.
+
+## Observation and partial cleanup logs (training-13)
+
+Screen briefing/status/reward wording is unchanged. An unavailable recovery observation logs `[DynamicTraining] Recovery observation unavailable; hold reset: <reason>` once per unavailable episode, resets the stop timer and continues other pilots. Partial group cleanup that fails logs `[DynamicTraining] Object cleanup pending (<alias or SEAD setup>): <reason>` once and retries on the mission timer. Confirmed disappearance releases the reference. SEAD observation/cleanup logs keep their existing prefixes.

@@ -185,7 +185,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - AVAILABLEで使用中assignmentがない状態を `unreservedSince` から連続計測し、`dead.unreservedSiteCleanupSeconds = 1800`（ミッション時刻30分）でCleanupする。RETAIN専用予約中・IN_USE（地上ARMED含む）は計測しない。準備失敗のrollbackは元の開始時刻を復元し、期限を延長しない。候補選定・使用予約時にも期限を確認する。AVAILABLEは元保持者の切断Cleanup対象外。観測不能を全滅とは扱わないが未予約timeoutは適用し、削除失敗はSweepで再試行する。
 - 全員終了時にIN_USEならCLEANUPへ倒す。明示保持・開放済みSite以外はCleanupが標準。専用保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
 - 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
-- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。Lua全11スイートとBuild/Sync/Installテストも通す。
+- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。Lua全12スイートとBuild/Sync/Installテストも通す。
 
 ---
 
@@ -359,7 +359,7 @@ CAS: 720
 - HookはMissionLoadEnd後にpollを開始しStop後のframeで通信・採番しない。DCSがStop前にSSEを破棄した場合は最終flush不能をログへ残し、直近の保存済みrevisionを維持する。ミッション側はInitializeだけで保存済みと表示せず、有効なAcknowledgeを受けて初めて確認済みとする。初期化はスロット選択やPlayer Statisticsに依存しない。
 - Hookは `scripts/Build-PersistenceHook.ps1` で結合し、`scripts/Install-PersistenceHook.ps1 -SavedGamesPath <DCSユーザーディレクトリ>` で配置する。導入・更新後はDCS再起動が必要。MissionScripting.luaと他Hookを変更しない。
 - ホスト導入時はinstallerに `-ConfigureHost` を付け、autoexec.cfgへ呼出元userhooks・接続先missionのAPI許可を追加する。従来のserver許可と既存設定・他の許可を維持し、変更前にbackup、再実行はidempotent。不完全・重複管理ブロックや不正文字コードでは変更を拒否する。
-- Lua全11スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
+- Lua全12スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
 
 ---
 
@@ -566,7 +566,7 @@ Dynamic Training
 - config.strike.modes/targets/pbTargets/membersに対応を集約。元7構成の不備は両方式、pbOnly追加構成の不備はそのSiteのPBだけを無効化し、他カテゴリは継続する。
 - Missions.strikeSitesの予約は両方式で共有。全員終了後に周辺設備も含む7/9個を削除し、削除未確認は予約維持と5秒再試行。nil・例外・ID不一致は破壊根拠にしない。共有達成・個人150/90/0、同じstrikeScore/schema4を維持し、この変更でのHook更新は不要。
 - Statusは公開済み本文だけ、達成後は座標/標高なしの達成・帰還指示20秒。Mark Strike TargetはTOO案内点/PB実目標の北50 mの赤煙約120秒、手動のみ。連打防止・期限/達成/終了停止・停止失敗再試行・古いcallback拒否・F10ページ制御を維持。
-- Test-Strike.lua、実.miz54テンプレート・6サイト×2方式×3目標の全36選択を使うTest-StrikeMission.ps1と全11Luaスイート・BUILD/SYNC/INSTALL/ZONES/INTERDICTIONMEを確認。登録済みLuaだけをSync/Checkし、ME設定・座標・経路・トリガー・リソース表を直接変更しない。
+- Test-Strike.lua、実.miz54テンプレート・6サイト×2方式×3目標の全36選択を使うTest-StrikeMission.ps1と全12Luaスイート・BUILD/SYNC/INSTALL/ZONES/INTERDICTIONMEを確認。登録済みLuaだけをSync/Checkし、ME設定・座標・経路・トリガー・リソース表を直接変更しない。
 
 ## Air Interdiction（移動車列、実装済み・DCS内確認待ち）
 
@@ -575,4 +575,11 @@ Dynamic Training
 - MOOSE SPAWN:NewWithAliasと任務IDで分離し、MEの車種・位置・経路・速度・WP0への周回・車間距離・散開設定を維持する。MEユニット名の連番や接尾辞に依存しない。元テンプレートを有効化しない。Missions.interdictionSitesで1地域1Wing、全員終了と削除確認まで予約維持、失敗時は再試行。
 - 対象3実体を固定し全3両の破壊で達成。nil・例外・ID不一致は破壊根拠にしない。第三者の撃破も数え、共有達成・個人精算・各自150/90/0と共通帰還を使う。airInterdictionScoreをschema4で保存し、schema1/2/3は未収録列を0で復元。サーバーHookの同時更新・DCS再起動が必要。
 - TARGET AREAは周回中心DDM・分の小数3桁。受注10秒→5行ブリーフィング60秒、達成後は座標なし結果・帰還指示20秒。Statusは公開済み本文だけで現在位置・残数・内部状態を追加しない。スモークは追加しない。
-- Test-AirInterdiction.lua、実.miz全6経路を使うTest-AirInterdictionMission.ps1、全11Luaスイート・BUILD/SYNC/INSTALL/ZONES/STRIKEMEを実行。道路追従・橋・散開後復帰・実射はゲーム内確認待ちとして分ける。ME設定を直接編集せず、登録済みLuaのSync/CheckとZIP内容保持を確認する。
+- Test-AirInterdiction.lua、実.miz全6経路を使うTest-AirInterdictionMission.ps1、全12Luaスイート・BUILD/SYNC/INSTALL/ZONES/STRIKEMEを実行。道路追従・橋・散開後復帰・実射はゲーム内確認待ちとして分ける。ME設定を直接編集せず、登録済みLuaのSync/CheckとZIP内容保持を確認する。
+
+## 共通の観測と削除（training-13）
+
+- src/observations.luaが有限数・Vec3・固定IDの生死観測・連続観測時間を担う。別IDを死亡の証拠にしない。明示死亡かつID消失だけは元の死亡wrapperとして扱える。
+- src/object_lifecycle.luaがDestroy後の実体消失確認と、部分生成失敗の固有alias回収・5秒再試行を担う。Site予約・通常削除の所有権は各任務モジュールに残す。
+- 帰還の観測失敗は参加者ごとに封じ込め、10秒の連続停止計測をリセットする。SEADの30秒と共に、pollSecondsの2倍を超える監視間隔・時計逆行も計測を再開する。
+- Test-Reliability.luaのREL-01〜19と全12Luaスイートを確認する。詳細はdocs/AUDIT_2026-10-27.md。

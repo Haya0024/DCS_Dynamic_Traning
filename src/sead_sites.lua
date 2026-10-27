@@ -22,7 +22,9 @@ function SEADSites.LivingTargets(site)
         local target = byUnit[unit]
         -- Explicit loss remains authoritative even when the wrapper returns nil.
         if target and target.lost then return end
-        local alive = unit:IsAlive()
+        local alive
+        if target then alive = Observations.TargetAlive(target, false)
+        else alive = unit:IsAlive() end
         assert(type(alive) == "boolean", "SAM site life observation unavailable.")
         if alive == false then
             if target then target.lost = true end
@@ -197,9 +199,9 @@ function SEADSites.Sweep()
         if site.cleanupRequested and site.disposition == "CLEANUP" and not site.reservedByAssignmentID
             and not site.cleaning then
             site.cleaning = true -- Destroy can synchronously emit events.
-            local ok, result = pcall(function() return site.spawn.group:Destroy(false) end)
+            local ok, result = ObjectLifecycle.Remove(site.spawn.group)
             site.cleaning = nil
-            if ok and result ~= false then
+            if ok then
                 site.cleaned = true
                 Missions.sites[site.id] = nil
                 env.info("[DynamicTraining] SEAD site cleaned: " .. site.id)

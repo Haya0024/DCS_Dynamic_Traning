@@ -7,6 +7,8 @@ end
 function SEAD.Begin(assignmentID, missionID, playerPosition)
     assert(assignmentID, "SEAD assignment identity unavailable.")
     local settings = Config.sead
+    assert(Observations.Finite(settings.cleanupRetrySeconds) and settings.cleanupRetrySeconds > 0,
+        "Invalid SEAD cleanup interval.")
     assert(type(settings.templates) == "table" and #settings.templates > 0, "SEAD templates are empty.")
     assert(type(settings.zones) == "table" and #settings.zones > 0, "SEAD zones are empty.")
     assert(missionID and playerPosition and playerPosition.x and playerPosition.z,
@@ -74,9 +76,10 @@ function SEAD.Begin(assignmentID, missionID, playerPosition)
         samType = selected.type, pbCode = selected.pbCode, primaryUnitType = selected.primaryUnitType,
         zoneName = zoneName, areaLabel = (settings.zoneLabels or {})[zoneName] or zoneName,
         acceptancePosition = { x = playerPosition.x, y = playerPosition.z } }
-    return { plan = plan, template = name, attempts = 0, totalAttempts = 0, rejections = {},
+    local alias = "DT_SEAD_" .. tostring(assignmentID)
+    return { plan = plan, template = name, alias = alias, attempts = 0, totalAttempts = 0, rejections = {},
         offsets = offsets, radius = radius, radarCount = radarCount, settings = settings,
-        spawner = SPAWN:NewWithAlias(name, "DT_SEAD_" .. tostring(assignmentID)) }
+        spawner = SPAWN:NewWithAlias(name, alias) }
 end
 
 local function TerrainClear(job, zone, point)
@@ -87,6 +90,7 @@ local function TerrainClear(job, zone, point)
         local coordinate = COORDINATE:NewFromVec2(p)
         if not coordinate:IsSurfaceTypeLand() then return false, "non-LAND" end
         local height = coordinate:GetLandHeight()
+        assert(Observations.Finite(height), "SEAD terrain height unavailable.")
         low, high = math.min(low or height, height), math.max(high or height, height)
         if high - low > settings.maxHeightDifferenceMeters then
             -- Range observed before early rejection, not the full site's range.
@@ -139,10 +143,14 @@ local function ObjectsClear(job, point)
         -- MOOSE returns raw DCS objects from ScanObjectsSquare. Standard object
         -- bounds are needed to measure clearance from the structure, not its origin.
         local location = object:getPoint()
+        assert(Observations.Vec3(location), "SEAD obstacle position unavailable.")
         local description = object.getDesc and object:getDesc()
         local box = description and description.box
         local objectRadius = settings.unknownObjectRadiusMeters
         if box and box.min and box.max then
+            assert(Observations.Finite(box.min.x) and Observations.Finite(box.min.z)
+                and Observations.Finite(box.max.x) and Observations.Finite(box.max.z),
+                "SEAD obstacle bounds unavailable.")
             local x = math.max(math.abs(box.min.x), math.abs(box.max.x))
             local y = math.max(math.abs(box.min.z), math.abs(box.max.z))
             objectRadius = math.sqrt(x * x + y * y)
@@ -167,8 +175,10 @@ function SEAD.Spawn(job)
     if valid then valid, reason = ObjectsClear(job, point) end
     if not valid then return nil, "Planned SEAD site no longer safe: " .. tostring(reason) end
     -- Omit airborne heights: DCS places each ground vehicle on local terrain.
-    local enemy = job.spawner:SpawnFromVec2(point)
-    if not enemy then return nil, "SEAD SpawnFromVec2 returned nil." end
+    local enemy, problem = ObjectLifecycle.CreateGroup(job.alias, function()
+        return job.spawner:SpawnFromVec2(point)
+    end, job.settings.cleanupRetrySeconds)
+    if not enemy then return nil, problem end
     local ok, result = pcall(function()
         enemy:OptionAlarmStateRed()
         enemy:OptionROEOpenFire()
@@ -194,7 +204,10 @@ function SEAD.Spawn(job)
             coordinate = COORDINATE:NewFromVec2(point), attempts = job.totalAttempts,
             suppressionHoldSeconds = job.settings.suppressionHoldSeconds, emitterState = "ACTIVE" }
     end)
-    if not ok then pcall(function() enemy:Destroy(false) end); return nil, tostring(result) end
+    if not ok then
+        ObjectLifecycle.Cleanup(enemy, job.settings.cleanupRetrySeconds, "SEAD setup")
+        return nil, tostring(result)
+    end
     return result
 end
 

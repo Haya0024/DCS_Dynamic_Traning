@@ -29,6 +29,7 @@ return {
     },
     sead = {
         fullReward = 150,
+        cleanupRetrySeconds = 5, -- Failed setup before a site can own the group.
         suppressionHoldSeconds = 30,
         modes = { "TOO", "PB" },
         templates = {

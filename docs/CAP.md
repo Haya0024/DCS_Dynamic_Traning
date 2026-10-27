@@ -45,3 +45,7 @@ CAP Scoreを独立し、Total/Careerと統計へ加算する。現在の保存sc
 全CAP9円×SEAD10円について、中心距離から両半径を引いた円外縁間隔を、最大SAM計画射程15 NM＋安全余裕5 NM以上とする。最短は23.8 NM。設定は`sead.templates[].planningRangeNM`（SA-6:15 / SA-8:8）と`cap.samSafetyBufferNM`（5）。これはME配置を検証する計画値で、AIの射程を変更する設定ではない。
 
 `Test-ZoneCoverage.ps1`をTest-Allで実行し、90組すべての離隔を確認する。SEAD車両が配置円内に収まり、CAPプレイヤーがCAP円内にいる前提で判定する。移動・進入・追撃で円外に出た場合や、別途MEで置いたSAMには適用しない。CAP敵機の外周15〜25 NMでの生成・進入経路とプレイヤーの追撃を完全に分離する仕組みではない。
+
+## 削除確認と部分生成（training-13）
+
+Destroyが例外を出さずnilで戻っても、GetDCSObjectの再取得で実体消失を確認するまでCAP.cleanupへ保持し、5秒で再試行する。同期イベントによる削除再入も抑止する。生成途中の例外/nilは固有aliasで回収しObjectLifecycleが待ちを所有する。REL-01/12/18/19とCAP35件で確認する。

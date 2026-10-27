@@ -13,7 +13,8 @@ local function kill(s,u) u.alive=false; u.life=0; s:event('Dead',u) end
 local function complete(s,r) for _,t in ipairs(r.interdictionPlan.targets) do kill(s,t.unit) end end
 local function recover(s,p)
     p=p or s.player; s:land(s:base(),s.time+1,p); p.position.y=0
-    s:tick(s.time+1); s:tick(s.time+10)
+    local first=s.time+1
+    for time=first,first+10 do s:tick(time) end
 end
 
 test('six dormant templates are cached without spawning or drawing',function()

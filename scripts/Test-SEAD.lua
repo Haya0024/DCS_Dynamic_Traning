@@ -822,7 +822,8 @@ test("damage comparison uses the mission-start snapshot rather than factory life
     for t = 2, 100 do s:tick(t) end
     assert(record.initialLife == 50 and not record.offSince and s:mission().state == "ACTIVE")
     radar.life = 49; s:tick(101)
-    radar.life = 48; s:tick(120) -- Further damage does not restart the OFF timer.
+    radar.life = 48 -- Further damage does not restart the OFF timer.
+    for time = 102, 120 do s:tick(time) end
     assert(record.initialLife == 50 and record.offSince == 101)
     for t = 121, 130 do s:tick(t) end
     assert(s:mission().state == "ACTIVE")
@@ -929,10 +930,12 @@ test("emitter FSM exposes ACTIVE, PENDING, reset and SUPPRESSED independently of
     status(s, "ACTIVE"); assert(r.spawn.emitterState == "SUPPRESSION_PENDING")
     assert(not string.find(s.messages[#s.messages].text, "Emitter state:", 1, true))
     assert(not string.find(s.messages[#s.messages].text, "Radar 1 OFF:", 1, true))
-    s:tick(32); assert(r.spawn.emitterState == "SUPPRESSION_PENDING")
+    for time = 4, 32 do s:tick(time) end
+    assert(r.spawn.emitterState == "SUPPRESSION_PENDING")
     radar.radarEmitting = true; s:tick(33)
     assert(r.spawn.emitterState == "ACTIVE" and not r.spawn.primaryUnits[1].offSince)
-    radar.radarEmitting = false; s:tick(34); s:tick(64)
+    radar.radarEmitting = false
+    for time = 34, 64 do s:tick(time) end
     assert(r.spawn.emitterState == "SUPPRESSED" and r.state == "RTB_PENDING")
     s:lastMessageContains("SEAD Objective Complete\nEnemy radar suppressed.")
     status(s, "RTB_PENDING"); s:lastMessageContains("Enemy radar suppressed.")
@@ -969,7 +972,8 @@ end)
 test("SAM lifecycle waits for every participant and is independent of released wing locks", function()
     local s = setup(); s:occupyWing(); generate(s); s:tick(1)
     local r, g = s:mission(), s.spawns[1]
-    g.units[1].life, g.units[1].radarEmitting = 99, false; s:tick(2); s:tick(62)
+    g.units[1].life, g.units[1].radarEmitting = 99, false
+    for time = 2, 62 do s:tick(time) end
     assert(s:sites()[r.id] == r.site and not r.site.cleanupRequested and not g.destroyCalls)
     recover(s, nil, 70); s:score(150)
     assert(s:sites()[r.id] == r.site and not g.destroyCalls and s:mission() == r)
@@ -1118,6 +1122,8 @@ local function placementDiagnostic(s, options)
                 IsVec2InZone = sample.IsVec2InZone }
         end
     end
+    s.env.Observations = loadModule("src/observations.lua")
+    s.env.ObjectLifecycle = loadModule("src/object_lifecycle.lua")
     s.env.SEADObjective = loadModule("src/sead_objective.lua")
     local sead = loadModule("src/sead.lua")
     local diagnostic = dofile("scripts/SEAD-PlacementCheck.lua")

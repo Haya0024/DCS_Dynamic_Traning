@@ -1,6 +1,6 @@
 -- PB/TOO facilities: ME geometry, nearest-site selection, objectives and cleanup.
 local Strike = { sites = {}, templates = {}, marks = {} }
-local function finite(v) return type(v) == "number" and v == v and math.abs(v) < math.huge end
+local finite = Observations.Finite
 local function point(p) return type(p) == "table" and finite(p.x) and finite(p.y) end
 local function cleanupReference(name)
     local ok, object = pcall(function() return STATIC:FindByName(name, false) end)
@@ -16,16 +16,7 @@ local function cleanupReference(name)
         end
     }
 end
-local function remove(object)
-    -- STATIC:Destroy returns nil for an already absent object. Verify absence;
-    -- never free a site merely because a deletion call did not throw.
-    local ok, gone = pcall(function()
-        if object:GetDCSObject() == nil then return true end
-        assert(object:Destroy(false) ~= false, "Static deletion refused.")
-        return object:GetDCSObject() == nil
-    end)
-    return ok and gone == true
-end
+local remove = ObjectLifecycle.Remove
 
 function Strike.Initialize()
     -- ME group names are stable; the actual unit names may or may not end in
@@ -214,15 +205,7 @@ function Strike.Remaining(plan)
     local remaining = 0
     for _, target in ipairs(plan.targets) do
         if not target.lost then
-            local ok, alive = pcall(function()
-                local alive = target.unit:IsAlive()
-                assert(type(alive) == "boolean", "Strike observation unavailable.")
-                if alive == false then return false end
-                assert(target.unit:GetID() == target.objectID, "Strike object identity changed.")
-                local life = target.unit:GetLife()
-                assert(finite(life), "Strike life observation unavailable.")
-                return life > 0
-            end)
+            local ok, alive = pcall(Observations.TargetAlive, target, true)
             if ok and alive == false then target.lost = true
             else
                 remaining = remaining + 1

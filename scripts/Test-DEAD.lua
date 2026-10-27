@@ -37,7 +37,8 @@ local function primary(s, r, suppressed)
     local radar = r.spawn.primaryUnits[1].unit
     if suppressed then
         radar.life, radar.radarEmitting = 99, false
-        s:tick(s.time + 1); s:tick(s.time + 30)
+        local first = s.time + 1
+        for time = first, first + 30 do s:tick(time) end
     else destroy(s, radar) end
     assert(r.state == "RTB_PENDING")
 end
@@ -574,7 +575,7 @@ test("Immediate continuation clears the old landing hold but permits a fresh SEA
     assert(r.participants[1].landing and r.participants[1].state == "LANDING_CHECK")
     s:command("Continue as DEAD"); assert(not r.participants[1].landing)
     s:land(s:base(), s.time + 1); local landed = s.time
-    s:tick(landed); s:tick(landed + 9)
+    for time = landed, landed + 9 do s:tick(time) end
     assert(r.state == "DEAD_ACTIVE" and not r.participants[1].done)
     s:tick(landed + 10); assert(not s:mission() and r.site.cleaned)
     s:score(150); s:categoryScores({ deadScore = 0 }); s:assertClean()
@@ -845,7 +846,8 @@ test("live site targets alone do not allow DEAD before SEAD primary completion",
     assert(site.remainingTargetCount == 4 and site.state == "ACTIVE" and not site.seadCompleted)
     assert(not site.followOnAvailable and not has(s, "Continue as DEAD") and not has(s, "Preserve Site for DEAD"))
     local radar = r.spawn.primaryUnits[1].unit; radar.life, radar.radarEmitting = 99, false
-    s:tick(s.time + 1); s:tick(s.time + 29)
+    local first = s.time + 1
+    for time = first, first + 29 do s:tick(time) end
     assert(r.state == "ACTIVE" and site.remainingTargetCount == 4 and not site.followOnAvailable)
     s:tick(s.time + 1); assert(site.seadCompleted and site.remainingTargetCount == 4 and site.followOnAvailable)
     s:assertClean()
@@ -1078,7 +1080,8 @@ test("unfinished Immediate DEAD recovery resets to its combat phase on bolter or
     for _, takeoffEvent in ipairs({ "Takeoff", "RunwayTakeoff", "poll" }) do
         local s, r = ready(1, false); s:command("Continue as DEAD")
         local base, time = s:base(), s.time + 1
-        s:land(base, time); s:tick(time); s:tick(time + 5)
+        s:land(base, time)
+        for sample = time, time + 5 do s:tick(sample) end
         s.player.airborne = true
         if takeoffEvent ~= "poll" then s:event(takeoffEvent, s.player) end
         s:tick(time + 6)
@@ -1103,7 +1106,8 @@ test("Immediate DEAD completion during SEAD recovery preserves its hold and upda
     for _, bolter in ipairs({ false, true }) do
         local s, r = ready(1, false); s:command("Continue as DEAD")
         local base, time = s:base(), s.time + 1
-        s:land(base, time); s:tick(time); s:tick(time + 5)
+        s:land(base, time)
+        for sample = time, time + 5 do s:tick(sample) end
         local p, landing = r.participants[1], r.participants[1].landing
         finish(s, r)
         assert(p.landing == landing and p.state == "LANDING_CHECK" and landing.stableSince == time)
@@ -1112,7 +1116,10 @@ test("Immediate DEAD completion during SEAD recovery preserves its hold and upda
             s.player.airborne = true; s:event("RunwayTakeoff", s.player)
             assert(not p.landing and p.state == "RTB_PENDING")
             recover(s)
-        else s:tick(time + 9); assert(not p.done); s:tick(time + 10) end
+        else
+            for sample = time + 6, time + 9 do s:tick(sample) end
+            assert(not p.done); s:tick(time + 10)
+        end
         s:score(300); assert(r.site.cleaned); s:assertClean()
     end
 end)

@@ -16,16 +16,7 @@ function Intercept.Cleanup(group)
     end
     if pending.cleaning then return false end -- Destroy may emit synchronous events.
     pending.cleaning = true
-    local ok, problem = pcall(function()
-        assert(group:Destroy(false) ~= false, "Destroy returned false.")
-        -- Bundled MOOSE returns nil on success. GetDCSObject performs a fresh
-        -- lookup; Group:IsAlive only checks the first unit and cannot prove
-        -- deletion. The raw DCS existence check confirms any remaining object.
-        local object = group:GetDCSObject()
-        if object ~= nil then
-            assert(object:isExist() == false, "Enemy group disappearance unconfirmed.")
-        end
-    end)
+    local ok, problem = ObjectLifecycle.Remove(group)
     pending.cleaning = nil
     if ok then
         Intercept.pendingCleanup[group] = nil
@@ -78,10 +69,12 @@ function Intercept.Spawn(playerUnit, assignmentID)
     spawn:SetAltitude(altitude * 0.3048, true)
     -- A new SPAWN instance starts at #001. Unique aliases prevent concurrent
     -- assignments (and retries) from reusing DCS group/unit names.
-    local enemy = SPAWN:NewWithAlias(template, "DT_INTERCEPT_" .. tostring(assignmentID))
-        :InitHeading(spawn:HeadingTo(reference))
-        :SpawnFromVec3(spawn:GetVec3())
-    if not enemy then return nil, "Intercept enemy spawn failed." end
+    local alias = "DT_INTERCEPT_" .. tostring(assignmentID)
+    local enemy, problem = ObjectLifecycle.CreateGroup(alias, function()
+        return SPAWN:NewWithAlias(template, alias):InitHeading(spawn:HeadingTo(reference))
+            :SpawnFromVec3(spawn:GetVec3())
+    end, settings.cleanupRetrySeconds)
+    if not enemy then return nil, problem end
     local ok, result = pcall(function()
         local destination = reference:Translate(settings.throughDistanceNM * 1852, (bearing + 180) % 360, true)
         destination:SetAltitude(altitude * 0.3048, true)

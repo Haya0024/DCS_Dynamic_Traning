@@ -1,6 +1,11 @@
 -- Trial values; all speeds presented to players use knots.
 return {
-    playerType = "FA-18C_hornet",
+    missionName = "Persistent and Dynamic Training",
+    -- DCS type names are the detection contract, never Client group names.
+    playerTypes = {
+        ["FA-18C_hornet"] = { tasks = { "Intercept", "CAP", "SEAD", "DEAD", "Strike", "Air Interdiction" } },
+        ["AH-64D_BLK_II"] = { tasks = { "Air Interdiction" }, multicrew = true, interdictionProfile = "helicopter" }
+    },
     pollSeconds = 1,
     playerScanSeconds = 2,
     takeoffCheckSeconds = 2,
@@ -62,7 +67,14 @@ return {
     dead = { fullReward = 150, unreservedSiteCleanupSeconds = 1800 },
     airInterdiction = {
         fullReward = 150, cleanupRetrySeconds = 5,
-        templates = { "TPL_AI_01", "TPL_AI_02", "TPL_AI_03", "TPL_AI_04", "TPL_AI_05", "TPL_AI_06" }
+        minDistanceNM = 20, maxDistanceNM = 100,
+        templates = { "TPL_AI_01", "TPL_AI_02", "TPL_AI_03", "TPL_AI_04", "TPL_AI_05", "TPL_AI_06" },
+        helicopter = {
+            minDistanceNM = 3, maxDistanceNM = 13,
+            coordinateFormat = "MGRS", mgrsAccuracy = 4, -- Four easting + four northing digits.
+            templates = { "TPL_AI_01", "TPL_AI_02", "TPL_AI_03", "TPL_AI_04", "TPL_AI_05", "TPL_AI_06",
+                "TPL_AI_07", "TPL_AI_08", "TPL_AI_09", "TPL_AI_10" }
+        }
     },
     strike = {
         fullReward = 150, cleanupRetrySeconds = 5,

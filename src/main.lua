@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-14" }
+DynamicTrainingRuntime = { version = "training-15" }
 Persistence.Publish()
 
 local menus = {}
@@ -247,6 +247,9 @@ local function Generate(groupName, category)
     local group = GROUP:FindByName(groupName)
     local roster, problem = Player.ForGroup(groupName)
     if not roster then Message(group, problem); return end
+    if not Player.CanTask(roster, category) then
+        Message(group, "This task is not available for the occupied aircraft types.", 15); return
+    end
     local blocker = Missions.Blocker(groupName, roster)
     if blocker then Message(group, blocker); return end
     local record = { group = group, groupName = groupName, category = category, participants = {},
@@ -262,7 +265,8 @@ local function Generate(groupName, category)
     if category == "Air Interdiction" then
         record.owner = roster[1]
         local ok, problem = pcall(function()
-            record.interdictionPlan = AirInterdiction.Plan(record.owner.unit:GetVec3(), record.assignmentID)
+            record.interdictionPlan = AirInterdiction.Plan(record.owner.unit:GetVec3(), record.assignmentID,
+                record.owner.unit:GetTypeName())
             if not record.interdictionPlan then return end
             record.spawn = AirInterdiction.Spawn(record.interdictionPlan)
             record.interdictionBriefing = AirInterdiction.Briefing(record.interdictionPlan)
@@ -274,7 +278,11 @@ local function Generate(groupName, category)
                 env.error("[DynamicTraining] Air Interdiction setup: " .. tostring(problem))
                 Message(group, "ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.", 20)
             else
-                Message(group, "No available Air Interdiction routes among the two nearest sites. Try again later.", 20)
+                local profile = AirInterdiction.Profile(record.owner.unit:GetTypeName())
+                local range = profile.minDistanceNM and string.format(" within %g-%g NM",
+                    profile.minDistanceNM, profile.maxDistanceNM) or ""
+                Message(group, "No available Air Interdiction routes among the two nearest sites" .. range ..
+                    ". Try again later.", 20)
             end
             return
         end
@@ -558,20 +566,16 @@ local function Abort(groupName, target, assignment)
 end
 
 ScanPlayers = function()
-    local present = {}
-    -- Standard API lists human BLUE units; MOOSE supplies wrappers and menus.
-    -- Neither airfield names nor Client group names are fixed.
-    for _, dcsUnit in ipairs(coalition.getPlayers(coalition.side.BLUE) or {}) do
-        if dcsUnit:isExist() then
-            local unit = UNIT:FindByName(dcsUnit:getName())
-            if unit and unit:GetTypeName() == Config.playerType then
-                local group = unit:GetGroup()
-                present[group:GetName()] = group
-            end
-        end
-    end
+    local present = Player.Groups()
     for name, group in pairs(present) do
         local roster = Player.ForGroup(name) or {}
+        local taskRoster = roster
+        if #taskRoster == 0 then
+            taskRoster = {}
+            for _, unit in ipairs(group:GetUnits() or {}) do
+                if Player.Profile(unit) then taskRoster[#taskRoster + 1] = { unit = unit } end
+            end
+        end
         local records = Missions.ForGroup(name, roster)
         local signature = tostring(group:GetID())
         for _, owner in ipairs(roster) do
@@ -627,9 +631,12 @@ ScanPlayers = function()
                 { "Abort Mission", Abort }, { "Player Statistics", Statistics }
             }) do
                 local label, action = command[1], command[2]
-                AddCommand(label, function()
-                    Safe(label, group, function() action(name); ScanPlayers() end)
-                end)
+                local category = label:match("^Task: (.+)$")
+                if not category or Player.CanTask(taskRoster, category) then
+                    AddCommand(label, function()
+                        Safe(label, group, function() action(name); ScanPlayers() end)
+                    end)
+                end
             end
             if canMarkStrike then
                 local record = strike
@@ -828,21 +835,26 @@ local function HandleEvent(record, event)
     local time = event.Time or event.time or timer.getTime()
     local reason = failureEvents[event.id]
     if reason then
+        local matched = false
         for _, p in ipairs(record.participants) do
             if Player.EventMatches(p.owner, event) then
+                matched = true
                 DebugLog(record, "Failure event matched: event=" .. reason .. "; unit=" .. tostring(p.owner.unitName) ..
                     "; objectID=" .. tostring(p.owner.objectID) .. "; state=" .. tostring(p.state) .. "; done=" .. tostring(p.done == true))
-                if p.done then return end
-                p.failureEvent = reason
-                if p.primaryCompletedAt and time >= p.primaryCompletedAt then
-                    SettleParticipant(record, p, "RTB_FAILURE", reason .. " before safe recovery (60%).", time)
-                else
-                    p.primaryCompletedAt = nil
-                    SettleParticipant(record, p, "FAILED", reason .. " before primary completion (0 points).", time)
+                if not p.done then
+                    p.failureEvent = reason
+                    if p.primaryCompletedAt and time >= p.primaryCompletedAt then
+                        SettleParticipant(record, p, "RTB_FAILURE", reason .. " before safe recovery (60%).", time)
+                    else
+                        p.primaryCompletedAt = nil
+                        SettleParticipant(record, p, "FAILED", reason .. " before primary completion (0 points).", time)
+                    end
                 end
-                return
             end
         end
+        -- An aircraft loss applies to all registered people aboard that aircraft.
+        -- A duplicate event or an already-aborted seat must not hide another crew member.
+        if matched then return end
         if (record.state == "ACTIVE" or record.state == "DEAD_ACTIVE") and
             (event.id == EVENTS.Crash or event.id == EVENTS.Dead or event.id == EVENTS.UnitLost) then
             if record.category == "CAP" then
@@ -918,4 +930,4 @@ Safe("Air Interdiction template initialization", nil, AirInterdiction.Initialize
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
 Log("Runtime initialized; version=" .. DynamicTrainingRuntime.version .. "; MOOSE event subscriber retained.")
-GlobalMessage("Dynamic Training ready. Wing UCID scoring.\n" .. Persistence.StartupStatus(), 10)
+GlobalMessage(Config.missionName .. " ready. Wing UCID scoring.\n" .. Persistence.StartupStatus(), 10)

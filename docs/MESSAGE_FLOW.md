@@ -1,6 +1,6 @@
 # 任務メッセージのタイミング・分岐一覧
 
-更新: 2026-10-27。現在の `training-14` の実装を読み取った、表示を見直すための一覧。
+更新: 2026-11-01。現在の `training-15` の実装を読み取った、表示を見直すための一覧。
 本文・タイミングは現在の実装に合わせる。実画面のキャプチャではない。2026-10-15の変更でPBのTHREAT AREAを推定座標へ統一し、抑制条件を30秒へ短縮した。DEADの座標をラベルと同じ行へまとめ、受注本文の並び順も更新した。
 
 対象は実装済みの Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。
@@ -324,7 +324,7 @@ UCID不明の精算ではPoints・Total Score・保存状態・SEAD/DEAD内訳�
 | Intercept達成後 | INT-03の達成結果と帰還指示 | 20 |
 | Strike受注後・攻撃中 | STRIKE-02T/PのTOO施設DDMまたはPP目標DMS＋標高・破壊指示・報酬・人数 | 60 |
 | Strike達成後 | STRIKE-03の達成・帰還指示だけ（座標なし） | 20 |
-| Air Interdiction受注後・攻撃中 | AI-02の周回中心DDM・3両破壊指示・報酬・人数 | 60 |
+| Air Interdiction受注後・攻撃中 | AI-02の周回中心座標（Hornet DDM／Apache MGRS 8桁）・3両破壊指示・報酬・人数 | 60 |
 | Air Interdiction達成後 | AI-03の達成・帰還指示だけ（座標なし） | 20 |
 | CAP受注後・哨戒中 | CAP-02の空域座標・目的・人数・報酬。進捗・出現有無・残敵を追加しない | 60 |
 | CAP達成後 | CAP-08の達成結果と帰還指示だけ（座標なし） | 20 |
@@ -396,9 +396,9 @@ UCID不明者は `PLAYER STATISTICS: <名前>` と `UCID unavailable; unscored.`
 | Group不在（宛先Groupなしなら画面送信なし） | `Player group unavailable.` | 10 |
 | 人間搭乗者なし | `At least one human pilot is required.` | 10 |
 | 操縦者不明 | `Human pilot unavailable.` | 10 |
-| 陣営／機種が対象外 | `A BLUE F/A-18C player aircraft is required.` | 10 |
+| 陣営／機種が対象外 | `A supported BLUE player aircraft is required.` | 10 |
 | 機体識別取得失敗 | `Player aircraft identity unavailable.` | 10 |
-| 同一UCIDが参加2機に重複 | `The same UCID cannot occupy two participating aircraft.` | 10 |
+| 同一UCIDが参加席に重複 | `The same UCID cannot occupy two participating seats.` | 10 |
 | UCID APIなし、受注は継続 | `<名前>: Server UCID API unavailable; this sortie is unscored.` | 15 |
 | UCID照合失敗、受注は継続 | `<名前>: UCID could not be verified; this sortie is unscored.` | 15 |
 | CAP中心が距離内にない | `No CAP areas within 40-100 NM. Change position and retry.` | 20 |
@@ -451,7 +451,7 @@ Select 'Task: SEAD' to retry.
 
 | タイミング | 全体へ出す正確な本文 | 秒 |
 |---|---|---|
-| 初期化成功 | `Dynamic Training ready. Wing UCID scoring.`＋改行＋`Persistence initialization pending.` | 10 |
+| 初期化成功 | `Persistent and Dynamic Training ready. Wing UCID scoring.`＋改行＋`Persistence initialization pending.` | 10 |
 | 同じbundleを再ロード | `Dynamic Training is already loaded.` | 10 |
 | MOOSE未ロード | `ERROR: Load MOOSE before DynamicTraining.` | 15 |
 
@@ -564,12 +564,12 @@ Statusは達成前にSTRIKE-02T/Pを同じ本文で再表示し、達成後はST
 | AI-01 | 近い2地域からの抽選・生成成功。地上／空中共通 | `Air Interdiction mission accepted.` | 10 |
 | AI-02 | AI-01直後、1回だけ | 下記の中心座標ブリーフィング | 60 |
 | AI-03 | 今回生成した3両すべての破壊 | 下記の達成・帰還指示 | 20 |
-| AI-04 | 近い2地域が使用不可 | `No available Air Interdiction routes among the two nearest sites. Try again later.` | 20 |
+| AI-04 | 近い2地域が使用不可 | `No available Air Interdiction routes among the two nearest sites within 20-100 NM. Try again later.` | 20 |
 | AI-05 | 準備・生成・座標整形に失敗 | `ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.` | 20 |
 
 ```text
 AIR INTERDICTION MISSION
-TARGET AREA: <周回WPの外接矩形中心DDM・分の小数3桁>
+TARGET AREA: <周回WPの外接矩形中心。Hornet: DDM・分小数3桁／Apache: MGRS 8桁>
 OBJECTIVE: Destroy all 3 convoy vehicles; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <人数>.
@@ -581,6 +581,8 @@ All 3 convoy vehicles destroyed.
 Each pilot: return to a BLUE airfield or carrier.
 Reward per pilot: 150 points; recovery failure: 90 points.
 ```
+
+ApacheのAI-04は距離範囲を含む `No available Air Interdiction routes among the two nearest sites within 3-13 NM. Try again later.` を20秒表示する。範囲内の候補なしでも同じ。ApacheはAir InterdictionだけをF10に表示し、古い他任務callbackも受注前に拒否する。AI-02の人数には人間CPGを含む。ApacheのTARGET AREAは`MGRS 37S BV 1234 5678`形式のMGRS 8桁（東4＋北4）、HornetはDDM・分小数3桁。受注時の公開済み座標をStatusでも再表示する。詳細は[APACHE.md](APACHE.md)。
 
 AI-02はcoordinateBriefingSeconds設定を使う。攻撃中のStatusはAI-02と同じ本文、達成後は座標を外したAI-03だけ20秒。部分撃破・移動開始・周回・散開の自動通知はなく、車列の現在位置・方向・残数は追加しない。個別精算は共通通知にカテゴリ名Air Interdictionを使う。削除再試行中も精算通知を繰り返さない。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
 

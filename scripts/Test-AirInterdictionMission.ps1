@@ -3,10 +3,13 @@ param([string]$LuaPath = 'C:/Program Files (x86)/Steam/steamapps/common/DCSWorld
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $projectRoot 'mission/Persistent_and_Dynamic_FA-18C_Training.miz'))
+$archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $projectRoot 'mission/persistant_and_dynamic_traning.miz'))
 try {
-    $reader = [System.IO.StreamReader]::new($archive.GetEntry('mission').Open())
-    try { $source = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    $source = ''
+    foreach ($entryName in @('mission', 'warehouses', 'l10n/DEFAULT/dictionary')) {
+        $reader = [System.IO.StreamReader]::new($archive.GetEntry($entryName).Open())
+        try { $source += $reader.ReadToEnd() + "`n" } finally { $reader.Dispose() }
+    }
 } finally { $archive.Dispose() }
 $checks = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Test-AirInterdictionMission.lua'))
 Push-Location -LiteralPath $projectRoot

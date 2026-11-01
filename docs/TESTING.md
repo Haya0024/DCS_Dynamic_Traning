@@ -1,6 +1,6 @@
 # テスト仕様書
 
-更新日: 2026-10-27
+更新日: 2026-11-01
 
 ## 目的と対象
 
@@ -28,21 +28,24 @@
 | MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
 | STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 67 | PP/TOO・近い2施設・各3種類抽選、TOO7/PP9物体、DDM/DMS・地表標高、対象判定、予約、MP2・150/90/0、生成失敗・削除再試行・任意スモーク |
 | AI | [Test-AirInterdiction.lua](../scripts/Test-AirInterdiction.lua) | 39 | 近い2経路・周回中心DDM・3両破壊、ME経路維持、予約、MP2、個別精算、観測不能・生成失敗・削除再試行 |
+| APACHE | [Test-Apache.lua](../scripts/Test-Apache.lua) | 27 | 機種別F10、MGRS 8桁/先頭ゼロ/切り捨て・MOOSE実関数・Status再表示・変換失敗解除、3/13 NM境界、SOLO/MP2、PLT/CPG・CPG単独、席交換、参加者固定、150/90/0、UCID・喪失・無採点席の独立性 |
 | REL | [Test-Reliability.lua](../scripts/Test-Reliability.lua) | 19 | 全点検の異常系：削除未確認、部分生成、死亡ID、帰還観測、監視間隔、不正地形、MP2反復 |
-| INTERDICTIONME | [Test-AirInterdictionMission.ps1](../scripts/Test-AirInterdictionMission.ps1) | 2確認グループ | 実.mizの6車列・道路/周回/名前/ID、全6中心の近い2候補計12選択で経路全体保持・生成・破壊・削除 |
+| INTERDICTIONME | [Test-AirInterdictionMission.ps1](../scripts/Test-AirInterdictionMission.ps1) | 5確認グループ | 実.mizの10車列・道路/周回/名前/ID、Hornet全6経路の20〜100 NM受注と全15駐機位置の候補あり、Apache全12駐機位置の3〜13 NM候補あり、4青空港8グループ12 Client機・タイトル、全10経路のApache受注/経路保持/生成/破壊/削除 |
 | STRIKEME | [Test-StrikeMission.ps1](../scripts/Test-StrikeMission.ps1) | 2確認グループ | 実.mizの6施設・54テンプレート、全36選択の生成位置・TOO7/PP9個・DDM/DMS・必要数破壊・全削除 |
 | SYNC | [Test-MissionSync.ps1](../scripts/Test-MissionSync.ps1) | 3確認グループ | ZIP保持、拒否時の無変更、ME相当の保存後の再同期 |
 | BUILD | [Test-MissionBuild.ps1](../scripts/Test-MissionBuild.ps1) | 2確認グループ | 結合の再現性、モジュール保存後の再結合・同期 |
 | INSTALL | [Test-PersistenceInstall.ps1](../scripts/Test-PersistenceInstall.ps1) | 5確認グループ | Hook導入・backup・拒否、実ファイル保存、別Luaプロセスで復元・破損復旧、ホスト設定保存・許可追加・不正設定拒否 |
 | ZONES | [Test-ZoneCoverage.ps1](../scripts/Test-ZoneCoverage.ps1) | 3確認グループ | 実.mizの全Client駐機位置でCAP2〜3・SEAD2〜4候補、全19円のME登録・可視性・半径・名前/IDの一意性、全候補の受注・SEAD生成・解除、MEのみの参照・欠落時解除・再受注、CAP/SEAD全90組でSAM計画射程＋安全余裕の離隔 |
 
-Luaは合計495ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST48＋MAP18＋STRIKE67＋AI39＋REL19）、12スイート。各ケース内のループやassertは別ケースに数えない。Test-PersistenceDisk.luaはINSTALLが別プロセスで実行するfixture。Test-ZoneCoverage.lua・Test-StrikeMission.lua・Test-AirInterdictionMission.luaは実.mizのデータを前置する結合検証で、Luaケース数に含めない。
+Luaは合計522ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST48＋MAP18＋STRIKE67＋AI39＋REL19＋APACHE27）、13スイート。各ケース内のループやassertは別ケースに数えない。Test-PersistenceDisk.luaはINSTALLが別プロセスで実行するfixture。Test-ZoneCoverage.lua・Test-StrikeMission.lua・Test-AirInterdictionMission.luaは実.mizのデータを前置する結合検証で、Luaケース数に含めない。
 
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの6行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
-現在の実ミッションとSyncの既定先は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-10-27、training-14。StrikeのPP表記、ppTargets/ppOnly/ppValid、全36施設選択を確認。SEADのHARM PBは維持する。Lua全495ケース（12スイート）と全結合検証が通過。
+現在の実ミッションとSyncの既定先は `mission/persistant_and_dynamic_traning.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
+最新の自動検証: 2026-11-01、training-15。Lua全522ケース（13スイート）とBUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME5が通過。ApacheのSOLO/MP2/人間PLT・CPG、範囲・UCID別精算を模擬検証。距離条件を3〜13 NMへ変更し、全12 Apache駐機位置で候補あり（Incirlik2候補、他3空港は各1候補）を確認した。3/13 NM境界・範囲外拒否も検証した。Hornetは20〜100 NMへ変更し、20/100 NM境界、全15駐機位置の候補ありも確認。ApacheのMGRS 8桁、同梱MOOSE実整形関数・先頭ゼロ・切り捨て・精度設定独立性・変換失敗解除とHornet DDM維持も検証した。
+
+2026-10-27、training-14。StrikeのPP表記、ppTargets/ppOnly/ppValid、全36施設選択を確認。SEADのHARM PBは維持する。Lua全495ケース（12スイート）と全結合検証が通過。
 
 2026-10-27、training-13。Lua全495ケース（12スイート、REL19）、BUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME2が通過。REL-19は同じMP2で6カテゴリ×20周、120任務を完了・個別帰還し、活動台帳/予約/削除待ちの解放と各人21,000点を検証する。模擬反復は実サーバーの長時間負荷試験ではない。点検範囲と修正一覧は[AUDIT_2026-10-27.md](AUDIT_2026-10-27.md)。
 
@@ -139,7 +142,7 @@ foreach ($suite in $suites) {
 ```
 
 ビルド・同期ツールは次の2本を順に実行する。どちらも一時ディレクトリの使い捨てミッションを使用する。
-SYNCは編集元から実プロジェクトのbundleを再生成することがあるが、実際の `mission/Persistent_and_Dynamic_FA-18C_Training.miz` は変更しない。
+SYNCは編集元から実プロジェクトのbundleを再生成することがあるが、実際の `mission/persistant_and_dynamic_traning.miz` は変更しない。
 BUILDはソースも一時プロジェクトへコピーして検証する。Watcherはテスト内で起動・停止し、一時ファイルを終了時に削除する。
 
 ```powershell
@@ -627,7 +630,7 @@ CAP-31では登録機と同名だがIDが異なる脱出イベントも入力し
 
 ### 実施前提
 
-同期済みの `mission/Persistent_and_Dynamic_FA-18C_Training.miz` を開き直し、ミッションを再開始する。
+同期済みの `mission/persistant_and_dynamic_traning.miz` を開き直し、ミッションを再開始する。
 採点・UCID確認はマルチプレイのサーバー側で行い、静的BLUE Hornet Clientスロットを使う。
 MP2は2人を受注前に搭乗させ、並行テストは別DCSグループを用意する。
 機体の初期兵装が空なのは仕様なので、必要な兵装を地上で再武装する。
@@ -856,7 +859,7 @@ STRIKEMEは保存済み実.mizの54物体をMOOSE境界fixtureへ渡し、6施�
 | AI-34/35/36 | 再受注は新alias、途中参加/AI非登録、重複読み込み防止 |
 | AI-37/38/39 | MOOSE wrapper未登録/例外時のnative回収、座標失敗で予約なし、Life0も3両必要 |
 
-INTERDICTIONMEは実.mizを読み取り、全体のMEユニット/グループ名・IDの一意性と、6車列のRED/Russia・Late Activation・3車種・道路・周回指示を検査する。各中心から近い2候補の全12選択で、実ME経路の全フィールドと車両位置の保持、中心算出・生成・3両破壊・全削除を模擬確認する。地形や道路ネットワーク、MOOSE/nativeエンジンによる実走行は模擬できない。
+INTERDICTIONMEは実.mizを読み取り、全体のMEユニット/グループ名・IDの一意性と、10車列のRED/Russia・Late Activation・3車種・道路・周回指示を検査する。Hornetは全6経路を範囲内の受注点から、全15駐機位置では20〜100 NMの候補を検証し、Apacheは全12駐機位置と全10経路を検証する。各選択で、実ME経路の全フィールドと車両位置の保持、中心算出・生成・3両破壊・全削除を模擬確認する。地形や道路ネットワーク、MOOSE/nativeエンジンによる実走行は模擬できない。
 
 | 手動ID | 条件・期待結果 |
 |---|---|
@@ -882,3 +885,12 @@ PAR-16の例外確認は全体ERRORではなく参加者単位の観測ログ1�
 |---|---|
 | MAN-64 | training-13でMP2の基地帰還と移動空母帰還、5 knots境界・10秒・復行・個人中止・各150/90/0を確認。SEAD損傷＋OFF30秒・再発信リセット・DEAD継承も再確認。未実施 |
 | MAN-65 | training-13で長時間の任務反復を行い、DCSログ・敵/Staticの残留・再受注・プロセスメモリを記録。模擬120任務ではMOOSE内部データベースやDCS資源の寿命を証明できない。未実施 |
+
+## Apacheの確認（training-15）
+
+Test-Apache.luaのAPACHE-01〜27は[APACHE.md](APACHE.md)に記載した機種別F10、3/13 NM境界、2機編隊、同一機の乗員、受注ロックと個別精算を検証する。保存済みMEの構成検証はTest-AirInterdictionMission.ps1に含める。
+
+| ID | 手動確認 |
+|---|---|
+| MAN-66 | 4空港のApache SOLO/MP2でF10受注、MGRS 8桁からの捜索・KU入力、車列の道路追従・散開・3両破壊、BLUE空港への着陸イベント・5 knots以下10秒・各150/90/0、Hook保存/再開始後復元を確認。全4空港の駐機位置から受注できることも確認する。未実施 |
+| MAN-67 | 人間PLT＋CPG、CPG＋George操縦士、MP2の4乗員でネットワーク席・UCIDを確認。受注後の席交換・途中参加・離席・個別Abort・機体喪失と重複イベント、乗員1人だけの死亡時のイベント挙動を確認し、別乗員/別機の誤精算がないか記録。未実施 |

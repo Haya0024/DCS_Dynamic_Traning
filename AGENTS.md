@@ -16,7 +16,7 @@ Intercept、SEAD、DEAD、Strike、CAS、Anti-Ship などの訓練ミッショ�
 - DCS World
 - Syria マップ
 - MOOSE Framework
-- プレイヤー機体: F/A-18C Lot 20
+- プレイヤー機体: F/A-18C Lot 20 / AH-64D Apache（Air Interdiction）
 - BLUE Coalition: USA
 - RED Coalition: Russia
 
@@ -35,7 +35,7 @@ SOLO（Client ×1）のグループ名は以下。
 プレイヤーは任意の BLUE 空港から出撃できる。
 
 MP2（Client ×2）は INCIRLIK / AKROTIRI / BEIRUT / RAMAT / SC に配置済み。5拠点にSOLOとMP2を各1グループ、合計10グループ・15 Clientスロットを置く。
-列挙した名前を検出ロジックの条件にせず、搭乗中の BLUE F/A-18C をグループ単位で取得する。
+列挙した名前を検出ロジックの条件にせず、搭乗中のBLUE F/A-18C / AH-64Dをグループ単位で取得する。Apacheは4青空港にSOLO/MP2各1グループ、計8グループ・12 Client機を追加済み。MP2は2機編隊で、同一機の人間PLT/CPGはそれぞれUCID別の参加者として受注時に固定する。機種・任務の対応はconfig.playerTypesを正とし、グループ名を検出条件にしない。
 
 プレイヤー機の初期パイロン設定は意図的に空とする。
 プレイヤーが地上で再武装を要請し、好きな兵装を搭載する運用とする。
@@ -185,7 +185,7 @@ BLUE 空港への RTB を追加評価対象とする。
 - AVAILABLEで使用中assignmentがない状態を `unreservedSince` から連続計測し、`dead.unreservedSiteCleanupSeconds = 1800`（ミッション時刻30分）でCleanupする。RETAIN専用予約中・IN_USE（地上ARMED含む）は計測しない。準備失敗のrollbackは元の開始時刻を復元し、期限を延長しない。候補選定・使用予約時にも期限を確認する。AVAILABLEは元保持者の切断Cleanup対象外。観測不能を全滅とは扱わないが未予約timeoutは適用し、削除失敗はSweepで再試行する。
 - 全員終了時にIN_USEならCLEANUPへ倒す。明示保持・開放済みSite以外はCleanupが標準。専用保持timeout・明示削除メニュー・Siteの永続化は未実装。プレイヤー成績の保存とは分ける。
 - 責務は `src/dead.lua`（選定・対象・判定・briefing）、`src/sead_sites.lua`（Site寿命・予約・Cleanup）、`src/sead_objective.lua`（従来のSEAD FSM）で分離する。
-- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。Lua全12スイートとBuild/Sync/Installテストも通す。
+- 仕様は `docs/DEAD.md`、模擬検証は `scripts/Test-DEAD.lua`。Lua全13スイートとBuild/Sync/Installテストも通す。
 
 ---
 
@@ -359,7 +359,7 @@ CAS: 720
 - HookはMissionLoadEnd後にpollを開始しStop後のframeで通信・採番しない。DCSがStop前にSSEを破棄した場合は最終flush不能をログへ残し、直近の保存済みrevisionを維持する。ミッション側はInitializeだけで保存済みと表示せず、有効なAcknowledgeを受けて初めて確認済みとする。初期化はスロット選択やPlayer Statisticsに依存しない。
 - Hookは `scripts/Build-PersistenceHook.ps1` で結合し、`scripts/Install-PersistenceHook.ps1 -SavedGamesPath <DCSユーザーディレクトリ>` で配置する。導入・更新後はDCS再起動が必要。MissionScripting.luaと他Hookを変更しない。
 - ホスト導入時はinstallerに `-ConfigureHost` を付け、autoexec.cfgへ呼出元userhooks・接続先missionのAPI許可を追加する。従来のserver許可と既存設定・他の許可を維持し、変更前にbackup、再実行はidempotent。不完全・重複管理ブロックや不正文字コードでは変更を拒否する。
-- Lua全12スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
+- Lua全13スイート、Build/Sync、`scripts/Test-PersistenceInstall.ps1` を検証する。専用fixture以外の保存データをテストで変更しない。
 
 ---
 
@@ -428,7 +428,7 @@ Dynamic Training
 
 - gameplay ロジックをモジュール分割する
 - プレイヤー空港をハードコードしない
-- 現在操作中のプレイヤーを動的に検出する
+- 現在搭乗中の人間を動的に検出する。Apacheの人間PLT/CPGはME unitIdと乗員席suffixを照合し、同一機の2人を別UCIDとして扱う
 - プレイヤー向け表示は NM / ft / knots を基本とする
 - 設定値とロジックを分離する
 - Intercept、SEAD、Strike などを独立モジュール化する
@@ -457,7 +457,7 @@ Dynamic Training
 - `src/mission_report.lua` / `notifications.lua` / `map_overlay.lua`: 手動レポート・画面／ログ出力・地図。
 - `server/`: 保存Hook、通信・保存手順・ファイルI/O・backup。
 - `scripts/`: 結合・同期・Hook導入・模擬テスト。`Test-All.ps1`が一括検証入口。
-- `mission/Persistent_and_Dynamic_FA-18C_Training.miz`: 現在の実ミッション。
+- `mission/persistant_and_dynamic_traning.miz`: 現在の実ミッション。
 - `vendor/MOOSE/Moose.lua`: 使用版を固定したMOOSE。
 
 将来はdifficulty、CAS、Anti-Ship等を独立したモジュールで追加する。
@@ -489,7 +489,7 @@ Dynamic Training
 - `src/*.lua` と `vendor/MOOSE/Moose.lua` を編集元とする。設定値は `src/config.lua` に集約する。
 - `scripts/Build-Mission.ps1` の順序付き対応表が設定・出力・保存・搭乗者・任務・目標観測・レポートの各モジュールを結合し、最後に `src/main.lua` を `build/DynamicTraining.lua` に加える。生成物を直接編集しない。
 - 保存codecまたはserver側Luaを変更したらHookも再結合し、導入用bundleと保存テストを確認する。導入済みHookの更新にはinstallerとDCS再起動を使う。
-- Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、既定先 `mission/Persistent_and_Dynamic_FA-18C_Training.miz` も更新する。別ファイルを指定する場合だけ `-MissionPath` を使う。
+- Codex は上記 Lua を変更したら、作業完了前に必ず以下を順に実行し、既定先 `mission/persistant_and_dynamic_traning.miz` も更新する。別ファイルを指定する場合だけ `-MissionPath` を使う。
   1. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1`
   2. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -Check`
 - 同期・確認に失敗した場合は、反映済みと報告せず理由を伝える。
@@ -570,12 +570,12 @@ Dynamic Training
 
 ## Air Interdiction（移動車列、実装済み・DCS内確認待ち）
 
-- docs/AIR_INTERDICTION.mdを正とする。src/air_interdiction.luaに中心算出・抽選・生成・3両観測・削除を分離し、config.airInterdictionに候補6件・満額150・削除再試行5秒を置く。
-- TPL_AI_01～06のRED/Russia・Late Activation・3車両を使う。全WPの外接矩形中心までの水平距離で近い2地域を固定し、使用可能な1地域を等確率抽選。3番目へ回さず、距離制限・空港所有権で選別しない。地上でも即ACTIVE・生成。
+- docs/AIR_INTERDICTION.mdとdocs/APACHE.mdを正とする。ApacheのF10はAir Interdictionと共通操作だけを表示し、古い他任務callbackも受注前に拒否する。src/air_interdiction.luaに中心算出・抽選・生成・3両観測・削除を分離し、config.airInterdictionに候補6件・満額150・削除再試行5秒を置く。
+- HornetはTPL_AI_01～06、ApacheはTPL_AI_01～10のうち長機から中心まで3～13 NMのRED/Russia・Late Activation・3車両を使う。全WPの外接矩形中心までの水平距離で近い2地域を固定し、使用可能な1地域を等確率抽選。3番目へ回さず、Hornetは20〜100 NM、Apacheは3〜13 NMに絞り、空港所有権では選別しない。地上でも即ACTIVE・生成。
 - MOOSE SPAWN:NewWithAliasと任務IDで分離し、MEの車種・位置・経路・速度・WP0への周回・車間距離・散開設定を維持する。MEユニット名の連番や接尾辞に依存しない。元テンプレートを有効化しない。Missions.interdictionSitesで1地域1Wing、全員終了と削除確認まで予約維持、失敗時は再試行。
 - 対象3実体を固定し全3両の破壊で達成。nil・例外・ID不一致は破壊根拠にしない。第三者の撃破も数え、共有達成・個人精算・各自150/90/0と共通帰還を使う。airInterdictionScoreをschema4で保存し、schema1/2/3は未収録列を0で復元。サーバーHookの同時更新・DCS再起動が必要。
-- TARGET AREAは周回中心DDM・分の小数3桁。受注10秒→5行ブリーフィング60秒、達成後は座標なし結果・帰還指示20秒。Statusは公開済み本文だけで現在位置・残数・内部状態を追加しない。スモークは追加しない。
-- Test-AirInterdiction.lua、実.miz全6経路を使うTest-AirInterdictionMission.ps1、全12Luaスイート・BUILD/SYNC/INSTALL/ZONES/STRIKEMEを実行。道路追従・橋・散開後復帰・実射はゲーム内確認待ちとして分ける。ME設定を直接編集せず、登録済みLuaのSync/CheckとZIP内容保持を確認する。
+- TARGET AREAは周回中心。HornetはDDM・分の小数3桁、ApacheはMGRS_Accuracy=4を明示したMGRS 8桁（東4＋北4、ゾーン/グリッド識別子付き）。受注10秒→5行ブリーフィング60秒、達成後は座標なし結果・帰還指示20秒。Statusは公開済み本文だけで現在位置・残数・内部状態を追加しない。スモークは追加しない。
+- Test-AirInterdiction.lua、実.miz全10経路・12 Apache駐機位置を使うTest-AirInterdictionMission.ps1、全12Luaスイート・BUILD/SYNC/INSTALL/ZONES/STRIKEMEを実行。道路追従・橋・散開後復帰・実射はゲーム内確認待ちとして分ける。ME設定を直接編集せず、登録済みLuaのSync/CheckとZIP内容保持を確認する。
 
 ## 共通の観測と削除（training-13）
 
@@ -583,3 +583,9 @@ Dynamic Training
 - src/object_lifecycle.luaがDestroy後の実体消失確認と、部分生成失敗の固有alias回収・5秒再試行を担う。Site予約・通常削除の所有権は各任務モジュールに残す。
 - 帰還の観測失敗は参加者ごとに封じ込め、10秒の連続停止計測をリセットする。SEADの30秒と共に、pollSecondsの2倍を超える監視間隔・時計逆行も計測を再開する。
 - Test-Reliability.luaのREL-01〜19と全12Luaスイートを確認する。詳細はdocs/AUDIT_2026-10-27.md。
+
+## 2026-11-01の名称変更とApache対応
+
+ユーザー明示依頼により実ミッション名を`mission/persistant_and_dynamic_traning.miz`、表示名を`Persistent and Dynamic Training`へ変更した。例外として`l10n/DEFAULT/dictionary`の既存`DictKey_sortie_5`の値だけを変更し、mission設定・トリガー・リソース表・機体・経路・その他の辞書項目は保持する。内部のDynamicTraining識別子、保存先、Hook名、F10ルートDynamic Trainingは維持する。
+
+Apacheの受注・採点・帰還は既存の台帳・150/90/0・schema4を再利用し、FARP帰還は追加しない。Test-Apache.luaもTest-Allに含める。Apacheの座標はMGRS 8桁で受注時に確定し、Statusも同じ公開済み本文を再表示する。HornetのDDMは維持する。距離条件はユーザー指定で3〜13 NMへ変更。保存済み配置ではIncirlikにTPL_AI_09/01の2候補、Beirut/Akrotiri/Ramatに各1候補があり、全12 Apache駐機位置から受注できる。範囲を自動拡張せず、ユーザーの経路を勝手に動かさない。

@@ -43,7 +43,7 @@ for _, country in pairs(mission.coalition.blue.country) do
     for _, group in pairs((country.plane or {}).group or {}) do
         local start = group.route and group.route.points and group.route.points[1]
         for _, unit in pairs(group.units) do
-            if unit.type == config.playerType and (unit.skill == "Client" or unit.skill == "Player")
+            if unit.type == "FA-18C_hornet" and (unit.skill == "Client" or unit.skill == "Player")
                 and start and (start.airdromeId or start.linkUnit) then
                 local origin = { x = unit.x, y = unit.y }
                 local key = start.airdromeId and "airfield:" .. start.airdromeId or "carrier:" .. start.linkUnit

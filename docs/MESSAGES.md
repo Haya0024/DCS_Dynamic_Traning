@@ -1,6 +1,6 @@
 # Mission messages and DCS logs
 
-Updated: 2026-10-27
+Updated: 2026-11-01
 
 日本語の任務別・分岐別タイムラインと表示見直し用の参照IDは [任務メッセージのタイミング・分岐一覧](MESSAGE_FLOW.md) を参照。このページは英語の全文例とログの詳細カタログ。
 
@@ -8,7 +8,7 @@ The separate placement diagnostic mission logs `[SEADPlacementCheck] START`, one
 
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
 
-The six F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, `Task: DEAD`, `Task: Strike`, and `Task: Air Interdiction`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the feature specifications.
+Hornet exposes all six tasks; Apache exposes only `Task: Air Interdiction`, with the shared Status/Abort/Statistics controls. Registered pilots include human Apache CPGs. The six F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, `Task: DEAD`, `Task: Strike`, and `Task: Air Interdiction`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the feature specifications.
 
 ## Output channels
 
@@ -24,7 +24,7 @@ Screen durations: default 10 seconds, coordinate briefings 60 seconds, settlemen
 
 Durations are display lifetimes, not delays between messages. Acceptance and briefing calls can occur in the same operation; airborne activation can immediately follow a coordinate briefing. The script does not wait for the previous message to expire.
 
-CAP / SEAD / DEAD / Strike TOO / Air Interdiction use one-line DDM with the `LL DDM` prefix and three decimal places in minutes. Each explicitly sets its precision independently of global MOOSE display settings. Strike TOO publishes the facility reference without elevation; Strike PP publishes the selected building DMS with seconds to two decimal places and ground elevation in ft MSL.
+CAP / SEAD / DEAD / Strike TOO / Hornet Air Interdiction use one-line DDM with the `LL DDM` prefix and three decimal places in minutes. Each explicitly sets its precision independently of global MOOSE display settings. Strike TOO publishes the facility reference without elevation; Strike PP publishes the selected building DMS with seconds to two decimal places and ground elevation in ft MSL.
 
 ## Screen: Intercept
 
@@ -474,7 +474,7 @@ All current human pilots are included with player and aircraft names when UCID i
 Startup — global, 10 seconds:
 
 ```text
-Dynamic Training ready. Wing UCID scoring.
+Persistent and Dynamic Training ready. Wing UCID scoring.
 Persistence initialization pending.
 ```
 
@@ -504,11 +504,11 @@ Each table row is one actual message body. Different mission categories produce 
 | Missing group | `Player group unavailable.` | 10 |
 | No human participant | `At least one human pilot is required.` | 10 |
 | Missing pilot | `Human pilot unavailable.` | 10 |
-| Wrong aircraft/coalition | `A BLUE F/A-18C player aircraft is required.` | 10 |
+| Wrong aircraft/coalition | `A supported BLUE player aircraft is required.` | 10 |
 | Missing aircraft identity | `Player aircraft identity unavailable.` | 10 |
-| Duplicate participant UCID | `The same UCID cannot occupy two participating aircraft.` | 10 |
+| Duplicate participant UCID | `The same UCID cannot occupy two participating seats.` | 10 |
 | UCID API unavailable at acceptance | `Hawk 1: Server UCID API unavailable; this sortie is unscored.` | 15 |
-| UCID verification failed at acceptance | `Hawk 1: UCID could not be verified; this sortie is unscored.` | 15 |
+| UCID verification failed at acceptance | `<unit name>: UCID could not be verified; this sortie is unscored.` | 15 |
 | SEAD planning cancelled | `SEAD selection cancelled. Player aircraft changed or unavailable.` | 10 |
 | Pre-start aircraft/occupant changed | `Intercept reservation cancelled. Player aircraft changed or unavailable.` | 10 |
 | Ground DEAD cancelled | `DEAD reservation cancelled. Player aircraft changed or unavailable.` | 10 |
@@ -561,7 +561,7 @@ Global example:
 
 ```text
 [DynamicTraining] MESSAGE [ALL]
-Dynamic Training ready. Wing UCID scoring.
+Persistent and Dynamic Training ready. Wing UCID scoring.
 Persistence initialization pending.
 ```
 
@@ -717,7 +717,7 @@ Raw identity methods may fail after destruction; these fields then show UNAVAILA
 
 ## DCS log: lifecycle and diagnostics
 
-Initialization adds `[DynamicTraining] Runtime initialized; version=training-14; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
+Initialization adds `[DynamicTraining] Runtime initialized; version=training-15; MOOSE event subscriber retained.` once to the DCS log. It has no screen output and identifies the deployed version. Repeated bundle loading does not reinitialize or add a subscriber.
 
 Each row is an example of a separate log entry. No screen duration applies.
 
@@ -871,11 +871,11 @@ Values follow Config.strike.smoke. These messages do not replace the coordinate 
 
 ## Screen: Air Interdiction acceptance, briefing and completion
 
-`Task: Air Interdiction` fixes the two nearest ME route centers at acceptance and chooses one available route equally. The three-vehicle convoy spawns immediately, on the ground or in flight, preserving its ME road route, speed, spacing and loop. Acceptance is `Air Interdiction mission accepted.` for 10 seconds, followed once by:
+`Task: Air Interdiction` fixes the two nearest ME route centers at acceptance (Hornet: TPL_AI_01–06 filtered to 20–100 NM; Apache: TPL_AI_01–10 filtered to 3–13 NM) and chooses one available route equally. Hornet publishes DDM with three decimal places in minutes; Apache publishes MGRS with four digits per axis, including zone and square identifiers (e.g. `TARGET AREA: MGRS 37S BV 1234 5678`). Apache uses MGRS_Accuracy=4, retains leading zeros and truncates each axis; global display settings do not override it. The coordinate is the same route-center search reference, formatted once for briefing and Status. The three-vehicle convoy spawns immediately, on the ground or in flight, preserving its ME road route, speed, spacing and loop. Acceptance is `Air Interdiction mission accepted.` for 10 seconds, followed once by:
 
 ```text
 AIR INTERDICTION MISSION
-TARGET AREA: <DDM route bounding-box center, minutes to three decimal places>
+TARGET AREA: <route bounding-box center: Hornet DDM, Apache 8-digit MGRS>
 OBJECTIVE: Destroy all 3 convoy vehicles; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <count>.
@@ -890,8 +890,12 @@ Each pilot: return to a BLUE airfield or carrier.
 Reward per pilot: 150 points; recovery failure: 90 points.
 ```
 
-If both nearest routes are unavailable, show `No available Air Interdiction routes among the two nearest sites. Try again later.` for 20 seconds. Setup failure shows `ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Cleanup failure retains the route reservation and retries without repeating settlement. Existing participant result messages use the category `Air Interdiction`. Initialization / setup / cleanup failures go to ERROR logs, accepted template names to DEBUG, and observation failures are logged only on transitions. Ordinary screen messages retain the MESSAGE log mirror.
+If both nearest routes are unavailable, show `No available Air Interdiction routes among the two nearest sites within 20-100 NM. Try again later.` for 20 seconds. Apache adds the range: `No available Air Interdiction routes among the two nearest sites within 3-13 NM. Try again later.` This also covers zero in-range candidates. Unsupported stale task callbacks show `This task is not available for the occupied aircraft types.` for 15 seconds before acquiring a lock. Setup failure shows `ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.` for 20 seconds. Both release the Wing/UCID lock without scoring. Cleanup failure retains the route reservation and retries without repeating settlement. Existing participant result messages use the category `Air Interdiction`. Initialization / setup / cleanup failures go to ERROR logs, accepted template names to DEBUG, and observation failures are logged only on transitions. Ordinary screen messages retain the MESSAGE log mirror.
 
 ## Observation and partial cleanup logs (training-13)
 
 Screen briefing/status/reward wording is unchanged. An unavailable recovery observation logs `[DynamicTraining] Recovery observation unavailable; hold reset: <reason>` once per unavailable episode, resets the stop timer and continues other pilots. Partial group cleanup that fails logs `[DynamicTraining] Object cleanup pending (<alias or SEAD setup>): <reason>` once and retries on the mission timer. Confirmed disappearance releases the reference. SEAD observation/cleanup logs keep their existing prefixes.
+
+## Apache crew identification notices (training-15)
+
+At acceptance, an Apache with unverified crew UCIDs adds `<unit name>: UCID could not be verified; unverified crew sorties are unscored.` for 15 seconds. If the crew API is unavailable or ambiguous, the fallback notice is `<unit name>: Crew could not be verified; this sortie is unscored.` for 15 seconds. This fallback never assigns another occupant's UCID. A CPG-only aircraft with no verifiable occupant cannot accept and receives the existing no-human notice.

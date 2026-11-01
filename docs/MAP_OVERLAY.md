@@ -47,7 +47,7 @@ API欠落・例外はDCSログの `[DynamicTraining] MapOverlay: [ERROR]` へ記
 
 ## ミッション設定と検証範囲
 
-2026-10-06に作業ツリーの `mission/Syria.miz`（現在は `mission/Persistent_and_Dynamic_FA-18C_Training.miz`）の `warehouses.airports` を読み取り、BLUEのIDは6 / 16 / 30 / 44であることを確認した。
+2026-10-06に作業ツリーの `mission/Syria.miz`（現在は `mission/persistant_and_dynamic_traning.miz`）の `warehouses.airports` を読み取り、BLUEのIDは6 / 16 / 30 / 44であることを確認した。
 DCS Syria `radio.lua` のairfield ID、MEの出撃route、同梱MOOSEのSyria名称を照合した結果は以下。
 
 | ID | BLUE陸上基地 |

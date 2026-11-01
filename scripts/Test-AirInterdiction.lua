@@ -17,16 +17,16 @@ local function recover(s,p)
     for time=first,first+10 do s:tick(time) end
 end
 
-test('six dormant templates are cached without spawning or drawing',function()
+test('ten dormant templates are cached without spawning or drawing',function()
     local s=scenario(); local sites=module(s,'AirInterdiction').sites
-    assert(#sites==6 and #s.spawns==0 and #s.randomCalls==0)
+    assert(#sites==10 and #s.spawns==0 and #s.randomCalls==0)
     for _,site in ipairs(sites) do assert(site.valid and site.point) end; s:assertClean()
 end)
 test('ground acceptance starts immediately with the five-line DDM briefing',function()
     local s=scenario(); local r=accept(s)
     assert(r.category=='Air Interdiction' and r.state=='ACTIVE' and #s.spawns==1)
     assert(s.messages[#s.messages-1].text=='Air Interdiction mission accepted.' and s.messages[#s.messages-1].seconds==10)
-    assert(s.messages[#s.messages].text=='AIR INTERDICTION MISSION\nTARGET AREA: LL DDM 101000.000 800.000\n'..
+    assert(s.messages[#s.messages].text=='AIR INTERDICTION MISSION\nTARGET AREA: LL DDM 81000.000 800.000\n'..
         'OBJECTIVE: Destroy all 3 convoy vehicles; then RTB.\nReward per pilot: 150 points.\nRegistered pilots: 1.')
     assert(s.messages[#s.messages].seconds==60); s:assertClean()
 end)
@@ -37,31 +37,42 @@ test('either nearest route can be selected by one equal draw',function()
     end
 end)
 test('all six routes are available from a nearby acceptance position',function()
-    for i=1,6 do local s=scenario(); s.player.position.x=i*100000+1000
+    for i=1,6 do local s=scenario(); s.player.position.x=i*80000+1000-40*1852
         assert(accept(s).interdictionPlan.site.name==string.format('TPL_AI_%02d',i)); s:assertClean()
     end
 end)
 test('route center uses geographic extents rather than waypoint density',function()
     local data=scenario().interdictionTemplates; local points=data.TPL_AI_01.route.points
     -- An extra point near the start must not bias the displayed center.
-    table.insert(points,2,{x=100010,y=310,action='On Road',speed=9.25})
+    table.insert(points,2,{x=80010,y=310,action='On Road',speed=9.25})
     points[#points].task.params.tasks[1].params.fromWaypointIndex=#points
     local s=scenario({interdictionTemplates=data}); local r=accept(s)
-    assert(r.interdictionPlan.location=='LL DDM 101000.000 800.000'); s:assertClean()
+    assert(r.interdictionPlan.location=='LL DDM 81000.000 800.000'); s:assertClean()
 end)
 test('acceptance uses the occupied participant with the lowest aircraft number',function()
     local s=scenario(); s:occupyWing(); s.player.number=2; s.wingman.number=1
-    s.wingman.position.x=501000; local r=accept(s)
+    s.wingman.position.x=401000-40*1852; local r=accept(s)
     assert(r.owner.unit==s.wingman and r.interdictionPlan.site.name=='TPL_AI_05'); s:assertClean()
 end)
 test('equal distance ties have deterministic ordering before the random draw',function()
-    local s=scenario(); s.player.position.x=151000; s.player.position.z=800
+    local s=scenario(); s.player.position.x=121000; s.player.position.z=800
     assert(accept(s).interdictionPlan.site.name=='TPL_AI_01'); s:assertClean()
 end)
-test('airborne selection needs no airport or minimum range',function()
-    local s=scenario(); s.player.airborne=true; s.player.position.x=101000
-    s.env.AIRBASE={FindByName=function() error('airport lookup forbidden') end}
-    assert(accept(s).state=='ACTIVE'); s:assertClean()
+test('airborne acceptance includes 20 and 100 NM and rejects outside the limits without airport lookup',function()
+    for _,nm in ipairs({19.999,20,100,100.001}) do
+        local s=scenario(); s.player.airborne=true; s.player.position={x=81000-nm*1852,y=100,z=800}
+        s.env.AIRBASE={FindByName=function() error('airport lookup forbidden') end}
+        for _,site in ipairs(module(s,'AirInterdiction').sites) do
+            if site.name~='TPL_AI_01' then site.point={x=1e9,y=1e9} end
+        end
+        s:command('Task: Air Interdiction')
+        assert((s:mission()~=nil)==(nm>=20 and nm<=100))
+        if not s:mission() then
+            assert(#s.spawns==0 and not module(s,'Missions').pilots['ucid-a'])
+            s:lastMessageContains('within 20-100 NM')
+        end
+        s:assertClean()
+    end
 end)
 test('parallel wings reserve distinct nearest routes and distinct aliases',function()
     local s=scenario(); local a=accept(s); local p=s:addPilot('Other','ucid-b',20); s:tick(2)
@@ -70,7 +81,7 @@ test('parallel wings reserve distinct nearest routes and distinct aliases',funct
     assert(a.spawn.group.name~=b.spawn.group.name and s.randomCalls[2].maximum==1); s:assertClean()
 end)
 test('both nearest routes busy does not fall back to the third route',function()
-    local s=scenario(); accept(s); local p=s:addPilot('Other','ucid-b',20); s:tick(2); accept(s,1,p)
+    local s=scenario(); module(s,'AirInterdiction').sites[3].point={x=180000,y=800}; accept(s); local p=s:addPilot('Other','ucid-b',20); s:tick(2); accept(s,1,p)
     p=s:addPilot('Third','ucid-c',30); s:tick(4); s:command('Task: Air Interdiction',p)
     assert(not s:mission(p) and #s.spawns==2); s:lastMessageContains('No available Air Interdiction routes')
     s:command('Task: Intercept',p); assert(s:mission(p)); s:assertClean()

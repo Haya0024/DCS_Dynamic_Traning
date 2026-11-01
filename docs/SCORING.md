@@ -1,6 +1,6 @@
 # プレイヤー採点・帰還評価仕様
 
-更新日: 2026-10-27
+更新日: 2026-11-01
 
 現在の採点対象は Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。Intercept は敵航空機全滅、SEAD は主要レーダーの破壊または損傷＋Radar OFF連続30秒、DEADは開始時の残存対象全滅でクリアとする。CAPはzone内累計120秒と敵航空機全滅の両方でクリア。詳細は [CAP.md](CAP.md)。
 Immediate DEADは同じSEAD sortie内のphaseとして、SEADのID・達成結果・報酬を維持し、独立したDEAD報酬を追加する。詳細は [DEAD.md](DEAD.md)。
@@ -8,7 +8,7 @@ SEAD の対象レーダーと配置の仕様は [SEAD.md](SEAD.md) を参照す�
 
 ## 現在の実装と範囲
 
-マルチプレイの静的 Client スロットを対象とした試用実装。
+マルチプレイの静的Clientスロットが対象。Hornetの既存6任務に加え、ApacheのAir Interdictionも同じ150/90/0とUCID別精算を使う。同一機の人間PLT/CPGには各自の満額を付与し、人数で分割しない。未確認UCIDの乗員には加点しない。FARP帰還は対象外。Apacheの実DCS確認は未実施。詳細は[APACHE.md](APACHE.md)。
 UCID の照合、グループ別 F10 メニュー、クリア後の帰還評価、100% / 60% / 0%の精算、
 重複防止、成績表示とサーバーHookによる永続保存はコードに実装済み。
 ユーザーから任務がゲーム内で動作しているとの報告あり。
@@ -70,7 +70,7 @@ DCS 標準 API を使う理由をコードにも記載する。
 
 UCID は空でない文字列のみ採用する。接続中の playerID は永続成績のキーにしない。
 実機でテンプレートの `unitId` とネットワークの `slot` の対応を確認する。
-動的 Client スロットや複数乗員のスロット表記は今回の試用対象外。
+ApacheはME unitIdと乗員席suffix（unitId_1 / unitId_2）を照合し、搭乗中の各UCIDを別参加者として固定する。同一機内の席交換は許可する。動的Clientスロットは対象外。乗員席の実ネットワーク動作はDCS内確認待ち。
 
 UCID が取得できない場合は「採点なし」と表示して訓練を継続する。
 名前・機体名・仮の UCID を成績のキーに使わない。

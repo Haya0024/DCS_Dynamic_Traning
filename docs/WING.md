@@ -1,12 +1,12 @@
 # ウィング共有任務仕様
 
-更新日: 2026-10-13
+更新日: 2026-11-01
 
 ## 現在の実装と対象
 
-同じ DCS グループに搭乗する BLUE F/A-18C の人間プレイヤーが、1件の Intercept / CAP / SEAD / DEAD 任務を共有する。
-実ミッションはSOLO（Client ×1）とMP2（Client ×2）。4空港と空母に各1グループ、合計10グループ・15 Clientスロットを配置する。
-静的 Client スロットを対象とし、動的 Client スロット・複数乗員は試用対象外。
+同じDCSグループの人間プレイヤーが1任務を共有する。HornetはIntercept / CAP / SEAD / DEAD / Strike / Air Interdiction、ApacheはAir Interdictionに対応する。
+実ミッションはSOLO（Client ×1）とMP2（Client ×2）。4空港と空母に各1グループ、Hornetは計10グループ・15 Client機。Apacheは4空港にSOLO/MP2各1グループ、計8グループ・12 Client機を追加した。
+静的Clientスロットが対象。Apacheの人間PLT/CPGは同じ機体でもUCIDごとの参加者とし、受注時に固定する。MP2は2機編隊。動的Clientスロットは対象外。Apacheの詳細は[APACHE.md](APACHE.md)。
 コードと模擬テストは実装済み。ユーザーから任務がゲーム内で動作しているとの報告あり。
 MP2・複数ウィングの個別ケースの確認範囲は未記録。
 
@@ -18,7 +18,7 @@ SEAD は主要レーダー破壊、または損傷＋Radar OFF連続30秒で目�
 地点選定中の `PLANNING` も受注をブロックし、同一ウィング・UCID で Intercept と SEAD を同時に受注できない。
 SEADは受注時にTOO / PB・SAM・Zoneを固定し、実配置予定点とTOOの捜索点／PBの推定点を計画する。地上受注では全員の離陸後20秒で同じ計画を生成する。
 距離判定は受注時の長機位置を使う。詳細は [SEAD.md](SEAD.md) を参照する。
-以下の開始手順は Intercept の動作。共有目標・個別報酬・帰還評価は4カテゴリに適用する。全員離陸待ちはIntercept / SEAD / Follow-on DEADに適用する。
+以下の開始手順は Intercept の動作。共有目標・個別報酬・帰還評価は全6カテゴリに適用する。全員離陸待ちはIntercept / SEAD / Follow-on DEADに適用する。
 Follow-on DEADは既存Siteを受注時に予約し、全員離陸でACTIVEへ移す。20秒の生成待ちはない。
 CAPは受注時からACTIVE。元の未精算・操作中・空中の参加者の誰かが指定空域内なら時計を進め、全員外なら停止する。累計120秒＋生成敵全滅で達成。個人中止・事故で失った人を時計対象から除き、生存僚機は継続できる。詳細は [CAP.md](CAP.md)。
 

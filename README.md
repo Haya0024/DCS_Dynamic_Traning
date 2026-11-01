@@ -1,9 +1,10 @@
-# Persistent and Dynamic F/A-18C Training
+# Persistent and Dynamic Training
 
 DCS World の Syria マップで、F/A-18C の迎撃・戦闘空中哨戒・防空制圧・防空サイト破壊・固定施設攻撃・移動車列攻撃を繰り返し練習するための動的訓練ミッションです。
+AH-64D Apacheでは近距離のAir Interdictionに対応します。SOLO・2機編隊と同一機の人間PLT/CPGで、既存の受注・共有目標・UCID別採点を利用できます。詳細は[Apache仕様](docs/APACHE.md)。
 F10から任務を受注し、任務ごとの条件で敵を配置します。目標達成後は味方基地や空母への帰還まで評価します。
 
-ソロと2人のマルチプレイに対応しています。出撃場所と兵装を選び、短い迎撃訓練から、SEAD後に再武装してDEADへ向かう連続出撃まで、自分たちのペースで訓練できます。
+ソロと編隊・Apacheの複数乗員でのマルチプレイに対応しています。出撃場所と兵装を選び、自分たちのペースで訓練できます。
 
 ## 訓練できること
 
@@ -25,16 +26,16 @@ SEADでは受注時にTOO / PBを等確率で選びます。TOOは機種不明�
 
 ## 始め方
 
-必要な環境は **DCS World / Syriaマップ / F/A-18C** です。MOOSEと訓練スクリプトはミッションに組み込まれています。
+必要な環境は **DCS World / Syriaマップ / 搭乗するF/A-18CまたはAH-64D** です。MOOSEと訓練スクリプトはミッションに組み込まれています。
 
-1. [Persistent_and_Dynamic_FA-18C_Training.miz](mission/Persistent_and_Dynamic_FA-18C_Training.miz) をマルチプレイでホストします。
-2. BLUEのHornetスロットに搭乗します。Incirlik、Akrotiri、Beirut、Ramat David、空母から出撃できます。
+1. [persistant_and_dynamic_traning.miz](mission/persistant_and_dynamic_traning.miz) をマルチプレイでホストします。
+2. BLUEのHornetまたはApacheスロットに搭乗します。Incirlik、Akrotiri、Beirut、Ramat Davidから出撃でき、Hornetは空母にも配置しています。
 3. 再武装を要請し、訓練に合わせた兵装を搭載します。初期兵装は空です。
 4. F10の `Dynamic Training` から任務を選びます。
 5. 目標を達成したら、BLUEの基地または空母に帰還して精算します。
 
-Incirlik / Akrotiri / Beirut / Ramat David / 空母の5拠点に、単独の `SOLO`（Client ×1）とプレイヤー2人用の `MP2`（Client ×2）があります。合計10グループ・15 Clientスロットです。
-MP2では参加する全員が搭乗してから受注してください。
+Hornetは4空港＋空母にSOLO（Client ×1）・MP2（Client ×2）、計10グループ・15 Client機。Apacheは4空港に同じ構成で計8グループ・12 Client機。合計18グループ・27 Client機です。MP2は2機編隊の名称で、Apacheの同一機PLT/CPGとは別です。
+編隊・同一機の人間乗員とも、参加する全員が搭乗してから受注してください。
 
 Intercept / SEADを地上で受注した場合は、登録参加者全員の離陸を待ち、離陸検出から20秒後に敵を生成します。
 全員が空中で受注した場合、Interceptは即開始、SEADは配置計画の確定後に開始します。
@@ -86,7 +87,9 @@ F10の`Mark Strike Target`で、TOOは従来の施設案内点、PPは抽選し�
 
 ## Air Interdiction — 移動車列への攻撃
 
-`Task: Air Interdiction` はMEの6周回経路の中心から受注時の長機に近い2か所を候補とし、使用可能な1か所を等確率で抽選します。周回WPの外接矩形中心をDDM（分の小数3桁）で案内します。座標を手掛かりに道路上の車列をTOOで捜索し、Tigr・BTR-70・Uralの3両すべてを破壊して帰還してください。
+`Task: Air Interdiction` はHornet用MEの6周回経路のうち、受注時の長機から中心まで20〜100 NMの近い2か所を候補とし、使用可能な1か所を等確率で抽選します。周回WPの外接矩形中心をDDM（分の小数3桁）で案内します。座標を手掛かりに道路上の車列をTOOで捜索し、Tigr・BTR-70・Uralの3両すべてを破壊して帰還してください。
+
+Hornetは全15駐機位置で候補あり。IncirlikはAI_02（約92.9 NM）、AkrotiriはAI_06（約25.0 NM）、BeirutはAI_05/04（約73.5/77.5 NM）、RamatはAI_05（約48.8 NM）、空母初期位置はAI_06（約92.6 NM）。ApacheはTPL_AI_01〜10のうち、受注時の長機から周回中心まで3〜13 NMの近い2地域を使います。現配置ではIncirlikにTPL_AI_09（約3.71〜3.80 NM）とTPL_AI_01（約9.25〜9.30 NM）の2候補、AkrotiriにTPL_AI_10（約7.86〜7.90 NM）、BeirutにTPL_AI_08（約10.90〜10.96 NM）、RamatにTPL_AI_07（約12.51〜12.52 NM）が各1候補あります。全4青空港のApache駐機位置で受注でき、保存座標は維持しています。ApacheのTARGET AREAはMGRS 8桁（東4桁＋北4桁、ゾーン・グリッド識別子付き）で表示し、HornetはDDM・分小数3桁を使います。
 
 地上でも即生成し、MEの経路・速度・周回指示・車間距離を維持します。1地域につき1Wingで、全員終了後に削除します。Statusは公開済みの中心座標、達成後は座標なしの帰還指示です。報酬は各自150／達成後事故90／未達成事故・Abort0。詳細は[Air Interdiction仕様](docs/AIR_INTERDICTION.md)。実走行・橋の通過・散開後の復帰・実射は確認待ちです。
 
@@ -182,20 +185,20 @@ Gitではソース、テスト、仕様書、共通のVS Codeタスクを管理�
 Luaを変更したら、リポジトリのルートで次を実行して `.miz` 内のスクリプトを更新します。同期時に結合も行います。
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -MissionPath "mission/Persistent_and_Dynamic_FA-18C_Training.miz"
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -MissionPath "mission/Persistent_and_Dynamic_FA-18C_Training.miz" -Check
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -MissionPath "mission/persistant_and_dynamic_traning.miz"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -MissionPath "mission/persistant_and_dynamic_traning.miz" -Check
 ```
 
 保存時の自動同期は `-Watch`、またはVS Codeの `DCS: Watch mission Lua` タスクで起動できます。監視の終了はCtrl+Cです。
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -MissionPath "mission/Persistent_and_Dynamic_FA-18C_Training.miz" -Watch
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Sync-Mission.ps1 -MissionPath "mission/persistant_and_dynamic_traning.miz" -Watch
 ```
 
 同期は登録済みの埋め込みLuaを置き換え、その他のミッション内容の保持を検証します。直前の `.miz` は同じ場所に `.miz.bak` として保存します。
 同期後にMEから実行する場合は `.miz` を開き直してください。実行中のDCSミッションへの反映には、更新した `.miz` での再開始が必要です。
 
-全体の検証は次のコマンドで実行できます。両bundleを結合し、Lua全12スイートとBuild/Sync/Installテストを専用fixtureで確認します。実ミッションへの反映は上記Sync/Checkで行います。
+全体の検証は次のコマンドで実行できます。両bundleを結合し、Lua全13スイートとBuild/Sync/Installテストを専用fixtureで確認します。実ミッションへの反映は上記Sync/Checkで行います。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1

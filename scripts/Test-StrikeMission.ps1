@@ -3,7 +3,7 @@ param([string]$LuaPath = 'C:/Program Files (x86)/Steam/steamapps/common/DCSWorld
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $projectRoot 'mission/Persistent_and_Dynamic_FA-18C_Training.miz'))
+$archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $projectRoot 'mission/persistant_and_dynamic_traning.miz'))
 try {
     $sources = @()
     foreach ($entry in @('mission')) {

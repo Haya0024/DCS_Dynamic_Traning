@@ -65,6 +65,16 @@ local function scenario(options)
     end
     s.players = {}
     s.player, s.wingman = s:addPilot("Pilot", options.unscored and "" or "ucid-a", 10)
+    if options.aircraftType then
+        s.player.kind, s.wingman.kind = options.aircraftType, options.aircraftType
+    end
+    if options.playerPosition then s.player.position = options.playerPosition end
+
+    function s:addCrew(unit, name, ucid, id, slot)
+        self.connections[id] = { id = id, name = name, ucid = ucid, side = 2,
+            slot = slot or (tostring(unit.slotID) .. "_2") }
+        return { group = unit.group, slotID = id }
+    end
 
     function s:occupyWing(name, ucid, unit)
         local p = unit or self.wingman
@@ -119,6 +129,13 @@ local function scenario(options)
     function coordinate:ToStringLLDDM(settings)
         assert(settings and settings.LL_Accuracy == 3, "Expected three decimal places in DDM minutes")
         return string.format("LL DDM %.3f %.3f", self.x, self.z)
+    end
+    function coordinate:ToStringMGRS(settings)
+        assert(settings and settings.MGRS_Accuracy == 4, "Expected four digits per MGRS axis")
+        s.mgrsCalls = s.mgrsCalls or {}
+        s.mgrsCalls[#s.mgrsCalls + 1] = { x = self.x, z = self.z, accuracy = settings.MGRS_Accuracy }
+        -- Local fixture metres, not a substitute for DCS geographic conversion.
+        return string.format("MGRS 37S BV %04d %04d", math.floor(self.x / 10) % 10000, math.floor(self.z / 10) % 10000)
     end
     function coordinate:ScanObjectsSquare(side, units, statics, scenery)
         assert(units and statics and scenery)

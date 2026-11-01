@@ -1,4 +1,4 @@
-# Persistent and Dynamic F/A-18C Training
+# Persistent and Dynamic Training
 
 Mission Editorへ貼り付ける日英の原稿。各項目は単独でも使える文章とする。
 「ミッション概要」は全体の説明欄、それ以降はBLUE側の任務説明欄への掲載を想定する。
@@ -8,7 +8,7 @@ Mission Editorへ貼り付ける日英の原稿。各項目は単独でも使え
 
 ### ミッション概要
 
-Persistent and Dynamic F/A-18C Trainingは、F/A-18Cで迎撃、戦闘空中哨戒、防空制圧、防空サイト破壊を繰り返し練習する訓練ミッションです。BLUE側の基地または空母から出撃し、F10の「Dynamic Training」で任務を選択してください。目標達成だけでなく、味方基地や空母への安全な帰還まで評価します。ソロでも同じグループのプレイヤーと協力しても参加できます。
+Persistent and Dynamic Trainingは、F/A-18CとAH-64D Apacheで訓練するミッションです。F/A-18Cでは迎撃・戦闘空中哨戒・防空制圧・防空サイト破壊・固定施設攻撃・移動車列攻撃を、Apacheでは近距離の移動車列攻撃を繰り返し練習できます。BLUE側の基地または空母から出撃し、F10の「Dynamic Training」で任務を選択してください。目標達成だけでなく、味方基地や空母への安全な帰還まで評価します。ソロでも同じグループのプレイヤーと協力しても参加できます。
 
 ### 出撃準備と任務操作
 
@@ -32,7 +32,7 @@ SEADで制圧したサイトの残存車両をすべて破壊してください�
 
 ### Air Interdiction — 移動車列への攻撃
 
-近い2周回地域の1つを抽選し、周回WP中心のDDM座標を案内します。道路上を移動する車列をTOOで捜索し、3両すべてを破壊して帰還してください。地上受注でも即生成します。座標は周回経路の中心です。
+Hornetは6経路のうち長機より20〜100 NMの近い2周回地域、Apacheは全10経路から長機位置より3〜13 NMの近い2地域を候補として1つを抽選し、周回WP中心をHornetにはDDM、ApacheにはMGRS 8桁（東4＋北4、ゾーン・グリッド識別子付き）で案内します。Apacheはこの任務に対応し、4青空港から出撃できます。全4青空港の駐機位置から受注候補があります。道路上を移動する車列をTOOで捜索し、3両すべてを破壊して帰還してください。地上受注でも即生成します。座標は周回経路の中心です。
 
 ### Strike — 固定施設への攻撃
 
@@ -54,7 +54,7 @@ Total Score、Career Points、カテゴリ別スコア、任務・帰還など�
 
 ### Mission overview
 
-Persistent and Dynamic F/A-18C Training provides repeatable F/A-18C training in interception, combat air patrol, suppression of enemy air defenses, and destruction of enemy air defenses. Depart from a BLUE airfield or carrier and select a mission through the F10 "Dynamic Training" menu. Your performance is evaluated through both objective completion and safe recovery at a friendly airfield or carrier. Fly solo or cooperate with other players in the same flight group.
+Persistent and Dynamic Training supports AH-64D Air Interdiction and repeatable F/A-18C training in interception, combat air patrol, suppression of enemy air defenses, and destruction of enemy air defenses. Depart from a BLUE airfield or carrier and select a mission through the F10 "Dynamic Training" menu. Your performance is evaluated through both objective completion and safe recovery at a friendly airfield or carrier. Fly solo or cooperate with other players in the same flight group.
 
 ### Preparation and mission controls
 
@@ -78,7 +78,7 @@ Destroy all remaining vehicles at a site previously suppressed during SEAD. "Con
 
 ### Air Interdiction — Moving convoy
 
-One available route is selected from the nearest two of six patrol routes. Search the roads around the published DDM route-center coordinate in TOO, destroy all three convoy vehicles, then RTB. The convoy spawns immediately even for ground acceptance. The coordinate marks the route center.
+Hornet selects one available route from the nearest two of six patrol routes whose centers are 20–100 NM from the leader at acceptance. Apache uses the nearest two of ten routes whose centers are 3–13 NM from the leader at acceptance. Apache slots and eligible routes are available from parking at all four BLUE airports. The route-center coordinate is DDM for Hornet and 8-digit MGRS (four easting and four northing digits, with zone and square identifiers) for Apache. Search the surrounding roads in TOO, destroy all three convoy vehicles, then RTB. The convoy spawns immediately even for ground acceptance. The coordinate marks the route center.
 
 ### Strike — Fixed ground facilities
 
@@ -90,7 +90,7 @@ After objective completion, recover at a BLUE airfield or a supported BLUE carri
 
 ### Multiplayer and participants
 
-Players in the same group share one mission, with a limit of one active mission per group. Have every participating player occupy a slot before accepting a task. Participants are fixed at acceptance; AI aircraft, empty slots, and players joining later are excluded from that mission's scoring. Objective completion is shared, while recovery, losses, aborts, and points are evaluated individually. Rewards are not divided between participants. Even after one pilot recovers, the group cannot accept another mission until every registered participant has settled or aborted. Other groups can run independent missions at the same time.
+Human Apache PLT/CPG crew are registered and scored separately at acceptance. Players in the same group share one mission, with a limit of one active mission per group. Have every participating player occupy a slot before accepting a task. Participants are fixed at acceptance; AI aircraft, empty slots, and players joining later are excluded from that mission's scoring. Objective completion is shared, while recovery, losses, aborts, and points are evaluated individually. Rewards are not divided between participants. Even after one pilot recovers, the group cannot accept another mission until every registered participant has settled or aborted. Other groups can run independent missions at the same time.
 
 ### Saved progress
 

@@ -1,25 +1,25 @@
 # 実装構成と設計上の約束
 
-更新日: 2026-10-27
+更新日: 2026-11-01
 
 ## 対象
 
 Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
-この構成は`training-14`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-15`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
-実ミッションのプレイヤー配置は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、合計10グループ・15 Clientスロット。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
+実ミッションのプレイヤー配置は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、Hornetは計10グループ・15 Client機、Apacheは4空港にSOLO/MP2の8グループ・12 Client機、総計18グループ・27 Client機。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
 
 ## 責務と依存
 
 | 層 | モジュール | 責務 |
 |---|---|---|
 | 設定 | `config.lua` | 訓練値・時間・候補・報酬。各任務の設定は`intercept` / `cap` / `sead` / `dead` / `strike` / `airInterdiction`に置く |
-| 搭乗者 | `player.lua` | BLUE Hornetの動的列挙、UCID・機体・イベント照合 |
+| 搭乗者 | `player.lua` | BLUE Hornet/Apacheの動的列挙、Apache乗員席、UCID・機体・イベント照合 |
 | 任務台帳 | `missions.lua` | Wing/UCIDロック、受注順、活動中任務とSiteの参照 |
 | 訓練地域 | 実ミッションのME Trigger Zone | 全19円の中心・半径の唯一の定義元。各任務はZONE:FindByNameで参照し、Configの候補名・距離制限で選定 |
 | 固定施設 | `strike.lua` | ME Static取得・54原本除去、PP/TOO・近い2施設の抽選、TOO7/PP9物体生成、DDM/DMS・標高、施設予約・削除再試行 |
-| 移動車列 | `air_interdiction.lua` | ME周回中心の算出、近い2経路の抽選、3両生成・破壊観測、地域予約・削除再試行 |
+| 移動車列 | `air_interdiction.lua` | ME周回中心の算出、機種別候補と距離条件、近い2経路の抽選、3両生成・破壊観測、地域予約・削除再試行 |
 | 観測契約 | `observations.lua` | 有限数・Vec3・固定IDの生死確認、連続観測の時間境界。公開・採点判断は呼出元に残す |
 | 実体削除 | `object_lifecycle.lua` | Destroy後の消失確認、固有aliasの部分生成回収と削除待ち。Site予約は所有しない |
 | 空中目標 | `air_targets.lua` | Intercept/CAPの生成済み機体のID固定、喪失イベント、生存観測 |
@@ -85,9 +85,9 @@ training-3では実行入口をmain.luaへ改名し、Interceptの敵削除再�
 
 ## 開発と検証
 
-全体の確認は`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1`。両bundleを結合し、Lua 12スイートとBUILD/SYNC/INSTALLを使い捨てfixtureで検証する。Luaの場所は`-LuaPath`で指定できる。
+全体の確認は`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-All.ps1`。両bundleを結合し、Lua 13スイートとBUILD/SYNC/INSTALLを使い捨てfixtureで検証する。Luaの場所は`-LuaPath`で指定できる。
 
-実ミッションへの反映はその後に`Sync-Mission.ps1`、続けて`Sync-Mission.ps1 -Check`。既定先は`mission/Persistent_and_Dynamic_FA-18C_Training.miz`。別ファイルは`-MissionPath`で明示する。既存埋め込みLuaだけを置換し、ZIP内のその他の内容を保持する。詳細はREADMEとTESTINGを参照する。
+実ミッションへの反映はその後に`Sync-Mission.ps1`、続けて`Sync-Mission.ps1 -Check`。既定先は`mission/persistant_and_dynamic_traning.miz`。別ファイルは`-MissionPath`で明示する。既存埋め込みLuaだけを置換し、ZIP内のその他の内容を保持する。詳細はREADMEとTESTINGを参照する。
 
 ## Strikeの状態と保存形式
 
@@ -99,7 +99,7 @@ Strikeの任意スモークはstrike.luaのMark/StopMark/Sweepで管理する。
 
 ## Air Interdictionの状態と地域予約
 
-MEのTPL_AI_01～06はLate Activationのまま保ち、route.pointsの外接矩形中心をキャッシュする。受注時の長機から近い2中心を固定し、使用可能な1経路を抽選する。Missions.interdictionSites[templateName]へplanを予約し、SPAWN:NewWithAliasでME経路と3両を複製して即ACTIVE。3実体のIDと明示死亡を固定して全滅でRTB_PENDING。元のユニット名の連番には依存しない。全員精算後に削除し、削除が確認できるまで予約を維持する。失敗は5秒間隔で再試行し、生成後例外も固有aliasのMOOSE/native参照で回収する。Statusは公開した中心DDMの本文のみ、達成後は座標を外す。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
+MEのTPL_AI_01～10はLate Activationのまま保ち、route.pointsの外接矩形中心をキャッシュする。Hornetは6経路のうち20〜100 NM、Apacheは全10経路のうち3～13 NMにあるものから、受注時の長機に近い2中心を固定し、使用可能な1経路を抽選する。Missions.interdictionSites[templateName]へplanを予約し、SPAWN:NewWithAliasでME経路と3両を複製して即ACTIVE。3実体のIDと明示死亡を固定して全滅でRTB_PENDING。元のユニット名の連番には依存しない。全員精算後に削除し、削除が確認できるまで予約を維持する。失敗は5秒間隔で再試行し、生成後例外も固有aliasのMOOSE/native参照で回収する。Statusは公開した中心座標の本文のみ。HornetはDDM3桁、ApacheはMGRS各軸4桁を受注時に整形・保存し、達成後は座標を外す。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
 
 ## training-13の全点検
 

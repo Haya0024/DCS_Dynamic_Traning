@@ -12,7 +12,7 @@ foreach ($script in @('Build-Mission.ps1', 'Sync-Mission.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination (Join-Path $testRoot "scripts/$script")
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'vendor/MOOSE/Moose.lua') -Destination (Join-Path $testRoot 'vendor/MOOSE/Moose.lua')
-Copy-Item -LiteralPath (Join-Path $projectRoot 'mission/Persistent_and_Dynamic_FA-18C_Training.miz') -Destination (Join-Path $testRoot 'mission/Persistent_and_Dynamic_FA-18C_Training.miz')
+Copy-Item -LiteralPath (Join-Path $projectRoot 'mission/persistant_and_dynamic_traning.miz') -Destination (Join-Path $testRoot 'mission/persistant_and_dynamic_traning.miz')
 $controller = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'SEAD-PlacementCheck.lua'))
 $selection = ''
 if ($ZoneNames) {
@@ -38,5 +38,5 @@ $entry = $entry.Replace('__SPAWN_CHECK__', $spawnFlag)
 & (Join-Path $testRoot 'scripts/Sync-Mission.ps1')
 & (Join-Path $testRoot 'scripts/Sync-Mission.ps1') -Check
 $output = Join-Path $projectRoot 'build/SEAD_Placement_Check.miz'
-Copy-Item -LiteralPath (Join-Path $testRoot 'mission/Persistent_and_Dynamic_FA-18C_Training.miz') -Destination $output
+Copy-Item -LiteralPath (Join-Path $testRoot 'mission/persistant_and_dynamic_traning.miz') -Destination $output
 Write-Output "Built placement-only mission: $output"

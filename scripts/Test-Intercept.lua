@@ -259,7 +259,7 @@ test("solo and MP2 show one title-only start; range altitude aspect hostiles cou
             return n
         end
         s.generate()
-        assert(logs("MESSAGE [ALL]\nDynamic Training ready. Wing UCID scoring.") == 1)
+        assert(logs("MESSAGE [ALL]\nPersistent and Dynamic Training ready. Wing UCID scoring.") == 1)
         if not airborne then
             s:lastMessageContains("Waiting for ALL registered pilots to take off.")
             assert(messages("Hostiles will spawn") == 0)

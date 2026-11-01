@@ -335,7 +335,7 @@ Test-Interceptは22ケース。INT-19〜22で、終了時・生成後設定失�
 - 敵観測: [src/air_targets.lua](../src/air_targets.lua)
 - Status/Statistics: [src/mission_report.lua](../src/mission_report.lua)
 - 採点・帰還: [SCORING.md](SCORING.md)
-- ミッション: [Persistent_and_Dynamic_FA-18C_Training.miz](../mission/Persistent_and_Dynamic_FA-18C_Training.miz)
+- ミッション: [persistant_and_dynamic_traning.miz](../mission/persistant_and_dynamic_traning.miz)
 - API 実装: [vendor/MOOSE/Moose.lua](../vendor/MOOSE/Moose.lua)
 - Lua 同期: [scripts/Sync-Mission.ps1](../scripts/Sync-Mission.ps1)
 

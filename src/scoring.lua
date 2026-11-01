@@ -30,7 +30,8 @@ function Scoring.Settle(mission, result, reason)
     -- A wing shares the mission ID, but each registered UCID settles once.
     -- Unknown identities have a session-only aircraft key and never a score.
     local key = mission.owner.ucid and ("ucid:" .. mission.owner.ucid)
-        or ("aircraft:" .. tostring(mission.owner.objectID))
+        or ("aircraft:" .. tostring(mission.owner.objectID) ..
+            (mission.owner.seat and (":seat:" .. mission.owner.seat) or ""))
     local ledger = Scoring.settlements[mission.id] or {}
     local existing = ledger[key]
     if existing then return existing end

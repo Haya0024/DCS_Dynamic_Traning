@@ -2,6 +2,36 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-11-01 ApacheのAir Interdiction座標をMGRS 8桁へ変更
+
+ユーザー指定でApacheのTARGET AREAをDDMからMGRSへ変更。config.airInterdiction.helicopterのcoordinateFormat=MGRS / mgrsAccuracy=4を使い、MOOSE ToStringMGRSへ精度4を明示する。ゾーン・100 kmグリッド識別子・東4桁＋北4桁を表示し、先頭ゼロを保持して切り捨てる。周回中心の捜索点、誤差追加なし、60秒、Statusの公開済み本文再表示、達成後の座標除去は維持する。Hornetは従来DDMのまま。距離・目標・採点・ME配置を変更しない。
+
+Apacheに2ケースを追加し、同梱MOOSEの実変換/整形関数を座標変換境界のstub付きで検証する。8桁・先頭ゼロ・切り捨て・グローバル精度からの独立性と、座標変換失敗時の生成前解除を確認する。Lua全522ケース・13スイート、全結合検証が通過。Build→Sync→Check成功。直前バックアップと、登録済みLua以外の8 ZIPエントリ一致を確認。DCS内の実地理座標変換・KU入力は手動確認対象。
+
+## 2026-11-01 HornetのAir Interdictionを20〜100 NMへ制限
+
+ユーザー指定でHornetの6経路に、受注時の長機から周回中心まで20〜100 NM（両端含む）の条件を追加。範囲内の近い2地域を固定して抽選し、候補なしでは距離付き通常通知で解除する。Apacheの3〜13 NM、既存の座標表示・目標条件・採点・ME配置は維持する。
+
+保存済み15 Hornet駐機位置の全てで候補あり。IncirlikはAI_02約92.9 NM、AkrotiriはAI_06約25.0 NM、BeirutはAI_05/04約73.5/77.5 NM、RamatはAI_05約48.8 NM、空母初期位置はAI_06約92.6 NM。Lua全520ケース・13スイート、全結合検証が通過。境界・範囲外・近い2候補・使用中・3番目へ回さない条件を検証し、Build→Sync→Checkで反映した。直前バックアップと登録済みLua以外の8 ZIPエントリ一致も確認。DCS実飛行は未実施。模擬経路の間隔を80 kmへ調整し、新しい距離制限の下で既存の並行任務・精算テストの意図を維持する。
+
+## 2026-11-01 Apacheの距離条件を3〜13 NMへ変更
+
+ユーザー指定でApacheのAir Interdictionだけを5〜12 NMから3〜13 NM（両端含む）へ変更。Hornetの候補・採点・ME座標・経路は維持する。全12 Apache駐機位置で候補ありとなり、IncirlikはTPL_AI_09/01の2候補、AkrotiriはTPL_AI_10、BeirutはTPL_AI_08、RamatはTPL_AI_07の各1候補を確保した。受注時の長機から周回中心までの距離を使い、周回全点を13 NM内へ収める条件ではない。
+
+Lua全520ケース・13スイートと全結合検証が通過。Apacheの3/13 NM境界・範囲外拒否、実.mizの全駐機位置と抽選候補を検証し、Build→Sync→Checkで反映した。直前の.mizバックアップが一致し、変更は登録済みDynamicTraining.luaだけで他8 ZIPエントリを保持した。以下の5〜12 NM時の候補なし記録は当時の結果として維持する。
+
+## 2026-11-01 ApacheのAir Interdictionとミッション名変更（training-15）
+
+ユーザーがMEで追加したApacheのSOLO/MP2を確認。4青空港に各SOLO1機・MP2 2機、8グループ・12 Client機、BLUE/USA・コールド開始・名前/ID一意性・Apache間の駐機重複なしを検証した。TPL_AI_01〜10は全てRED/Russia・Late Activation・3両・On Road・最終WP→WP0の周回を持つ。
+
+機種別F10と候補選定を追加。Hornetは従来6経路・距離制限なし、Apacheは10経路から長機位置より5〜12 NM内の近い2地域を固定し抽選する。既存のWing/UCID排他、共有3両破壊、個別帰還150/達成後喪失90/未達成喪失・Abort0、Air Interdiction Score/schema4を再利用した。人間PLT/CPGはネットワーク席を照合して別UCIDで登録し、CPG単独・席交換・参加者固定・同機全乗員の喪失精算を模擬検証した。FARP帰還は追加しない。Hookのコード・保存形式は変更しない。
+
+保存済み12駐機位置からの中心距離では、IncirlikのTPL_AI_01が9.248〜9.297 NM、AkrotiriのTPL_AI_10が7.859〜7.895 NM、BeirutのTPL_AI_08が10.903〜10.957 NMで対象。TPL_AI_09はIncirlikから3.706〜3.799 NM、TPL_AI_07はRamatから12.513〜12.519 NMで対象外。Ramatは駐機位置から候補なし。座標と経路は維持し、範囲を拡張せず通常通知で拒否する。詳細は[APACHE.md](APACHE.md)。
+
+実ファイルを`mission/persistant_and_dynamic_traning.miz`、表示名を`Persistent and Dynamic Training`へ改名。表示名はユーザー明示依頼の既存dictionary sortie値だけ変更し、他の辞書項目・ME設定・機体・経路・トリガー・リソース表・ニーボードは維持する。既定同期先・VS Codeタスク・検証スクリプト・現行文書を更新し、内部DynamicTraining識別子と過去の記録は維持する。
+
+Lua全520ケース（13スイート、Apache25）とBUILD2・SYNC3・INSTALL5・ZONES3・STRIKEME2・INTERDICTIONME4が通過。全10車列のApache受注・生成・経路維持・3両破壊・削除、12駐機位置の候補あり/なしを模擬検証した。初回の制限環境では使い捨てZIPのFile.Replaceが拒否されたため、同じ検証を許可された通常実行環境で完了した。Build→Sync→Check成功。保存前バックアップとの比較で、既存dictionaryのタイトル値と登録済みDynamicTraining.luaだけが変わり、他7 ZIPエントリとME本体のbytesを保持した。DCS実飛行・実射・Apache乗員の実ネットワーク/喪失イベント・帰還保存は未確認で、MAN-66/67に記録する。
+
 ## 2026-10-27 StrikeをPP表記へ統一（training-14）
 
 ユーザー指定により、JDAM/JSOW向けStrikeの方式をPBからPP（Pre-Planned）へ訂正した。STRIKE MISSION (PP)、attackMode、config.strike.ppTargets、ppOnly、ppValid、テストと現行仕様書を揃えた。SEADのHARM PB（Pre-Briefed）は維持する。抽選・対象・座標・標高・報酬・保存schema4は変更しない。過去のPB表記は当時の履歴として残す。

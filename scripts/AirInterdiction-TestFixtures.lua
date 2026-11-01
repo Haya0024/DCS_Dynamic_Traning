@@ -5,11 +5,11 @@ return function(s, env, options, newUnit)
         local out={}; for k,x in pairs(v) do out[k]=copy(x) end; return out
     end
     s.interdictionTemplates={}
-    for i=1,6 do
+    for i=1,10 do
         local name=string.format('TPL_AI_%02d',i)
         local points={}
         for j,p in ipairs({{0,0},{2000,0},{2000,1000},{0,1000}}) do
-            points[j]={x=i*100000+p[1],y=300+p[2],action='On Road',speed=9.25,
+            points[j]={x=i*80000+p[1],y=300+p[2],action='On Road',speed=9.25,
                 task={id='ComboTask',params={tasks={}}}}
         end
         points[1].task.params.tasks={{id='WrappedAction',params={action={id='Option',params={name=30,value=60.96}}}}}

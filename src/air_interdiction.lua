@@ -2,8 +2,23 @@
 local AirInterdiction = { sites = {} }
 local finite = Observations.Finite
 
+function AirInterdiction.Profile(aircraftType)
+    local aircraft = Config.playerTypes[aircraftType]
+    local profile = aircraft and aircraft.interdictionProfile
+    return profile and Config.airInterdiction[profile] or Config.airInterdiction
+end
+
 function AirInterdiction.Initialize()
-    for _, name in ipairs(Config.airInterdiction.templates) do
+    local names = {}
+    for _, aircraft in pairs(Config.playerTypes) do
+        local profile = aircraft.interdictionProfile and Config.airInterdiction[aircraft.interdictionProfile]
+            or Config.airInterdiction
+        for _, name in ipairs(profile.templates) do names[name] = true end
+    end
+    local ordered = {}
+    for name in pairs(names) do ordered[#ordered + 1] = name end
+    table.sort(ordered)
+    for _, name in ipairs(ordered) do
         local site = { name = name }
         AirInterdiction.sites[#AirInterdiction.sites + 1] = site
         local ok, problem = pcall(function()
@@ -37,12 +52,20 @@ function AirInterdiction.Initialize()
     end
 end
 
-function AirInterdiction.Plan(position, assignmentID)
+function AirInterdiction.Plan(position, assignmentID, aircraftType)
     assert(position and finite(position.x) and finite(position.z), "Convoy acceptance position unavailable.")
+    local profile = AirInterdiction.Profile(aircraftType)
+    local allowed = {}
+    for _, name in ipairs(profile.templates) do allowed[name] = true end
     local nearest = {}
     for _, site in ipairs(AirInterdiction.sites) do
-        if site.point then nearest[#nearest + 1] = { site = site,
-            distance = (site.point.x - position.x)^2 + (site.point.y - position.z)^2 } end
+        if site.point and allowed[site.name] then
+            local distance = (site.point.x - position.x)^2 + (site.point.y - position.z)^2
+            if (not profile.minDistanceNM or distance >= (profile.minDistanceNM * 1852)^2)
+                and (not profile.maxDistanceNM or distance <= (profile.maxDistanceNM * 1852)^2) then
+                nearest[#nearest + 1] = { site = site, distance = distance }
+            end
+        end
     end
     table.sort(nearest, function(a, b)
         if a.distance == b.distance then return a.site.name < b.site.name end
@@ -55,7 +78,13 @@ function AirInterdiction.Plan(position, assignmentID)
     end
     if #available == 0 then return nil end
     local site = available[math.random(1, #available)]
-    local location = COORDINATE:NewFromVec2(site.point):ToStringLLDDM({ LL_Accuracy = 3 })
+    local coordinate = COORDINATE:NewFromVec2(site.point)
+    local location
+    if profile.coordinateFormat == "MGRS" then
+        location = coordinate:ToStringMGRS({ MGRS_Accuracy = profile.mgrsAccuracy })
+    else
+        location = coordinate:ToStringLLDDM({ LL_Accuracy = 3 })
+    end
     assert(type(location) == "string" and location ~= "", "Convoy coordinate unavailable.")
     local reward = Config.airInterdiction.fullReward
     assert(finite(reward) and reward >= 0 and reward % 1 == 0, "Invalid convoy reward.")

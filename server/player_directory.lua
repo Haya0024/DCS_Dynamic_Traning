@@ -1,7 +1,8 @@
 -- Read identity in the host control environment, where dynamic slot properties are authoritative.
 local PlayerDirectory = {}
 function PlayerDirectory.Collect(control, network)
-    assert(control.getUnitProperty and network.get_player_list and network.get_player_info, "Player identity APIs unavailable")
+    assert(control.getUnitProperty and control.UNIT_MISSION_ID ~= nil
+        and network.get_player_list and network.get_player_info, "Player identity APIs unavailable")
     local rows = {}
     for _, id in ipairs(assert(network.get_player_list())) do
         local p = assert(network.get_player_info(id))
@@ -13,7 +14,9 @@ function PlayerDirectory.Collect(control, network)
             if kind == "FA-18C_hornet" or kind == "AH-64D_BLK_II" then
                 local name = control.getUnitProperty(unitID, control.UNIT_NAME)
                 local group = control.getUnitProperty(unitID, control.UNIT_GROUPNAME)
-                local objectID = tonumber(control.getUnitProperty(unitID, control.UNIT_RUNTIME_ID))
+                -- SSE Unit:getID is the mission unit ID (often a decimal string),
+                -- not Sim.UNIT_RUNTIME_ID's internal engine object handle.
+                local objectID = tonumber(control.getUnitProperty(unitID, control.UNIT_MISSION_ID))
                 assert(type(name) == "string" and name ~= "" and type(group) == "string" and group ~= ""
                     and objectID and objectID > 0 and objectID % 1 == 0, "Player runtime identity unavailable")
                 rows[#rows + 1] = { playerID = id, ucid = p.ucid, name = p.name, slot = slot, side = 2,

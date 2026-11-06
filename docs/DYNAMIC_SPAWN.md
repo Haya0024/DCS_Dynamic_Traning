@@ -27,17 +27,19 @@ Apacheの2人目は、新しく機体を生成せず、Spawn Slotsから生成�
 
 ## 識別と採点
 
-動的生成機にはME unitIdがない場合があるため、runtime object IDをslot IDへ推測変換しない。サーバーHookがSim/DCS.getUnitPropertyでネットワークslotの実ユニット名・グループ名・機種・runtime IDを解決し、UCID・player ID・席と組にして既存のmission/a_do_script経由で固定endpointへ送る。
+動的生成機にはME unitIdがない場合があるため、runtime object IDをslot IDへ推測変換しない。サーバーHookがSim/DCS.getUnitPropertyでネットワークslotの実ユニット名・グループ名・機種・mission unit IDを解決し、UCID・player ID・席と組にして既存のmission/a_do_script経由で固定endpointへ送る。
 
-ミッションは最大3秒の識別情報を使い、現在のネットワークUCID・陣営・席、実機の名前・グループ・機種・runtime IDを再照合する。Apache同一機内の席交換を許可する。不明・古い・曖昧な情報では他人のUCIDや表示名へ置換せず、ソロは明示的な無採点、Mission Teamの作成/加入は拒否する。静的スロットの従来照合は互換用に残す。
+HookはUNIT_MISSION_IDを送る。UNIT_RUNTIME_IDは内部エンジンIDであり、SSE Unit:getIDとの比較に使わない。既存の配信フィールド名objectIDにはmission unit IDを入れる。SSE側が返す十進文字列は照合時だけ正の整数へ正規化し、参加者・目標の固定IDには元の型を保持する。
+
+ミッションは最大3秒の識別情報を使い、現在のネットワークUCID・陣営・席、実機の名前・グループ・機種・mission unit IDを再照合する。Apache同一機内の席交換を許可する。不明・古い・曖昧な情報では他人のUCIDや表示名へ置換せず、ソロは明示的な無採点、Mission Teamの作成/加入は拒否する。静的スロットの従来照合は互換用に残す。
 
 Hookは1秒間隔で識別情報を更新する。識別配信は成績ファイルI/Oから分離し、保存不能で他人の成績を使わない。席・接続情報は揮発データで、scores.datへは保存しない。Dynamic Spawn自体の導入時はschema4を維持した。現在はCAS追加によるschema5を使い、旧成績と採点率を維持する。Hookの配信には既存のuserhooks→mission API許可を使い、MissionScripting.luaは変更しない。
 
 ## サーバー更新
 
-今回の.mizと更新したbuild/DynamicTrainingPersistenceHook.luaを組にして使う。新Hookはサーバーの使用中Saved Games/DCS.../Scripts/Hooksへ配置し、DCSを再起動する。標準機体設定への切り替え時はHook変更なしだったが、現在のtraining-17はCAS/schema5のためHook再導入とサーバーDCS再起動が必要。新PCではInstall-PersistenceHook.ps1 -SavedGamesPath <使用中フォルダー> -ConfigureHostを使う。[導入手順](PERSISTENCE.md#導入)
+今回の.mizと更新したbuild/DynamicTrainingPersistenceHook.luaを組にして使う。新Hookはサーバーの使用中Saved Games/DCS.../Scripts/Hooksへ配置し、DCSを再起動する。標準機体設定への切り替え時はHook変更なしだったが、現在のtraining-17.2はCAS/schema5と識別修正のためHook再導入とサーバーDCS再起動が必要。新PCではInstall-PersistenceHook.ps1 -SavedGamesPath <使用中フォルダー> -ConfigureHostを使う。[導入手順](PERSISTENCE.md#導入)
 
-旧Hookでは動的生成機の識別配信ができないため、配置先が不明なサーバーへ自動導入済みとは扱わない。クライアントへのHook配置は不要。
+旧Hookでは動的生成機の識別配信ができないため、配置先が不明なサーバーへ自動導入済みとは扱わない。クライアントへのHook配置は不要。training-17.2のHook登録ログにはidentity=mission-unit-id-v2、配信成功時にはIDENTITIES_CONNECTEDを出す。API未提供・endpoint拒否・例外は状態変化時に記録し、保存処理は継続する。
 
 ## 移行と検証
 

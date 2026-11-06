@@ -79,14 +79,15 @@ test('dynamic SOLO completion and return retain the existing 150-point receipt',
     s:command('Task: Air Interdiction'); local r=assert(s:mission()); s:complete(r.spawn.group)
     recover(s,s.player); s:score(150); assert(not s:mission()); s:assertClean()
 end)
-test('host collector resolves dynamic slot IDs to names, runtime IDs and both crew seats',function()
+test('host collector uses mission unit IDs, distinct from engine runtime handles, for both crew seats',function()
     local collect=dofile('server/player_directory.lua'); local s=scenario({aircraftType='AH-64D_BLK_II'})
-    local row=dynamic(s); s.connections[10].slot=row.slot..'_1'
+    local row=dynamic(s); s.player.id=s.player.slotID; s.connections[10].slot=row.slot..'_1'
     s:addCrew(s.player,'CPG','ucid-cpg',21,row.slot..'_2')
-    local control={UNIT_TYPE='type',UNIT_NAME='name',UNIT_GROUPNAME='group',UNIT_RUNTIME_ID='runtime'}
+    local control={UNIT_TYPE='type',UNIT_NAME='name',UNIT_GROUPNAME='group',UNIT_RUNTIME_ID='runtime',UNIT_MISSION_ID='mission'}
     function control.getUnitProperty(id,key)
         assert(id==s.player.slotID)
-        return ({type=s.player.kind,name=s.player.unitName,group=s.player.group.name,runtime=s.player.id})[key]
+        return ({type=s.player.kind,name=s.player.unitName,group=s.player.group.name,
+            runtime=16777730,mission=tostring(s.player.id)})[key]
     end
     local rows=collect.Collect(control,s.env.net); assert(#rows==2)
     assert(s.env.DynamicTrainingPlayers.Update(rows))
@@ -268,4 +269,51 @@ test('member personal abort is isolated and leader-only mission abort cannot era
     s:abortSortie(p); assert(s:mission()==r); s:complete(r.spawn.group); recover(s,s.player)
     s:score(150); s:score(0,p); s:assertClean()
 end)
+test('numeric host IDs match decimal-string native IDs without changing frozen aircraft identity',function()
+    for _,kind in ipairs({'FA-18C_hornet','AH-64D_BLK_II'}) do
+        local options={aircraftType=kind}
+        if kind=='AH-64D_BLK_II' then options.playerPosition={x=81000-8*1852,y=0,z=800} end
+        local s=scenario(options); local row=dynamic(s)
+        s.player.id=tostring(row.objectID); s.player:newDCSObject(); s.players[1]=s.player.raw
+        s.rows={row}
+        if kind=='AH-64D_BLK_II' then
+            s:addCrew(s.player,'CPG','ucid-cpg',21,row.slot..'_2')
+            local c=s.env.UTILS.DeepCopy(row); c.playerID,c.ucid,c.name,c.slot=21,'ucid-cpg','CPG',s.connections[21].slot
+            s.rows[2]=c
+        end
+        assert(s.env.DynamicTrainingPlayers.Update(s.rows))
+        local people=module(s,'Player').ForAircraft(s.player,s.player.group)
+        assert(#people==#s.rows)
+        for _,p in ipairs(people) do assert(p.ucid and p.objectID==s.player.id and module(s,'Player').IsControlling(p)) end
+        s:command('Task: Air Interdiction'); local r=assert(s:mission()); s:complete(r.spawn.group)
+        recover(s,s.player); s:score(150)
+        if #s.rows==2 then assert(module(s,'Scoring').Get('ucid-cpg').totalScore==150) end
+        s:assertClean()
+    end
+end)
+
+test('identity rejection and missing APIs are logged once and recover independently of storage',function()
+    for _,mode in ipairs({'rejected','missing','error'}) do
+        local callbacks,time,delivery,polls,logs=nil,0,false,0,{}
+        local control={isServer=function() return true end,getRealTime=function() return time end,
+            setUserCallbacks=function(c) callbacks=c end}
+        if mode~='missing' then control.getUnitProperty=function() end end
+        local env=setmetatable({Sim=control,net={},lfs={writedir=function() return 'fixture/' end},
+            log={INFO=1,WARNING=2,ERROR=3,write=function(_,_,m) logs[#logs+1]=m end},
+            MissionBridge={description='fixture',New=function() return {
+                UpdatePlayers=function() if mode=='error' and not delivery then error('identity API denied') end; return delivery end,
+                SetError=function() end} end},
+            PlayerDirectory={Collect=function() return {} end},PersistenceFS={New=function() return {} end},
+            PersistenceService={New=function() return {phase='LOAD',Reset=function() end,Poll=function() polls=polls+1 end} end}
+        },{__index=_G})
+        local chunk=assert(loadfile('server/DynamicTrainingPersistenceHook.lua')); setfenv(chunk,env); chunk()
+        callbacks.onMissionLoadEnd(); callbacks.onSimulationFrame(); time=1; callbacks.onSimulationFrame()
+        local warnings=0; for _,m in ipairs(logs) do if m:find('Identity delivery unavailable',1,true) then warnings=warnings+1 end end
+        assert(warnings==1 and polls==2)
+        control.getUnitProperty=function() end; delivery=true; time=2; callbacks.onSimulationFrame()
+        assert(table.concat(logs,'\n'):find('IDENTITIES_CONNECTED: mission-unit-id-v2',1,true))
+        assert(table.concat(logs,'\n'):find('identity=mission-unit-id-v2',1,true))
+    end
+end)
+
 print(string.format('All %d dynamic player and mission team tests passed (simulated DCS/MOOSE/host APIs).',count))

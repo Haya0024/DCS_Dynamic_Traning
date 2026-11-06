@@ -371,4 +371,60 @@ test('an already validated target lost before the rest activate cannot earn a se
     assert(not s:mission() and not r.id); clean(s)
 end)
 
+test('DCS decimal-string unit IDs activate CAS and keep target identity through RTB', function()
+    local s=apache(); s.casStringUnitIDs=true; local r=accept(s)
+    assert(r.state=='ACTIVE' and #s.spawns==3)
+    for _,t in ipairs(r.casPlan.targets) do assert(type(t.objectID)=='string') end
+    complete(s,r); recover(s); s:score(150); clean(s); s:assertClean()
+end)
+
+test('decimal-string group IDs bind a numeric FAC target ID without mutating native identity', function()
+    local s=apache(); s.casStringUnitIDs=true; s.casStringGroupID=true; local r=accept(s)
+    assert(r.state=='ACTIVE')
+    local p=fac(r.casPlan.instances.jtac.group)
+    assert(type(p.groupId)=='number' and p.groupId==tonumber(r.spawn.group:GetID()))
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('native ID validation accepts only exactly represented positive integers or decimal strings', function()
+    local number=dofile('src/observations.lua').IDNumber
+    for _,id in ipairs({1,1000003,'1000003','0001000003',9007199254740991,'9007199254740991'}) do
+        assert(number(id)==tonumber(id))
+    end
+    for _,id in ipairs({false,true,{},0,-1,1.5,math.huge,0/0,'','0','-1','1.5','1e6',' 1',
+        '1000003x','9007199254740992',9007199254740992}) do assert(number(id)==nil) end
+    assert(number(nil)==nil)
+end)
+
+test('missing native objects remain pending with typed diagnostics, then release all resources', function()
+    local s=apache(); local original=s.env.SPAWN.NewFromTemplate
+    function s.env.SPAWN:NewFromTemplate(data,name,alias)
+        local spawner=original(self,data,name,alias); local spawn=spawner.Spawn
+        function spawner:Spawn()
+            local g=spawn(self)
+            if alias:find('_ENEMY$') then g.units[1].GetDCSObject=function() return nil end end
+            return g
+        end
+        return spawner
+    end
+    local r=accept(s); assert(r.state=='PREPARING')
+    s:tick(11); assert(not s:mission()); clean(s)
+    local errors=table.concat(s.errors,'\n'); assert(errors:find('idType=number raw=false',1,true))
+end)
+
+test('mixed string and numeric duplicate IDs cannot describe two different generated vehicles', function()
+    local s=apache(); local original=s.env.SPAWN.NewFromTemplate
+    function s.env.SPAWN:NewFromTemplate(data,name,alias)
+        local spawner=original(self,data,name,alias); local spawn=spawner.Spawn
+        function spawner:Spawn()
+            local g=spawn(self)
+            if alias:find('_ENEMY$') then g.units[2].id=tostring(g.units[1].id) end
+            return g
+        end
+        return spawner
+    end
+    s:command('Laser 1688'); assert(not s:mission()); clean(s)
+    assert(table.concat(s.errors,'\n'):find('Invalid generated CAS vehicle',1,true))
+end)
+
 print(string.format('All %d CAS tests passed (simulated DCS/MOOSE boundaries).', count))

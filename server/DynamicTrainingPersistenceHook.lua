@@ -1,7 +1,7 @@
 -- Build-PersistenceHook.ps1 prepends data, adapters and transaction service.
 local control, hooks = Sim or DCS, {}
 local loaded, nextPoll, lastError, diagnosticState, frameSeen = false, 0, nil, nil, false
-local identityError
+local identityError, identityConnected
 local function diagnostic(message)
     log.write("DynamicTrainingPersistenceDiagnostic", log.INFO, message)
 end
@@ -17,13 +17,20 @@ local service = PersistenceService.New(bridge, fs, lfs.writedir() .. "DynamicTra
 })
 local function safePoll()
     -- Identity delivery is independent of score storage: an I/O failure must not misidentify crews.
-    if control.getUnitProperty then
-        local ok, result = pcall(function() return bridge.UpdatePlayers(PlayerDirectory.Collect(control, net)) end)
-        if ok and result then identityError = nil
-        elseif not ok and tostring(result) ~= identityError then
-            identityError = tostring(result)
-            log.write("DynamicTrainingPlayers", log.WARNING, "Runtime identity delivery unavailable; unverified sorties remain unscored.")
+    local delivered, failure = pcall(function()
+        assert(type(control.getUnitProperty) == "function", "Host getUnitProperty API unavailable.")
+        assert(bridge.UpdatePlayers(PlayerDirectory.Collect(control, net)) == true,
+            "Mission player endpoint rejected identity snapshot.")
+    end)
+    if delivered then
+        if not identityConnected then
+            log.write("DynamicTrainingPlayers", log.INFO, "IDENTITIES_CONNECTED: mission-unit-id-v2.")
         end
+        identityError, identityConnected = nil, true
+    elseif tostring(failure) ~= identityError then
+        identityError, identityConnected = tostring(failure), false
+        log.write("DynamicTrainingPlayers", log.WARNING,
+            "Identity delivery unavailable; unverified sorties remain unscored. " .. identityError)
     end
     local ok, result = pcall(service.Poll)
     if ok then
@@ -40,7 +47,7 @@ end
 function hooks.onMissionLoadBegin()
     loaded, nextPoll, lastError, diagnosticState, frameSeen = false, 0, nil, nil, false
     service.Reset()
-    identityError = nil
+    identityError, identityConnected = nil, false
     diagnostic("MISSION_LOAD_BEGIN: Persistence connection state reset.")
 end
 function hooks.onMissionLoadEnd()
@@ -69,4 +76,5 @@ function hooks.onSimulationStop()
 end
 control.setUserCallbacks(hooks)
 diagnostic("HOOK_REGISTERED: control=" .. (Sim and "Sim" or "DCS") ..
-    "; net.dostring_in=" .. type(net and net.dostring_in) .. "; transport=" .. MissionBridge.description)
+    "; net.dostring_in=" .. type(net and net.dostring_in) .. "; transport=" .. MissionBridge.description ..
+    "; identity=mission-unit-id-v2")

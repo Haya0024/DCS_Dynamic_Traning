@@ -6,7 +6,7 @@
 
 Intercept / CAP / SEAD / DEAD / Strike / Air Interdiction / CASの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
-この構成は`training-17.1`で実装済み。Apache限定CASとschema5を追加した。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-17.2`で実装済み。Apache限定CASとschema5を追加した。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
 通常出撃はDynamic SpawnのDCS標準設定。4青空港にHornet/Apache、空母にHornetの計9機種選択を設ける。旧SOLO/MP2の18グループ・27 Client機とテンプレート参照は削除済み。駐機位置はDCSが自動割り当てし、受注・採点は実際に生成された機体を動的に検出する。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
 

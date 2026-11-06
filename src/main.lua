@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-17.1" }
+DynamicTrainingRuntime = { version = "training-17.2" }
 Persistence.Publish()
 DynamicTrainingPlayers = { protocol = 1, Update = Player.UpdateDirectory }
 

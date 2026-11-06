@@ -135,25 +135,28 @@ local function validateRole(plan, role)
         end)
         if not readable then return nil, "unit observation unavailable: " .. tostring(values) end
         local v = values
-        local detail = string.format("role=%s id=%s alive=%s ground=%s side=%s type=%s", role,
-            tostring(v.id), tostring(v.alive), tostring(v.ground), tostring(v.side), tostring(v.kind))
+        local id = Observations.IDNumber(v.id)
+        local detail = string.format("role=%s id=%s idType=%s raw=%s alive=%s ground=%s side=%s type=%s", role,
+            tostring(v.id), type(v.id), tostring(v.raw ~= nil and v.raw ~= false),
+            tostring(v.alive), tostring(v.ground), tostring(v.side), tostring(v.kind))
         -- DCS may return wrappers before the spawned units become active. Keep
         -- the complete rollback handle and wait on the mission timer, bounded.
-        if not finite(v.id) or v.id <= 0 or not v.raw or v.alive ~= true
+        if not id or not v.raw or v.alive ~= true
             or v.ground == nil or v.side == nil or v.kind == nil then return nil, detail end
-        assert(not plan.unitIDs[v.id] and not ids[v.id] and v.ground == true
+        assert(not plan.unitIDs[id] and not ids[id] and v.ground == true
             and v.side == instance.template.CoalitionID and (expected[v.kind] or 0) > 0,
             "Invalid generated CAS vehicle: " .. detail)
         -- GROUP:GetUnits uses pairs; validate the composition, not array order.
         expected[v.kind] = expected[v.kind] - 1
-        ids[v.id] = true
+        ids[id] = true
         targets[#targets + 1] = { unit = unit, objectID = v.id, dcsUnit = v.raw }
     end
     if role == "enemy" then
         local readable, id = pcall(function() return instance.group:GetID() end)
-        if not readable or not finite(id) or id <= 0 then return nil, "enemy Group ID unavailable" end
-        assert(id ~= plan.site.templates.enemy.groupId, "CAS enemy still has the source template's Group ID.")
-        plan.enemyGroupID = id
+        local number = readable and Observations.IDNumber(id)
+        if not number then return nil, "enemy Group ID unavailable: id=" .. tostring(id) .. " idType=" .. type(id) end
+        assert(number ~= plan.site.templates.enemy.groupId, "CAS enemy still has the source template's Group ID.")
+        plan.enemyGroupID = number
     end
     for id in pairs(ids) do plan.unitIDs[id] = true end
     return targets

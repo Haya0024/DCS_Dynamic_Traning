@@ -3,6 +3,17 @@ local Observations = {}
 function Observations.Finite(value)
     return type(value) == "number" and value == value and math.abs(value) < math.huge
 end
+function Observations.IDNumber(value)
+    -- DCS Unit:getID can return decimal strings; keep native IDs in records,
+    -- and normalize only at validation, wire or native-task boundaries.
+    if type(value) == "string" then
+        if not value:match("^%d+$") then return nil end
+        value = tonumber(value)
+    end
+    if Observations.Finite(value) and value > 0 and value <= 9007199254740991 and value % 1 == 0 then
+        return value
+    end
+end
 function Observations.Vec3(value)
     return type(value) == "table" and Observations.Finite(value.x)
         and Observations.Finite(value.y) and Observations.Finite(value.z)

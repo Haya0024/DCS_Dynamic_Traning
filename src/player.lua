@@ -58,7 +58,7 @@ local function directoryCrew(unit, group)
     local owners, seen = {}, {}
     for _, row in ipairs(Player.directory) do
         if row.unitName == unit:GetName() and row.groupName == group:GetName()
-            and row.objectID == unit:GetID() and row.aircraftType == unit:GetTypeName() then
+            and row.objectID == Observations.IDNumber(unit:GetID()) and row.aircraftType == unit:GetTypeName() then
             local ok, current = pcall(function() return net.get_player_info(row.playerID) end)
             if not ok or not current or current.ucid ~= row.ucid or current.side ~= row.side then return end
             local currentSlot = tostring(current.slot)
@@ -71,7 +71,7 @@ local function directoryCrew(unit, group)
             if not sameSeat or seen[currentSlot] then return end
             seen[currentSlot] = true
             owners[#owners + 1] = { unit = unit, dcsUnit = unit:GetDCSObject(), unitName = row.unitName,
-                objectID = row.objectID, name = row.name, group = group, groupName = row.groupName,
+                objectID = unit:GetID(), name = row.name, group = group, groupName = row.groupName,
                 number = unit:GetNumber() or math.huge, playerID = row.playerID, seat = currentSlot, ucid = row.ucid }
         end
     end

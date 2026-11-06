@@ -1,6 +1,6 @@
 # CAS / 標準JTAC
 
-training-17.1。CASを実装し、単独試験で使用したDCS標準FAC / JTACへ接続する。単独Apacheで離隔後にAGM-114Kが3発3中だったことはユーザー報告。動的生成したJTACの交信・照射・実射はDCS内確認待ち。
+training-17.2。CASを実装し、単独試験で使用したDCS標準FAC / JTACへ接続する。単独Apacheで離隔後にAGM-114Kが3発3中だったことはユーザー報告。動的生成したJTACの交信・照射・実射はDCS内確認待ち。
 
 ## 受注・地域・生成
 
@@ -11,6 +11,7 @@ training-17.1。CASを実装し、単独試験で使用したDCS標準FAC / JTAC
 - 現在は地域01だけ。ApacheはRamat付近からの利用を想定する。出撃空港名をロジックの条件にしない。
 - 地上 / 空中とも受注時に生成準備を開始する。離陸待ち・20秒待ちは設けない。DCSで新しい車両が有効になるまでPREPARINGを維持し、1秒ごとに再観測する。setupTimeoutSeconds（初期10秒）を超えた次の監視で失敗解除する。
 - 状態は `PREPARING → ACTIVE → RTB_PENDING → 終了`。全3グループとJTAC担当設定が成立して初めてACTIVE・採点開始とする。
+- DCSのUnit IDは正の整数または十進文字列を許可する。固定対象には元のIDを保持し、重複検査は数値へ正規化して行う。Group IDはFACタスクへの設定前に数値化する。不正ID・実体欠落・有効化未完了は準備待ちとし、IDのLua型・実体の有無も診断へ記録する。
 
 ## Mission EditorのTPL
 

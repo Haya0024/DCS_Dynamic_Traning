@@ -36,9 +36,12 @@ return function(s, env, options, newUnit)
         return { Spawn = function()
             if s.casBeforeFailure == role then error('CAS spawn before creation') end
             local g = { name = alias .. '#001', id = 30000 + #s.spawns, data = copy(data), units = {}, role = role }
+            if s.casStringGroupID then g.id = tostring(g.id) end
             g.raw = { isExist = function() return not g.destroyed end, destroy = function() g:Destroy(false) end }
             for i, u in ipairs(data.units) do
-                local unit = newUnit(g.name .. '-' .. i, 40000 + #s.spawns * 10 + i, nil, g, data.CoalitionID, u.type)
+                local id = 40000 + #s.spawns * 10 + i
+                if s.casStringUnitIDs then id = tostring(id) end
+                local unit = newUnit(g.name .. '-' .. i, id, nil, g, data.CoalitionID, u.type)
                 unit.position = { x = u.x, y = 0, z = u.y }; unit.life = 100
                 function unit:IsGround() return true end
                 function unit:IsAlive()

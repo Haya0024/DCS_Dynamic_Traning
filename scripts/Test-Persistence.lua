@@ -39,12 +39,13 @@ local function filesystem()
 end
 local path = "saved/DynamicTraining/scores.dat"
 local function hook(s, fs, startLoaded)
-    local h = { time = 0, errors = {}, messages = {}, diagnostics = {}, commits = {}, server = true, calls = 0 }
+    local h = { time = 0, errors = {}, messages = {}, diagnostics = {}, identities = {}, commits = {}, server = true, calls = 0 }
     local env = setmetatable({}, { __index = _G })
     env.Sim = { isServer = function() return h.server end, getRealTime = function() return h.time end,
         setUserCallbacks = function(callbacks) h.callbacks = callbacks end }
     env.log = { ERROR = 1, WARNING = 2, INFO = 3, write = function(source, level, message)
-        local messages = source == "DynamicTrainingPersistenceDiagnostic" and h.diagnostics or
+        local messages = source == "DynamicTrainingPlayers" and h.identities or
+            source == "DynamicTrainingPersistenceDiagnostic" and h.diagnostics or
             (level == 1 and h.errors or (message:match("^[A-Z]+_COMMITTED:") and h.commits or h.messages))
         messages[#messages + 1] = message
     end }

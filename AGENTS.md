@@ -615,3 +615,7 @@ Apacheの受注・採点・帰還は既存の台帳・150/90/0・schema4を再�
 ## CAS生成準備の修正（training-17.1）
 
 MOOSEのGetUnitsの順序をテンプレート順と同一視しない。CASは車種ごとの台数と固定ID・陣営で照合する。生成後の未有効状態・一覧未取得はPREPARINGで1秒ごとに再観測し、cas.setupTimeoutSeconds=10を超えた次の監視で回収する。採点開始は全検証後。準備中のStatusは準備通知だけ、Abort・機体変更・途中喪失でも部分生成と地域・通信枠を回収する。CAS34件、Lua592件/15スイート。旧17の配列順比較による失敗は模擬再現済みだが、今回の実ログはフィールド未記録のため直接原因の条件は断定しない。
+
+## DCS ID境界の修正（training-17.2）
+
+DCS Unit:getIDの正の整数/十進文字列をObservations.IDNumberで検証し、CASの固定対象には元のID型を保持する。重複判定とFAC用Group IDだけ数値化する。診断にidType/rawを含める。動的プレイヤーのHook配信にはUNIT_MISSION_IDを使い、内部エンジンのUNIT_RUNTIME_IDをSSE Unit:getIDへ比較しない。配信フィールドobjectIDはmission unit ID。照合時だけ正規化し、参加者には実機から取得した元IDを固定する。Hook登録はidentity=mission-unit-id-v2、配信成功はIDENTITIES_CONNECTED。拒否・API欠落・例外も診断し、保存処理とは独立させる。Lua599件/15スイート、CAS39・DynamicPlayers26。17.1の文字列ID準備停止とID種別の照合失敗は模擬再現済み。サーバー実ログは型/raw未記録のため直接原因の断定と区別し、17.2の実ゲーム検証は未完了。

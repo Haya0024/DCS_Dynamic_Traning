@@ -1,5 +1,15 @@
 # 検証・診断履歴
 
+## 2026-11-06 CASの文字列IDと動的機体の識別照合を修正（training-17.2）
+
+サーバーログではtraining-17.1のCASが22:26・22:27 JSTに生成済みBMP-2をalive=true / ground=true / side=1と観測しながら準備timeoutになった。旧ログはIDのLua型とrawの有無を記録していないため、その2条件のどちらだったかは直接断定できない。DCSのUnit:getIDが十進文字列を返す事例は[公式フォーラムの再現報告](https://forum.dcs.world/topic/347954-bug-unitgetbynameunitnamegetid-is-returning-a-string-and-not-a-number-as-it-should/)にもある。
+
+文字列IDを使う追加テストで旧版の準備停止を再現し、正の整数/十進文字列を検証する共通境界を追加した。固定対象のIDは元の型を保持し、重複判定とFAC用Group IDは数値化する。raw欠落・不正IDは引き続き拒否し、idType/rawを診断へ追加した。
+
+同じサーバーログにApacheとHornetの無採点が記録されていた。Hookが送るUNIT_RUNTIME_IDとSSE Unit:getIDのmission unit IDが異なる不具合も模擬再現し、HookをUNIT_MISSION_IDへ修正。SSEの文字列IDを照合時だけ数値へ正規化し、参加者の固定IDを保持する。Hook登録ログにidentity=mission-unit-id-v2、識別配信成功にIDENTITIES_CONNECTED、拒否/API欠落/例外には重複を抑えた診断を追加。サーバーで使われたHookの版・実データはこのログだけでは確定していない。
+
+Lua599件/15スイート（CAS39、DynamicPlayers26）と全結合検証が通過。ME設定・目標配置・距離・採点率・保存schema5は維持する。修正版の動的CAS受注・交信・実射とサーバーでのUCID照合はDCS内再確認待ち。サーバーの実使用Hookを更新してDCSを再起動する必要がある。
+
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
 ## 2026-11-06 Dynamic Spawnを標準機体設定へ変更

@@ -28,7 +28,66 @@ local function aircraftSlot(slot, multicrew)
     end
 end
 
+-- Host-verified runtime identities for dynamic slots; never infer slots from object IDs.
+Player.directory, Player.directoryAt = {}, nil
+function Player.UpdateDirectory(rows)
+    if type(rows) ~= "table" or #rows > 256 then return false end
+    local pending, ids, ucids = {}, {}, {}
+    for index, row in pairs(rows) do
+        if type(index) ~= "number" or index < 1 or index > #rows or index % 1 ~= 0 or type(row) ~= "table" then return false end
+        for _, field in ipairs({ "ucid", "name", "unitName", "groupName", "aircraftType", "slot" }) do
+            if type(row[field]) ~= "string" or row[field] == "" or #row[field] > 512 then return false end
+        end
+        if type(row.playerID) ~= "number" or row.playerID < 1 or row.playerID % 1 ~= 0
+            or type(row.objectID) ~= "number" or row.objectID < 1 or row.objectID % 1 ~= 0
+            or row.side ~= coalition.side.BLUE or not Config.playerTypes[row.aircraftType]
+            or ids[row.playerID] or ucids[row.ucid] then return false end
+        if not row.slot:match("^%d+$") and not (Config.playerTypes[row.aircraftType].multicrew
+            and row.slot:match("^%d+_[12]$")) then return false end
+        ids[row.playerID], ucids[row.ucid] = true, true
+        local copy = {}; for k, v in pairs(row) do copy[k] = v end
+        pending[#pending + 1] = copy
+    end
+    if #pending ~= #rows then return false end
+    Player.directory, Player.directoryAt = pending, timer.getTime()
+    return true
+end
+
+local function directoryCrew(unit, group)
+    if not Player.directoryAt or timer.getTime() < Player.directoryAt or timer.getTime() - Player.directoryAt > 3 then return end
+    local owners, seen = {}, {}
+    for _, row in ipairs(Player.directory) do
+        if row.unitName == unit:GetName() and row.groupName == group:GetName()
+            and row.objectID == unit:GetID() and row.aircraftType == unit:GetTypeName() then
+            local ok, current = pcall(function() return net.get_player_info(row.playerID) end)
+            if not ok or not current or current.ucid ~= row.ucid or current.side ~= row.side then return end
+            local currentSlot = tostring(current.slot)
+            local sameSeat = currentSlot == row.slot
+            if not sameSeat and Config.playerTypes[row.aircraftType].multicrew then
+                local oldAircraft = row.slot:match("^(%d+)_[12]$") or row.slot:match("^(%d+)$")
+                local newAircraft = currentSlot:match("^(%d+)_[12]$") or currentSlot:match("^(%d+)$")
+                sameSeat = oldAircraft and newAircraft and oldAircraft == newAircraft
+            end
+            if not sameSeat or seen[currentSlot] then return end
+            seen[currentSlot] = true
+            owners[#owners + 1] = { unit = unit, dcsUnit = unit:GetDCSObject(), unitName = row.unitName,
+                objectID = row.objectID, name = row.name, group = group, groupName = row.groupName,
+                number = unit:GetNumber() or math.huge, playerID = row.playerID, seat = currentSlot, ucid = row.ucid }
+        end
+    end
+    if #owners > 0 then return owners end
+end
+
+local function templateSlot(unit)
+    local ok, template = pcall(function() return unit:GetTemplate() end)
+    return ok and template and template.unitId or nil
+end
+
 function Player.ForUnit(unit, group)
+    if unit and unit:IsAlive() and Player.Profile(unit) then
+        local crew = directoryCrew(unit, group)
+        if crew and #crew == 1 then return crew[1] end
+    end
     if not unit or not unit:IsAlive() or not unit:GetPlayerName() or unit:GetPlayerName() == "" then
         return nil, "Human pilot unavailable."
     end
@@ -47,8 +106,7 @@ function Player.ForUnit(unit, group)
     -- MOOSE's GetUCID searches by display name. Enumerate the standard DCS
     -- network API instead to also verify coalition and the static client slot.
     -- Template unitId is the network slot; runtime object IDs may change.
-    local template = unit:GetTemplate()
-    local slotID = template and template.unitId
+    local slotID = templateSlot(unit)
     if not slotID or not net or not net.get_player_list or not net.get_player_info then
         return owner, "Server UCID API unavailable; this sortie is unscored."
     end
@@ -80,8 +138,11 @@ function Player.ForAircraft(unit, group)
         local owner, problem = Player.ForUnit(unit, group)
         return owner and { owner } or {}, problem
     end
-    local template = unit:GetTemplate()
-    local slotID = template and template.unitId
+    if unit and unit:IsAlive() then
+        local verified = directoryCrew(unit, group)
+        if verified then return verified end
+    end
+    local slotID = templateSlot(unit)
     local ok, crew = pcall(function()
         assert(slotID and net and net.get_player_list and net.get_player_info, "Crew API unavailable.")
         local owners, occupied = {}, {}
@@ -130,6 +191,9 @@ function Player.Groups()
     local groups = {}
     local function add(raw, requireCrew)
         if raw:isExist() then
+            -- Dynamic slots have no ME database entry until their native group is registered.
+            local nativeGroup = raw.getGroup and raw:getGroup()
+            if nativeGroup then GROUP:FindByName(nativeGroup:getName()) end
             local unit = UNIT:FindByName(raw:getName())
             if Player.Profile(unit) then
                 local group = unit:GetGroup()

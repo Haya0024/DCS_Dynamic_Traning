@@ -2,7 +2,9 @@
 
 仕様: 2026-11-01 / training-15。コード・模擬検証・保存済みMEデータの確認は実施済み。Apacheでの実飛行・実射・人間PLT/CPGのネットワーク動作はDCS内確認待ち。
 
-## 出撃スロット
+## 出撃
+
+2026-11-06 / training-16から通常の出撃はDynamic Spawnへ移行。以下のSOLO/MP2は一覧非表示のME設定原本で、固定スロット数の上限ではない。各空港のSOLO原本で1機ずつ生成する。別機体はF10のMission Team、同一機のPLT/CPGは自動共有。更新したサーバーHookが必要。詳しくは[DYNAMIC_SPAWN.md](DYNAMIC_SPAWN.md)。
 
 BLUE / USAのAH-64D_BLK_IIをIncirlik / Akrotiri / Beirut / Ramat Davidに配置。各空港にSOLO（Client ×1）とMP2（Client ×2）、合計8グループ・12 Client機。MP2は2機編隊を意味し、同一機のPLT/CPGを意味しない。空母のApacheは置いていない。
 
@@ -17,6 +19,10 @@ Apacheでは `config.airInterdiction.helicopter.templates` のTPL_AI_01〜10か�
 HornetはTPL_AI_01〜06のうち、長機から中心まで20〜100 NMにある近い2地域を使う。両機種は同じ地域予約を使い、同じ道路に別任務の車列を重ねて生成しない。
 
 案内する中心は現在の車列位置ではなく捜索基準。座標はMEから計算し、Luaへ座標を複製しない。経路・速度・車種・散開・周回指示はMEの設定をそのまま使う。
+
+## 編成追加の拡張
+
+2026-11-05に経路と編成を分離した。現在は編成候補が空なので既存の車列を維持する。将来は`helicopter.convoyTemplates`へ3両のMEグループ名を登録すると、同じ経路で編成を抽選できる。配置条件・設定例・継承規則は[AIR_INTERDICTION.md](AIR_INTERDICTION.md#経路と編成の分離2026-11-05)を参照。Hornetとは候補を分けられ、地域予約と3両破壊・採点は共通のまま。
 
 ## 保存済み配置の距離確認
 

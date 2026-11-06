@@ -9,15 +9,17 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-15" }
+DynamicTrainingRuntime = { version = "training-16" }
 Persistence.Publish()
+DynamicTrainingPlayers = { protocol = 1, Update = Player.UpdateDirectory }
 
+local MissionMessage = Notifications.Assignment
 local menus = {}
 local nextPlayerScan = 0
 local ScanPlayers
 
 local function PublishMission(record, kind, text, seconds)
-    Message(record.group, text, seconds)
+    MissionMessage(record, text, seconds)
     MissionReport.Remember(record, kind, text, seconds)
 end
 
@@ -91,7 +93,7 @@ local function SettleParticipant(record, p, result, reason, time)
                 p.deadReceipt.points, tostring(p.deadReceipt.scored)))
         end
     end
-    Message(record.group, text, 20)
+    MissionMessage(record, text, 20)
     if HasPending(record) then SelectLeader(record) else Close(record) end
 end
 
@@ -190,7 +192,7 @@ local function Start(record)
                 SettleParticipant(record, p, "FAILED", "DEAD reservation cancelled. No reward.")
             end
         else Close(record) end
-        Message(record.group, record.category .. " reservation cancelled. Player aircraft changed or unavailable.")
+        MissionMessage(record, record.category .. " reservation cancelled. Player aircraft changed or unavailable.")
         return
     end
     if record.category == "DEAD" then
@@ -207,7 +209,7 @@ local function Start(record)
         if not ok or not spawn then
             Close(record)
             env.error("[DynamicTraining] SEAD spawn: " .. tostring(ok and problem or spawn))
-            Message(record.group, "ERROR: SEAD spawn failed. Select 'Task: SEAD' to retry; see DCS log.", 20)
+            MissionMessage(record, "ERROR: SEAD spawn failed. Select 'Task: SEAD' to retry; see DCS log.", 20)
             return
         end
         record.spawn, record.state = spawn, "ACTIVE"
@@ -226,7 +228,7 @@ local function Start(record)
     if not ok or not spawn then
         Close(record)
         env.error("[DynamicTraining] Spawn: " .. tostring(ok and problem or spawn))
-        Message(record.group, "ERROR: Intercept enemy spawn failed. Select 'Task: Intercept' to retry.", 15)
+        MissionMessage(record, "ERROR: Intercept enemy spawn failed. Select 'Task: Intercept' to retry.", 15)
         return
     end
     record.spawn, record.state = spawn, "ACTIVE"
@@ -245,7 +247,8 @@ end
 local function Generate(groupName, category)
     category = category or "Intercept"
     local group = GROUP:FindByName(groupName)
-    local roster, problem = Player.ForGroup(groupName)
+    local okRoster, roster, problem, trainingWing = pcall(TrainingWings.Roster, groupName)
+    if not okRoster then Message(group, tostring(roster):gsub("^.-:%d+: ", ""), 20); return end
     if not roster then Message(group, problem); return end
     if not Player.CanTask(roster, category) then
         Message(group, "This task is not available for the occupied aircraft types.", 15); return
@@ -253,7 +256,7 @@ local function Generate(groupName, category)
     local blocker = Missions.Blocker(groupName, roster)
     if blocker then Message(group, blocker); return end
     local record = { group = group, groupName = groupName, category = category, participants = {},
-        state = "ARMED", nextTakeoffCheck = timer.getTime() }
+        state = "ARMED", trainingWing = trainingWing, nextTakeoffCheck = timer.getTime() }
     -- Freeze membership at acceptance, including those still on the ground.
     for _, owner in ipairs(roster) do
         record.participants[#record.participants + 1] = { owner = owner, state = "ARMED" }
@@ -261,7 +264,7 @@ local function Generate(groupName, category)
     local acquired, blocked = Missions.Acquire(record)
     if not acquired then Message(group, blocked); return end
     Notifications.RegisteredAircraft(record)
-    if problem then Message(group, problem, 15) end
+    if problem then MissionMessage(record, problem, 15) end
     if category == "Air Interdiction" then
         record.owner = roster[1]
         local ok, problem = pcall(function()
@@ -276,22 +279,23 @@ local function Generate(groupName, category)
             Close(record)
             if not ok then
                 env.error("[DynamicTraining] Air Interdiction setup: " .. tostring(problem))
-                Message(group, "ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.", 20)
+                MissionMessage(record, "ERROR: Air Interdiction setup failed. See DCS log; select 'Task: Air Interdiction' to retry.", 20)
             else
                 local profile = AirInterdiction.Profile(record.owner.unit:GetTypeName())
                 local range = profile.minDistanceNM and string.format(" within %g-%g NM",
                     profile.minDistanceNM, profile.maxDistanceNM) or ""
-                Message(group, "No available Air Interdiction routes among the two nearest sites" .. range ..
+                MissionMessage(record, "No available Air Interdiction routes among the two nearest sites" .. range ..
                     ". Try again later.", 20)
             end
             return
         end
         record.state = "ACTIVE"
-        Message(group, "Air Interdiction mission accepted.", 10)
+        MissionMessage(record, "Air Interdiction mission accepted.", 10)
         PublishMission(record, "briefing", record.interdictionBriefing .. string.format(
             "\nReward per pilot: %d points.\nRegistered pilots: %d.", record.fullReward, #roster),
             Config.coordinateBriefingSeconds)
-        DebugLog(record, "Air Interdiction started; route=" .. record.interdictionPlan.site.name)
+        DebugLog(record, "Air Interdiction started; route=" .. record.interdictionPlan.site.name ..
+            " composition=" .. (record.interdictionPlan.convoyName or "ROUTE_ORIGINAL"))
         return
     end
     if category == "Strike" then
@@ -307,14 +311,14 @@ local function Generate(groupName, category)
             Close(record)
             if not ok then
                 env.error("[DynamicTraining] Strike setup: " .. tostring(problem))
-                Message(group, "ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.", 20)
+                MissionMessage(record, "ERROR: Strike setup failed. See DCS log; select 'Task: Strike' to retry.", 20)
             else
-                Message(group, "No available Strike targets among the two nearest sites. Try again later.", 20)
+                MissionMessage(record, "No available Strike targets among the two nearest sites. Try again later.", 20)
             end
             return
         end
         record.state = "ACTIVE"
-        Message(group, "Strike mission accepted.", 10)
+        MissionMessage(record, "Strike mission accepted.", 10)
         PublishMission(record, "briefing", record.strikeBriefing .. string.format(
             "\nReward per pilot: %d points.\nRegistered pilots: %d.", record.fullReward, #roster),
             Config.coordinateBriefingSeconds)
@@ -328,18 +332,18 @@ local function Generate(groupName, category)
         if not ok then
             Close(record)
             env.error("[DynamicTraining] CAP setup: " .. tostring(plan))
-            Message(group, "ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.", 20)
+            MissionMessage(record, "ERROR: CAP setup failed. See DCS log; select 'Task: CAP' to retry.", 20)
             return
         end
         if not plan then
             Close(record)
-            Message(group, string.format("No CAP areas within %g-%g NM. Change position and retry.",
+            MissionMessage(record, string.format("No CAP areas within %g-%g NM. Change position and retry.",
                 Config.cap.minDistanceNM, Config.cap.maxDistanceNM), 20)
             return
         end
         record.capPlan, record.state = plan, "ACTIVE"
         BeginScoring(record, Config.cap.fullReward)
-        Message(group, "CAP mission accepted.", 10)
+        MissionMessage(record, "CAP mission accepted.", 10)
         PublishMission(record, "briefing", CAP.Briefing(plan) .. string.format("\nRegistered pilots: %d.\nReward per pilot: %d points.",
             #roster, record.fullReward), Config.coordinateBriefingSeconds)
         DebugLog(record, "CAP accepted; zone=" .. plan.name .. " template=" .. plan.template ..
@@ -370,11 +374,11 @@ local function Generate(groupName, category)
             SEADSites.Rollback(site, record.assignmentID, previous)
             if not ok then
                 env.error("[DynamicTraining] DEAD setup: " .. tostring(failure))
-                Message(group, "ERROR: DEAD setup failed. Site reservation rolled back; see DCS log.", 20)
-            else Message(group, "No preserved SAM sites available for DEAD.", 15) end
+                MissionMessage(record, "ERROR: DEAD setup failed. Site reservation rolled back; see DCS log.", 20)
+            else MissionMessage(record, "No preserved SAM sites available for DEAD.", 15) end
             return
         end
-        Message(group, "DEAD mission accepted.", 10)
+        MissionMessage(record, "DEAD mission accepted.", 10)
         local briefing = record.deadBriefing .. string.format("\nReward per pilot: %d points.\nRegistered pilots: %d.",
             record.fullReward, #record.participants)
         DebugLog(record, briefing .. "\nRemaining targets: " .. #record.deadTargets ..
@@ -397,7 +401,7 @@ local function Generate(groupName, category)
         if not ok then
             Close(record)
             env.error("[DynamicTraining] SEAD setup: " .. tostring(job))
-            Message(group, "ERROR: SEAD setup failed. See DCS log; select 'Task: SEAD' to retry.", 15)
+            MissionMessage(record, "ERROR: SEAD setup failed. See DCS log; select 'Task: SEAD' to retry.", 15)
             return
         end
         record.selection, record.plan, record.state = job, job.plan, "PLANNING"
@@ -491,7 +495,7 @@ local function FollowOn(groupName, record, preserve)
             if not p.done and Player.IsControlling(p.owner) then keeper = p.owner; break end
         end
         if keeper and SEADSites.Preserve(site, record.assignmentID, time, keeper) then
-            Message(group, "SAM site preserved for follow-on DEAD.\nKeeper: " .. site.retainedBy.name ..
+            MissionMessage(record, "SAM site preserved for follow-on DEAD.\nKeeper: " .. site.retainedBy.name ..
                 "\nSite remains reserved for your wing after SEAD settlement.\nReturn to base and rearm." ..
                 "\nSite will be cleaned when the keeper disconnects.", 20)
         end
@@ -566,6 +570,7 @@ local function Abort(groupName, target, assignment)
 end
 
 ScanPlayers = function()
+    TrainingWings.Sweep()
     local present = Player.Groups()
     for name, group in pairs(present) do
         local roster = Player.ForGroup(name) or {}
@@ -581,11 +586,14 @@ ScanPlayers = function()
         for _, owner in ipairs(roster) do
             signature = signature .. ":" .. owner.unitName .. ":" .. owner.objectID .. ":" .. owner.name .. ":" .. tostring(owner.ucid)
         end
+        local joinable, trainingWing = TrainingWings.List(name)
+        signature = signature .. ":training:" .. tostring(trainingWing and trainingWing.id)
+        for _, candidate in ipairs(joinable) do signature = signature .. ":join:" .. candidate.id end
         local targets = {}
-        local followOn = Missions.wings[name]
+        local followOn = Missions.groupLocks[name] or Missions.wings[name]
         local canContinue = FollowOnAvailable(name, followOn)
         local canPreserve = canContinue and followOn.site.disposition == "CLEANUP"
-        local strike = Missions.wings[name]
+        local strike = Missions.groupLocks[name] or Missions.wings[name]
         local canMarkStrike = CanMarkStrike(name, strike)
         signature = signature .. ":strikeMark:" .. tostring(canMarkStrike)
         signature = signature .. ":follow:" .. tostring(canContinue) .. ":preserve:" .. tostring(canPreserve)
@@ -632,9 +640,52 @@ ScanPlayers = function()
             }) do
                 local label, action = command[1], command[2]
                 local category = label:match("^Task: (.+)$")
-                if not category or Player.CanTask(taskRoster, category) then
+                if (not category or Player.CanTask(taskRoster, category))
+                    and (not category or not trainingWing or trainingWing.leader == name) then
                     AddCommand(label, function()
                         Safe(label, group, function() action(name); ScanPlayers() end)
+                    end)
+                end
+            end
+            local capturedGroupID = group:GetID()
+            local function WingCommand(label, operation)
+                AddCommand(label, function()
+                    Safe(label, group, function()
+                        local current = GROUP:FindByName(name)
+                        assert(current and current:GetID() == capturedGroupID, "Aircraft group changed. Reopen the F10 menu.")
+                        local ok, reason = pcall(operation)
+                        if not ok then Message(group, tostring(reason):gsub("^.-:%d+: ", ""), 20) end
+                        ScanPlayers()
+                    end)
+                end)
+            end
+            if trainingWing then
+                WingCommand("Mission Team Status", function()
+                    local current = assert(TrainingWings.members[name])
+                    assert(current.id == trainingWing.id, "This mission team is no longer current.")
+                    local names = {}
+                    for member in pairs(current.groups) do
+                        for _, owner in ipairs(Player.ForGroup(member) or {}) do
+                            names[#names + 1] = owner.name .. (member == current.leader and " [Leader group]" or "")
+                        end
+                    end
+                    table.sort(names)
+                    Message(group, "Mission team " .. current.id .. "\n" .. table.concat(names, "\n"), 20)
+                end)
+                WingCommand("Mission Team: " .. trainingWing.id .. " / Leave", function()
+                    TrainingWings.Leave(name, trainingWing.id); Message(group, "Left mission team.", 10)
+                end)
+            else
+                WingCommand("Create Mission Team", function()
+                    local created = TrainingWings.Create(name)
+                    Message(group, "Mission team " .. created.id .. " created. Other pilots may join via F10. Leader accepts the mission.", 20)
+                end)
+                for _, candidate in ipairs(joinable) do
+                    local id = candidate.id
+                    WingCommand("Join Mission Team " .. id .. ": " .. candidate.label, function()
+                        local joined = TrainingWings.Join(name, id)
+                        Message(group, "Joined mission team " .. id .. ". Wait for the leader to accept a mission.", 20)
+                        Message(GROUP:FindByName(joined.leader), "A group joined mission team " .. id .. ". Check Mission Team Status before accepting.", 20)
                     end)
                 end
             end
@@ -705,7 +756,7 @@ local function TickMission(record, time)
         -- Spread bounded terrain/scenery checks across ticks to avoid a long frame.
         local controlling = Ready(record)
         if not controlling then
-            Close(record); Message(record.group, "SEAD selection cancelled. Player aircraft changed or unavailable.")
+            Close(record); MissionMessage(record, "SEAD selection cancelled. Player aircraft changed or unavailable.")
             return
         end
         local reservations = {}
@@ -719,7 +770,7 @@ local function TickMission(record, time)
             Close(record)
             env.error("[DynamicTraining] SEAD selection: " .. tostring(ok and problem or plan))
             local detail = ok and SEAD.FailureSummary(record.selection) or "Site check error. See DCS log."
-            Message(record.group, "ERROR: SEAD placement failed.\n" .. detail .. "\nSelect 'Task: SEAD' to retry.", 25)
+            MissionMessage(record, "ERROR: SEAD placement failed.\n" .. detail .. "\nSelect 'Task: SEAD' to retry.", 25)
         elseif plan then
             -- Plan is complete before any physical spawn. Only the accepted
             -- plan supplies briefing data, including after departure/spawn.
@@ -745,7 +796,7 @@ local function TickMission(record, time)
                     SettleParticipant(record, p, "FAILED", "DEAD reservation cancelled. No reward.")
                 end
             else Close(record) end
-            Message(record.group, record.category .. " reservation cancelled. Player aircraft changed or unavailable.")
+            MissionMessage(record, record.category .. " reservation cancelled. Player aircraft changed or unavailable.")
         elseif not airborne then
             if record.spawnAt then
                 record.spawnAt, record.state = nil, "ARMED"
@@ -785,7 +836,7 @@ local function TickMission(record, time)
                 if update.transition then
                     local words = { STARTED = "CAP on station.",
                         PAUSED = "CAP patrol paused. Return to the assigned area.", RESUMED = "CAP patrol resumed." }
-                    Message(record.group, words[update.transition], 10)
+                    MissionMessage(record, words[update.transition], 10)
                 end
                 for _, percent in ipairs(update.progress) do
                     local suffix = ""
@@ -793,7 +844,7 @@ local function TickMission(record, time)
                         suffix = "\nPatrol time complete." ..
                             (CAP.Remaining(record.spawn) > 0 and " Destroy all remaining hostiles." or "")
                     end
-                    Message(record.group, "CAP patrol progress: " .. percent .. "%" .. suffix, 10)
+                    MissionMessage(record, "CAP patrol progress: " .. percent .. "%" .. suffix, 10)
                 end
                 if CAP.Complete(record.capPlan, record.spawn) then PrimaryComplete(record, time) end
             elseif record.category == "Strike" then

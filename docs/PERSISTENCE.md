@@ -73,6 +73,10 @@ primaryが欠落・破損なら正常backupから復旧する。primaryが読み
 native I/Oの数値errnoが欠落しても文字列の文言・言語から不存在を推測しない。数値ENOENTがないときは、親directoryを最後まで列挙し対象名がないことを確認する。既存file・権限エラー・属性取得例外・列挙エラー/中断はunreadableとして保存を停止する。失敗ログにはprimary/backupそれぞれの状態とI/O詳細を残し、成績本文を記録しない。読み書き途中の例外でもfileを閉じる。
 fileのwrite/flush/closeは例外・false・エラー返信を拒否するが、成功時に返り値がない実装も扱う。flush methodが提供される場合は呼び出す。提供されない場合はclose後の再読検証を必須とする。writeの呼び出し結果だけで保存成功にはせず、同じbytesの再読とschema検証を通してから昇格する。renameはsource消失とdestinationの同一bytes、removeは不存在を確認する。IO_COMPATIBILITYで戻り値の型とflushの有無を1回記録する。OSの物理fsyncや電源断までの耐久性を保証する方式ではない。
 
+## Dynamic Spawnの識別配信（training-16）
+
+2026-11-06の更新Hookは、成績保存とは独立してBLUE Hornet/Apacheのslotと実機の名前・runtime IDを解決し、ミッションへ1秒間隔で配信する。動的生成機の採点には新Hookと新.mizを組にして導入する。成績schema4・scores.dat・既存累計は変更しない。識別情報は揮発データで、I/O失敗時も別途配信を試みる。詳細は[DYNAMIC_SPAWN.md](DYNAMIC_SPAWN.md)。
+
 ## 導入
 
 次を実行する。専用モジュールを結合した1つのHookを配置し、既存の別Hookには触れない。同名の旧ファイルは更新前にbackupする。

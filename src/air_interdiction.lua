@@ -1,6 +1,19 @@
 -- Moving ground convoys retain ME routes, including the final loop task.
-local AirInterdiction = { sites = {} }
+local AirInterdiction = { sites = {}, convoys = {} }
 local finite = Observations.Finite
+
+local function validateVehicles(template)
+    assert(template.CoalitionID == coalition.side.RED and template.CategoryID == 2
+        and template.lateActivation == true, "Convoy must be RED, ground and late activated.")
+    assert(#template.units == 3, "Convoy must contain exactly three vehicles.")
+    for _, unit in ipairs(template.units) do
+        assert(type(unit.type) == "string" and unit.type ~= "", "Convoy vehicle type unavailable.")
+    end
+end
+
+local function convoyNames(profile)
+    return profile.convoyTemplates or Config.airInterdiction.convoyTemplates or {}
+end
 
 function AirInterdiction.Profile(aircraftType)
     local aircraft = Config.playerTypes[aircraftType]
@@ -9,11 +22,12 @@ function AirInterdiction.Profile(aircraftType)
 end
 
 function AirInterdiction.Initialize()
-    local names = {}
+    local names, convoys = {}, {}
     for _, aircraft in pairs(Config.playerTypes) do
         local profile = aircraft.interdictionProfile and Config.airInterdiction[aircraft.interdictionProfile]
             or Config.airInterdiction
         for _, name in ipairs(profile.templates) do names[name] = true end
+        for _, name in ipairs(convoyNames(profile)) do convoys[name] = true end
     end
     local ordered = {}
     for name in pairs(names) do ordered[#ordered + 1] = name end
@@ -33,9 +47,10 @@ function AirInterdiction.Initialize()
                 minY, maxY = math.min(minY, p.y), math.max(maxY, p.y)
             end
             site.point = { x = (minX + maxX) / 2, y = (minY + maxY) / 2 }
-            assert(template.CoalitionID == coalition.side.RED and template.CategoryID == 2
-                and template.lateActivation == true, "Convoy must be RED, ground and late activated.") -- DCS GROUND=2.
-            assert(#template.units == 3, "Convoy must contain exactly three vehicles.")
+            validateVehicles(template)
+            for _, unit in ipairs(template.units) do
+                assert(finite(unit.x) and finite(unit.y), "Convoy start position unavailable.")
+            end
             for _, p in ipairs(points) do
                 assert(p.action == "On Road" and finite(p.speed) and p.speed > 0, "Invalid convoy road/speed.")
             end
@@ -46,9 +61,23 @@ function AirInterdiction.Initialize()
                     and (task.params.nWaypointIndx or task.params.goToWaypointIndex) == 1 then loop = true end
             end
             assert(loop, "Convoy route must return from its last waypoint to WP0.")
+            site.template = UTILS.DeepCopy(template)
         end)
         site.valid = ok
         if not ok then env.error("[DynamicTraining] Air Interdiction template " .. name .. ": " .. tostring(problem)) end
+    end
+    local orderedConvoys = {}
+    for name in pairs(convoys) do orderedConvoys[#orderedConvoys + 1] = name end
+    table.sort(orderedConvoys)
+    for _, name in ipairs(orderedConvoys) do
+        local ok, template = pcall(function()
+            local group = assert(GROUP:FindByName(name), "Missing convoy composition: " .. name)
+            local data = assert(group:GetTemplate(), "Missing convoy composition data.")
+            validateVehicles(data)
+            return UTILS.DeepCopy(data)
+        end)
+        if ok then AirInterdiction.convoys[name] = template
+        else env.error("[DynamicTraining] Air Interdiction composition " .. name .. ": " .. tostring(template)) end
     end
 end
 
@@ -88,15 +117,41 @@ function AirInterdiction.Plan(position, assignmentID, aircraftType)
     assert(type(location) == "string" and location ~= "", "Convoy coordinate unavailable.")
     local reward = Config.airInterdiction.fullReward
     assert(finite(reward) and reward >= 0 and reward % 1 == 0, "Invalid convoy reward.")
+    local configured, candidates, seen = convoyNames(profile), {}, {}
+    for _, name in ipairs(configured) do
+        if AirInterdiction.convoys[name] and not seen[name] then
+            candidates[#candidates + 1], seen[name] = name, true
+        end
+    end
+    local convoyName
+    if #configured > 0 then
+        assert(#candidates > 0, "No valid convoy compositions available.")
+        convoyName = candidates[math.random(1, #candidates)]
+    end
     local plan = { site = site, location = location, assignmentID = assignmentID, fullReward = reward,
-        alias = "DT_INTERDICTION_" .. assignmentID, targets = {} }
+        convoyName = convoyName, alias = "DT_INTERDICTION_" .. assignmentID, targets = {} }
+    if convoyName then
+        -- Routes own placement, country, speed and WP tasks; compositions own vehicle properties.
+        -- Build an isolated template so neither ME source is mutated or spawned at its staging location.
+        local template = UTILS.DeepCopy(site.template)
+        local composition = AirInterdiction.convoys[convoyName]
+        for i, start in ipairs(site.template.units) do
+            local unit = UTILS.DeepCopy(composition.units[i])
+            for _, key in ipairs({ "x", "y", "heading", "name", "unitId" }) do unit[key] = start[key] end
+            template.units[i] = unit
+        end
+        plan.spawnTemplate = template
+    end
     Missions.interdictionSites[site.name] = plan
     return plan
 end
 
 function AirInterdiction.Spawn(plan)
     assert(Missions.interdictionSites[plan.site.name] == plan and not plan.spawnAttempted, "Invalid convoy reservation.")
-    local spawner = SPAWN:NewWithAlias(plan.site.name, plan.alias)
+    local spawner
+    if plan.spawnTemplate then
+        spawner = SPAWN:NewFromTemplate(plan.spawnTemplate, plan.site.name, plan.alias)
+    else spawner = SPAWN:NewWithAlias(plan.site.name, plan.alias) end
     plan.spawnAttempted = true
     local ok, group = pcall(function() return spawner:Spawn() end)
     if not ok or not group then

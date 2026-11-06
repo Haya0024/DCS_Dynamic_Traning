@@ -589,3 +589,5 @@ AI-02はcoordinateBriefingSeconds設定を使う。攻撃中のStatusはAI-02と
 ## training-13の観測・削除修正
 
 通常の画面本文とStatus再表示は維持。帰還観測失敗は停止計測を再開しログだけへ記録する。同Wingの別参加者は帰還評価を続ける。監視間隔が初期2秒を超えた場合も帰還10秒・SEAD30秒の連続計測を再開する。部分生成後の削除待ちはログと再試行で管理し、失敗した任務のロック解放後に成功・報酬を追加しない。
+
+2026-11-06 / training-16では、Mission Teamで受注した任務の自動通知を登録済みの全DCSグループへ配信する。Mission Statusは各グループから公開済み本文を再表示し、受注時の人員だけを共有・採点する。Create/Join/Leaveの文面はMESSAGES.md、手順と制限はDYNAMIC_SPAWN.mdを参照。

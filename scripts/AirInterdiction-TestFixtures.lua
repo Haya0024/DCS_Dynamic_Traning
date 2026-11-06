@@ -4,6 +4,7 @@ return function(s, env, options, newUnit)
         if type(v) ~= 'table' then return v end
         local out={}; for k,x in pairs(v) do out[k]=copy(x) end; return out
     end
+    env.UTILS = { DeepCopy = copy }
     s.interdictionTemplates={}
     for i=1,10 do
         local name=string.format('TPL_AI_%02d',i)
@@ -28,13 +29,12 @@ return function(s, env, options, newUnit)
         local g=s.groups[name]; return g and not g.destroyed and g.raw or nil
     end}
     local previous=env.SPAWN.NewWithAlias
-    function env.SPAWN:NewWithAlias(template,alias)
-        if not alias:find('^DT_INTERDICTION_%d+$') then return previous(self,template,alias) end
+    local function spawner(template,alias,custom)
         assert(s.interdictionTemplates[template] and template~=s.missingInterdictionTemplate)
         return {Spawn=function()
             if s.failInterdictionSpawnBefore then error('spawn unavailable') end
-            local data=copy(s.interdictionTemplates[template])
-            local g={name=alias..'#001',template=template,route=data.route,units={}}
+            local data=copy(custom or s.interdictionTemplates[template])
+            local g={name=alias..'#001',template=template,route=data.route,units={},data=data}
             g.raw={isExist=function() return not g.destroyed end,destroy=function() g:Destroy(false) end}
             for j,unit in ipairs(data.units) do
                 local u=newUnit(g.name..'-'..j,9000+#s.spawns*10+j,nil,g,1,unit.type)
@@ -63,5 +63,13 @@ return function(s, env, options, newUnit)
             if s.nilInterdictionSpawnAfter then return nil end
             return g
         end}
+    end
+    function env.SPAWN:NewWithAlias(template,alias)
+        if not alias:find('^DT_INTERDICTION_%d+$') then return previous(self,template,alias) end
+        return spawner(template,alias)
+    end
+    function env.SPAWN:NewFromTemplate(data,template,alias)
+        assert(data.name==template)
+        return spawner(template,alias,data)
     end
 end

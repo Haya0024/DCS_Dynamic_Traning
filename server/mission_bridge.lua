@@ -44,6 +44,20 @@ return "DTBRIDGE_INVALID:first=" .. type(first) .. ";second=" .. type(second)]]
     function bridge.GetProtocol()
         return execute("return DynamicTrainingPersistence and DynamicTrainingPersistence.protocol")
     end
+    function bridge.UpdatePlayers(rows)
+        local encoded = {}
+        for _, row in ipairs(rows) do
+            assert(type(row.playerID) == "number" and type(row.objectID) == "number" and row.side == 2)
+            local fields = { string.format("playerID=%.0f,objectID=%.0f,side=2", row.playerID, row.objectID) }
+            for _, field in ipairs({ "ucid", "name", "slot", "unitName", "groupName", "aircraftType" }) do
+                assert(type(row[field]) == "string" and #row[field] <= 512)
+                fields[#fields + 1] = field .. "=" .. string.format("%q", row[field])
+            end
+            encoded[#encoded + 1] = "{" .. table.concat(fields, ",") .. "}"
+        end
+        return execute("if not DynamicTrainingPlayers then return false end; return DynamicTrainingPlayers.Update({" ..
+            table.concat(encoded, ",") .. "})")
+    end
     function bridge.GetContext()
         return execute([[return "endpoint=" .. type(DynamicTrainingPersistence) ..
             "; trigger=" .. type(trigger) .. "; timer=" .. type(timer) ..

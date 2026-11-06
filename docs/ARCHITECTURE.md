@@ -6,20 +6,21 @@
 
 Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
-この構成は`training-15`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-16`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
-実ミッションのプレイヤー配置は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、Hornetは計10グループ・15 Client機、Apacheは4空港にSOLO/MP2の8グループ・12 Client機、総計18グループ・27 Client機。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
+通常出撃はDynamic Spawn。以下の18グループは非表示の設定原本であり、固定搭乗枠ではない。実ミッションのプレイヤー配置原本は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、Hornetは計10グループ・15 Client機、Apacheは4空港にSOLO/MP2の8グループ・12 Client機、総計18グループ・27 Client機。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
 
 ## 責務と依存
 
 | 層 | モジュール | 責務 |
 |---|---|---|
 | 設定 | `config.lua` | 訓練値・時間・候補・報酬。各任務の設定は`intercept` / `cap` / `sead` / `dead` / `strike` / `airInterdiction`に置く |
-| 搭乗者 | `player.lua` | BLUE Hornet/Apacheの動的列挙、Apache乗員席、UCID・機体・イベント照合 |
-| 任務台帳 | `missions.lua` | Wing/UCIDロック、受注順、活動中任務とSiteの参照 |
+| 搭乗者 | `player.lua` | BLUE Hornet/Apacheの動的列挙、Hookからのruntime照合情報、Apache乗員席、UCID・機体・イベント照合 |
+| 共有ウィング | `training_wings.lua` | 別DCSグループの作成/加入/脱退、機体・UCIDの再照合、受注時の参加者固定 |
+| 任務台帳 | `missions.lua` | 複数DCSグループ/Wing/UCIDロック、受注順、活動中任務とSiteの参照 |
 | 訓練地域 | 実ミッションのME Trigger Zone | 全19円の中心・半径の唯一の定義元。各任務はZONE:FindByNameで参照し、Configの候補名・距離制限で選定 |
 | 固定施設 | `strike.lua` | ME Static取得・54原本除去、PP/TOO・近い2施設の抽選、TOO7/PP9物体生成、DDM/DMS・標高、施設予約・削除再試行 |
-| 移動車列 | `air_interdiction.lua` | ME周回中心の算出、機種別候補と距離条件、近い2経路の抽選、3両生成・破壊観測、地域予約・削除再試行 |
+| 移動車列 | `air_interdiction.lua` | ME周回中心の算出、機種別候補と距離条件、近い2経路と任意の編成候補を独立抽選、元経路と車両設定を合成して3両生成・破壊観測、地域予約・削除再試行 |
 | 観測契約 | `observations.lua` | 有限数・Vec3・固定IDの生死確認、連続観測の時間境界。公開・採点判断は呼出元に残す |
 | 実体削除 | `object_lifecycle.lua` | Destroy後の消失確認、固有aliasの部分生成回収と削除待ち。Site予約は所有しない |
 | 空中目標 | `air_targets.lua` | Intercept/CAPの生成済み機体のID固定、喪失イベント、生存観測 |

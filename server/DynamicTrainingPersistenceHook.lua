@@ -1,6 +1,7 @@
 -- Build-PersistenceHook.ps1 prepends data, adapters and transaction service.
 local control, hooks = Sim or DCS, {}
 local loaded, nextPoll, lastError, diagnosticState, frameSeen = false, 0, nil, nil, false
+local identityError
 local function diagnostic(message)
     log.write("DynamicTrainingPersistenceDiagnostic", log.INFO, message)
 end
@@ -15,6 +16,15 @@ local service = PersistenceService.New(bridge, fs, lfs.writedir() .. "DynamicTra
     warning = function(message) log.write("DynamicTrainingPersistence", log.WARNING, message) end
 })
 local function safePoll()
+    -- Identity delivery is independent of score storage: an I/O failure must not misidentify crews.
+    if control.getUnitProperty then
+        local ok, result = pcall(function() return bridge.UpdatePlayers(PlayerDirectory.Collect(control, net)) end)
+        if ok and result then identityError = nil
+        elseif not ok and tostring(result) ~= identityError then
+            identityError = tostring(result)
+            log.write("DynamicTrainingPlayers", log.WARNING, "Runtime identity delivery unavailable; unverified sorties remain unscored.")
+        end
+    end
     local ok, result = pcall(service.Poll)
     if ok then
         if result then lastError = nil end
@@ -30,6 +40,7 @@ end
 function hooks.onMissionLoadBegin()
     loaded, nextPoll, lastError, diagnosticState, frameSeen = false, 0, nil, nil, false
     service.Reset()
+    identityError = nil
     diagnostic("MISSION_LOAD_BEGIN: Persistence connection state reset.")
 end
 function hooks.onMissionLoadEnd()

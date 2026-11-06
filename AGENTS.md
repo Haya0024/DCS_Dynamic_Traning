@@ -589,3 +589,9 @@ Dynamic Training
 ユーザー明示依頼により実ミッション名を`mission/persistant_and_dynamic_traning.miz`、表示名を`Persistent and Dynamic Training`へ変更した。例外として`l10n/DEFAULT/dictionary`の既存`DictKey_sortie_5`の値だけを変更し、mission設定・トリガー・リソース表・機体・経路・その他の辞書項目は保持する。内部のDynamicTraining識別子、保存先、Hook名、F10ルートDynamic Trainingは維持する。
 
 Apacheの受注・採点・帰還は既存の台帳・150/90/0・schema4を再利用し、FARP帰還は追加しない。Test-Apache.luaもTest-Allに含める。Apacheの座標はMGRS 8桁で受注時に確定し、Statusも同じ公開済み本文を再表示する。HornetのDDMは維持する。距離条件はユーザー指定で3〜13 NMへ変更。保存済み配置ではIncirlikにTPL_AI_09/01の2候補、Beirut/Akrotiri/Ramatに各1候補があり、全12 Apache駐機位置から受注できる。範囲を自動拡張せず、ユーザーの経路を勝手に動かさない。
+
+## 2026-11-06のDynamic Spawn移行
+
+ユーザーが明示許可した今回限りの例外として、実.mizのmission/warehousesへDynamic Spawn設定を直接適用することを許可した。対象は4青空港＋空母のDynamic Spawn・対象機種別無制限在庫・9つのSOLO原本リンク、既存18プレイヤーグループのdynSpawnTemplate/passwordだけ。敵・地形・経路・天候・トリガー・辞書・リソース表・ニーボードを保持し、移行前.miz.dynamic-spawn.bakと構造差分検証を必須とする。通常のLua更新は従来のSync/Check。
+
+通常出撃はDynamic Slots、別機体の共有はMission TeamをF10で作成/加入して長機受注。受注時に全参加者と全DCSグループを固定し、目標共有・各UCID精算・150/90/0を維持する。更新Hookがslotとruntime IDを解決して識別情報を配信する。schema4を変更せず、実サーバーへのHook導入とDCS内検証は実施事実と区別する。仕様はdocs/DYNAMIC_SPAWN.md。

@@ -29,12 +29,12 @@ SEADでは受注時にTOO / PBを等確率で選びます。TOOは機種不明�
 必要な環境は **DCS World / Syriaマップ / 搭乗するF/A-18CまたはAH-64D** です。MOOSEと訓練スクリプトはミッションに組み込まれています。
 
 1. [persistant_and_dynamic_traning.miz](mission/persistant_and_dynamic_traning.miz) をマルチプレイでホストします。
-2. BLUEのHornetまたはApacheスロットに搭乗します。Incirlik、Akrotiri、Beirut、Ramat Davidから出撃でき、Hornetは空母にも配置しています。
+2. BLUEのDynamic Slotsから基地とHornetまたはApacheを選びます。Incirlik、Akrotiri、Beirut、Ramat Davidから出撃でき、Hornetは空母にも対応しています。
 3. 再武装を要請し、訓練に合わせた兵装を搭載します。初期兵装は空です。
 4. F10の `Dynamic Training` から任務を選びます。
 5. 目標を達成したら、BLUEの基地または空母に帰還して精算します。
 
-Hornetは4空港＋空母にSOLO（Client ×1）・MP2（Client ×2）、計10グループ・15 Client機。Apacheは4空港に同じ構成で計8グループ・12 Client機。合計18グループ・27 Client機です。MP2は2機編隊の名称で、Apacheの同一機PLT/CPGとは別です。
+Dynamic Spawnは各自1機ずつ生成します。元の18グループ・27 Client機は一覧非表示の設定原本として保持し、9つのSOLO原本を基地・機種へ割り当てています。機体在庫は対象機種ごとに無制限。ApacheのCPGは生成済み機体の空席へ参加します。
 編隊・同一機の人間乗員とも、参加する全員が搭乗してから受注してください。
 
 Intercept / SEADを地上で受注した場合は、登録参加者全員の離陸を待ち、離陸検出から20秒後に敵を生成します。
@@ -118,7 +118,7 @@ DEADは、元のSEADで生成された同じSAMグループを使います。損
 
 ## ウィングで協力する
 
-同じスロットグループを1つのウィングとして扱い、**1ウィングにつき同時に1任務**を受注できます。
+別々の動的生成機は、F10のCreate Mission Team → Join Mission Team → 長機の受注で任務を共有できます。**1ウィングにつき同時に1任務**。同一機のApache乗員は自動共有します。詳しくは[Dynamic Spawnとウィング](docs/DYNAMIC_SPAWN.md)。
 目標達成は共有しますが、帰還評価とポイントはプレイヤーごとです。別ウィングは独立した任務を並行して進められます。
 
 参加者は受注時に固定します。空席・AIは採点対象に含めず、途中で搭乗したプレイヤーは次の任務から参加します。
@@ -148,7 +148,7 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 
 ## 開発状況と詳しい仕様
 
-現在は、マルチプレイのME配置済みClientスロットを対象とした試用実装です。動的Clientスロットは対象外です。
+マルチプレイのDynamic Spawnと静的Client互換に対応しています。動的生成機のUCID照合には今回更新したサーバーHookが必要です。新しい.mizとHookを配置し、サーバーDCSを再起動してください。実サーバーでのDynamic Spawn・共有・採点は確認待ちです。
 任務がゲーム内で動作しているとの報告はありますが、全ケースのDCS内確認は完了していません。自動テストの検証範囲と手動確認項目はテスト仕様書にまとめています。
 
 今後は難易度・Threat Budget、CAS / Anti-Shipなどの訓練を追加する予定です。

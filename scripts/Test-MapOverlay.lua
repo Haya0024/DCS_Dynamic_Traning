@@ -162,6 +162,7 @@ test("Bundled startup initializes once; regular mission ticks do not redraw", fu
     local s = scenario()
     local f = fixture({ base("Startup") })
     f.env.trigger.action.outText = s.env.trigger.action.outText
+    f.env.UTILS.DeepCopy = s.env.UTILS.DeepCopy -- Preserve the other MOOSE utility boundary on reload.
     for _, key in ipairs({ "AIRBASE", "Airbase", "UTILS", "COORDINATE", "trigger" }) do s.env[key] = f.env[key] end
     s.env.DynamicTrainingMapOverlayState = nil
     s.env.DynamicTrainingRuntime = nil -- Start with Drawing APIs installed in the harness.

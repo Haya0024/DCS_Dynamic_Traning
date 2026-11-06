@@ -17,6 +17,32 @@ local function recover(s,p)
     for time=first,first+10 do s:tick(time) end
 end
 
+local function compositionScenario(options)
+    options=options or {}
+    local data=scenario().interdictionTemplates
+    local copy=scenario().env.UTILS.DeepCopy
+    for _,name in ipairs({'TPL_AI_TEST_TRANSPORT','TPL_AI_TEST_ARMOR'}) do
+        local t=copy(data.TPL_AI_01); t.name=name; t.route=nil
+        for i,u in ipairs(t.units) do
+            u.type=name=='TPL_AI_TEST_ARMOR' and 'T-72B' or 'Ural-375'
+            u.x,u.y,u.heading,u.unitId,u.name=-900000-i,-800000,2.5,700+i,name..'-'..i
+            u.skill='Excellent'; u.custom={value=i}
+        end
+        data[name]=t
+    end
+    options.interdictionTemplates=data
+    local s=scenario(options)
+    local ai=module(s,'AirInterdiction')
+    local key,config=debug.getupvalue(ai.Profile,1); assert(key=='Config')
+    local function initialize(names,apacheNames)
+        config.airInterdiction.convoyTemplates=names
+        config.airInterdiction.helicopter.convoyTemplates=apacheNames
+        ai.sites,ai.convoys={},{}; ai.Initialize()
+    end
+    initialize({'TPL_AI_TEST_TRANSPORT','TPL_AI_TEST_ARMOR'})
+    return s,ai,initialize
+end
+
 test('ten dormant templates are cached without spawning or drawing',function()
     local s=scenario(); local sites=module(s,'AirInterdiction').sites
     assert(#sites==10 and #s.spawns==0 and #s.randomCalls==0)
@@ -257,5 +283,121 @@ test('Life zero polling requires all three original vehicles',function()
     local s=scenario(); local r=accept(s); local units=r.spawn.group.units
     units[1].life=0; units[2].life=0; s:tick(2); assert(r.state=='ACTIVE')
     units[3].life=0; s:tick(4); assert(r.state=='RTB_PENDING'); s:assertClean()
+end)
+test('composition draw is independent of route selection and excludes the original vehicles',function()
+    for route=1,2 do for convoy=1,2 do
+        local s=compositionScenario(); s.randomValues={route,convoy}; s:command('Task: Air Interdiction')
+        local r=assert(s:mission()); local p=r.interdictionPlan
+        assert(p.site.name==string.format('TPL_AI_%02d',route))
+        assert(p.convoyName==(convoy==1 and 'TPL_AI_TEST_TRANSPORT' or 'TPL_AI_TEST_ARMOR'))
+        assert(#s.randomCalls==2 and s.randomCalls[2].maximum==2)
+        for _,u in ipairs(r.spawn.group.units) do assert(u.kind==(convoy==1 and 'Ural-375' or 'T-72B')) end
+        s:assertClean()
+    end end
+end)
+
+test('composition keeps route geometry and tasks while copying vehicle properties without modifying either source',function()
+    local s,ai=compositionScenario(); local original=s.env.UTILS.DeepCopy(s.interdictionTemplates)
+    local r=accept(s); local data=r.spawn.group.data; local route=original.TPL_AI_01
+    local function same(a,b)
+        if type(a)~='table' then assert(a==b); return end
+        assert(type(b)=='table'); for k,v in pairs(a) do same(v,b[k]) end
+        for k in pairs(b) do assert(a[k]~=nil) end
+    end
+    same(data.route,route.route)
+    for i,u in ipairs(data.units) do
+        for _,key in ipairs({'x','y','heading','name','unitId'}) do assert(u[key]==route.units[i][key]) end
+        assert(u.skill=='Excellent' and u.custom.value==i)
+    end
+    data.units[1].custom.value=99; data.route.points[1].x=-1
+    same(s.interdictionTemplates,original)
+    assert(ai.convoys.TPL_AI_TEST_TRANSPORT.units[1].custom.value==1)
+    assert(ai.sites[1].template.route.points[1].x==route.route.points[1].x); s:assertClean()
+end)
+
+test('planned composition and route are frozen before spawn and status does not redraw them',function()
+    local s,ai=compositionScenario(); local p=ai.Plan(s.player.position,999,'FA-18C_hornet')
+    ai.convoys[p.convoyName].units[1].type='BTR-70'; ai.sites[1].template.units[1].x=-999
+    local spawned=ai.Spawn(p)
+    assert(spawned.group.units[1].kind=='Ural-375' and spawned.group.units[1].position.x==80000)
+    ai.Close(p); assert(next(module(s,'Missions').interdictionSites)==nil)
+    s.randomValues={1,2}; s:command('Task: Air Interdiction'); local r=assert(s:mission())
+    local n=#s.randomCalls; local text=s.messages[#s.messages].text
+    s:command('Mission Status'); assert(s.messages[#s.messages].text==text and #s.randomCalls==n)
+    s:assertClean()
+end)
+
+test('missing and invalid compositions are excluded without invalidating road routes',function()
+    for _,fault in ipairs({'missing','side','category','late','count','type'}) do
+        local s,ai,initialize=compositionScenario(); local bad=s.interdictionTemplates.TPL_AI_TEST_ARMOR
+        if fault=='missing' then s.groups.TPL_AI_TEST_ARMOR=nil
+        elseif fault=='side' then bad.CoalitionID=2 elseif fault=='category' then bad.CategoryID=0
+        elseif fault=='late' then bad.lateActivation=false elseif fault=='count' then table.remove(bad.units)
+        else bad.units[1].type='' end
+        initialize({'TPL_AI_TEST_ARMOR','TPL_AI_TEST_TRANSPORT'})
+        assert(not ai.convoys.TPL_AI_TEST_ARMOR and #s.errors==1)
+        local r=accept(s); assert(r.interdictionPlan.convoyName=='TPL_AI_TEST_TRANSPORT')
+        assert(s.randomCalls[2].maximum==1 and ai.sites[1].valid)
+    end
+end)
+
+test('configured pool with no valid composition fails before reservation and releases wing and UCID locks',function()
+    local s,ai,initialize=compositionScenario(); initialize({'MISSING_COMPOSITION'})
+    s:command('Task: Air Interdiction')
+    assert(not s:mission() and #s.spawns==0 and next(module(s,'Missions').interdictionSites)==nil)
+    assert(not module(s,'Missions').pilots['ucid-a']); s:lastMessageContains('ERROR: Air Interdiction setup failed.')
+    s:command('Task: Intercept'); assert(s:mission().category=='Intercept')
+end)
+
+test('duplicate composition names do not increase their draw weight',function()
+    local s,ai,initialize=compositionScenario()
+    initialize({'TPL_AI_TEST_TRANSPORT','TPL_AI_TEST_ARMOR','TPL_AI_TEST_TRANSPORT'})
+    s.randomValues={1,2}; s:command('Task: Air Interdiction')
+    assert(s:mission().interdictionPlan.convoyName=='TPL_AI_TEST_ARMOR' and s.randomCalls[2].maximum==2)
+    s:assertClean()
+end)
+
+test('Apache inherits the common pool and can override it or retain its original vehicles independently',function()
+    for _,mode in ipairs({'inherit','override','original'}) do
+        local s,ai,initialize=compositionScenario({aircraftType='AH-64D_BLK_II',
+            playerPosition={x=81000-8*1852,y=0,z=800}})
+        initialize({'TPL_AI_TEST_ARMOR'},mode=='override' and {'TPL_AI_TEST_TRANSPORT'} or mode=='original' and {} or nil)
+        local r=accept(s); local p=r.interdictionPlan
+        assert(p.location:find('MGRS',1,true))
+        assert(p.convoyName==(mode=='inherit' and 'TPL_AI_TEST_ARMOR' or mode=='override' and 'TPL_AI_TEST_TRANSPORT' or nil))
+        if mode=='original' then assert(r.spawn.group.units[1].kind=='Tigr_233036' and #s.randomCalls==1) end
+        s:assertClean()
+    end
+end)
+
+test('different compositions share route reservations until cleanup succeeds',function()
+    local s=compositionScenario(); local a=accept(s); local p=s:addPilot('Other','ucid-b',20); s:tick(2)
+    s.randomValues={1,2}; s:command('Task: Air Interdiction',p); local b=assert(s:mission(p))
+    assert(a.interdictionPlan.site.name~=b.interdictionPlan.site.name and a.interdictionPlan.convoyName~=b.interdictionPlan.convoyName)
+    a.spawn.group.cleanupFailures=1; s:command('Abort Mission')
+    assert(module(s,'Missions').interdictionSites.TPL_AI_01==a.interdictionPlan)
+    s:tick(7); assert(not module(s,'Missions').interdictionSites.TPL_AI_01)
+    assert(s:mission(p)==b and not b.spawn.group.destroyed)
+end)
+
+test('custom template constructor and partial spawn failures roll back without leaving a route locked',function()
+    for _,fault in ipairs({'constructor','failInterdictionSpawnBefore','failInterdictionSpawnAfter','nilInterdictionSpawnAfter','interdictionInvalidCount'}) do
+        local s=compositionScenario()
+        if fault=='constructor' then s.env.SPAWN.NewFromTemplate=function() error('constructor failed') end else s[fault]=true end
+        s:command('Task: Air Interdiction')
+        assert(not s:mission() and next(module(s,'Missions').interdictionSites)==nil)
+        for _,g in ipairs(s.spawns) do assert(g.destroyed) end
+        assert(not module(s,'Missions').pilots['ucid-a'])
+    end
+end)
+
+test('randomized compositions retain three-target objectives and 150 or 90 point settlement',function()
+    for _,result in ipairs({'RTB','LOSS'}) do
+        local s=compositionScenario(); s.randomValues={1,2}; s:command('Task: Air Interdiction'); local r=assert(s:mission())
+        kill(s,r.spawn.group.units[1]); kill(s,r.spawn.group.units[2]); assert(r.state=='ACTIVE')
+        kill(s,r.spawn.group.units[3]); assert(r.state=='RTB_PENDING')
+        if result=='RTB' then recover(s); s:score(150) else s:event('Crash',s.player); s:score(90) end
+        assert(not s:mission() and next(module(s,'Missions').interdictionSites)==nil); s:assertClean()
+    end
 end)
 print(string.format('All %d Air Interdiction tests passed (simulated DCS/MOOSE).',count))

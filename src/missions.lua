@@ -1,9 +1,9 @@
 -- Shared assignment state. Every mission category must acquire this blocker
 -- before reserving or spawning; locks survive individual participant settlement.
-local Missions = { wings = {}, pilots = {}, sites = {}, strikeSites = {}, interdictionSites = {}, sequence = 0 }
+local Missions = { wings = {}, groupLocks = {}, pilots = {}, sites = {}, strikeSites = {}, interdictionSites = {}, sequence = 0 }
 
 function Missions.Blocker(groupName, roster)
-    local record = Missions.wings[groupName]
+    local record = Missions.groupLocks[groupName] or Missions.wings[groupName]
     if not record then
         for _, owner in ipairs(roster or {}) do
             if owner.ucid and Missions.pilots[owner.ucid] then
@@ -41,7 +41,7 @@ function Missions.ForGroup(groupName, roster)
         end
     end
     -- Own wing first; pilots can also manage their earlier sortie after moving.
-    add(Missions.wings[groupName])
+    add(Missions.groupLocks[groupName] or Missions.wings[groupName])
     for _, owner in ipairs(roster or {}) do
         if owner.ucid then add(Missions.pilots[owner.ucid]) end
     end
@@ -53,9 +53,17 @@ function Missions.Acquire(record)
     for _, participant in ipairs(record.participants) do roster[#roster + 1] = participant.owner end
     local problem = Missions.Blocker(record.groupName, roster)
     if problem then return false, problem end
+    local groups = { [record.groupName] = record.group }
+    for _, owner in ipairs(roster) do
+        groups[owner.groupName] = owner.group
+        local blocked = Missions.Blocker(owner.groupName, roster)
+        if blocked then return false, blocked end
+    end
     Missions.sequence = Missions.sequence + 1
     record.assignmentID = Missions.sequence
     Missions.wings[record.groupName] = record
+    record.groups = groups
+    for name in pairs(groups) do Missions.groupLocks[name] = record end
     for _, owner in ipairs(roster) do
         if owner.ucid then Missions.pilots[owner.ucid] = record end
     end
@@ -65,6 +73,9 @@ end
 function Missions.Release(record)
     if not Missions.IsActive(record) then return false end
     Missions.wings[record.groupName] = nil
+    for name in pairs(record.groups or {}) do
+        if Missions.groupLocks[name] == record then Missions.groupLocks[name] = nil end
+    end
     for _, participant in ipairs(record.participants) do
         local ucid = participant.owner.ucid
         if ucid and Missions.pilots[ucid] == record then Missions.pilots[ucid] = nil end

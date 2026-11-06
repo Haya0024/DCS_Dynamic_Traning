@@ -2,6 +2,11 @@
 local scenario=dofile('scripts/Intercept-TestHarness.lua')
 local config=dofile('src/config.lua').airInterdiction
 local templates,centers,unitNames,unitIDs,groupNames,groupIDs={},{},{},{},{},{}
+local routeNames,convoyNames={},{}
+for _,profile in ipairs({config,config.helicopter}) do
+    for _,name in ipairs(profile.templates) do routeNames[name]=true end
+    for _,name in ipairs(profile.convoyTemplates or config.convoyTemplates or {}) do convoyNames[name]=true end
+end
 local function same(a,b)
     assert(type(a)==type(b))
     if type(a)~='table' then assert(a==b); return end
@@ -17,13 +22,15 @@ for side,co in pairs(mission.coalition) do for _,country in pairs(co.country or 
                 assert(not unitNames[u.name] and not unitIDs[u.unitId], 'Duplicate ME unit name/ID')
                 unitNames[u.name],unitIDs[u.unitId]=true,true
             end
-            if g.name:find('^TPL_AI_') then
+            if routeNames[g.name] or convoyNames[g.name] then
                 assert(side=='red' and country.name=='Russia' and category=='vehicle')
                 assert(g.lateActivation==true and #g.units==3)
-                local types={}; for _,u in ipairs(g.units) do types[u.type]=(types[u.type] or 0)+1 end
-                assert(types.Tigr_233036==1 and types['BTR-70']==1 and types['Ural-375']==1)
                 g.CoalitionID,g.CategoryID=1,2 -- Metadata added by MOOSE database registration.
                 templates[g.name]=g
+            end
+            if routeNames[g.name] then
+                local types={}; for _,u in ipairs(g.units) do types[u.type]=(types[u.type] or 0)+1 end
+                assert(types.Tigr_233036==1 and types['BTR-70']==1 and types['Ural-375']==1)
                 local minX,maxX,minY,maxY=math.huge,-math.huge,math.huge,-math.huge
                 for _,p in ipairs(g.route.points) do
                     assert(p.action=='On Road' and p.speed>0)
@@ -41,7 +48,8 @@ for side,co in pairs(mission.coalition) do for _,country in pairs(co.country or 
         end
     end
 end end
-local n=0; for _ in pairs(templates) do n=n+1 end; assert(n==10)
+local n=0; for _ in pairs(centers) do n=n+1 end; assert(n==10)
+for name in pairs(convoyNames) do assert(templates[name], 'Configured composition missing from ME: '..name) end
 for _,name in ipairs(config.templates) do assert(templates[name],name) end
 for _,name in ipairs(config.helicopter.templates) do assert(templates[name],name) end
 print('PASS: actual .miz has ten RED three-vehicle road loops, late activation and unique names/IDs')

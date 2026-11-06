@@ -95,3 +95,9 @@ Human Apache PLT/CPG crew are registered and scored separately at acceptance. Pl
 ### Saved progress
 
 Total Score, Career Points, category scores, and accumulated mission and recovery statistics are recorded. When persistence is connected and a save has been confirmed, these results carry over to later mission sessions and server restarts. Check "Player Statistics" for saved, pending, or disconnected status. Without a persistence connection, results are recorded only for the current session. Active missions and preserved SAM sites reset when the mission restarts.
+
+## Dynamic Spawn / Mission Teamの追記案（training-16）
+
+BLUEのDynamic Slotsから基地と機種を選択してください。ApacheのCPGは生成済み機体のSpawn Slotsから空席へ参加します。協力する場合はF10のCreate Mission Team → 僚機のJoin Mission Team → 長機のTask受注。参加者は受注時に固定され、目標は共有、帰還・採点は各自です。ソロおよびApache同乗者だけならウィング作成は不要です。
+
+この文書はME用の案内文で、今回の限定設定変更では.mizの既存ブリーフィング辞書へ自動転記していません。

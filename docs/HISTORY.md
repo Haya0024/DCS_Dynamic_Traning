@@ -2,6 +2,24 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-11-06 任務共有メニューをMission Teamへ改名
+
+ユーザー指定でCreate Training WingをCreate Mission Teamへ変更。Join Mission Team / Mission Team Status / Mission Team: <番号> / Leaveと作成・加入・退出・拒否通知も揃えた。DCS編隊やデータリンクを変更する機能ではなく、任務共有だけを表す名称とする。内部モジュール・台帳・採点・Hookは維持。既存DynamicPlayers 24ケースとSync/Checkで確認し、更新一式も再生成する。
+
+## 2026-11-06 Dynamic Spawnと別グループのTraining Wing（training-16）
+
+ユーザーの明示依頼によりDynamic Spawnへ移行。さらにME画面操作が完了できなかったため、ユーザーから今回限りの直接編集例外を取得し、4青空港＋空母のDynamic Spawn/対象機種別無制限在庫/9つのSOLOリンクと、既存18グループのテンプレート化・一覧非表示だけを変更した。旧配置・MP2原本・敵・経路・天候・トリガー・辞書・ニーボードを保持。移行前を.miz.dynamic-spawn.bakへ保存。通常のLuaは別途Sync/Checkする。
+
+Hookのruntime slot照合と3秒の識別情報、F10 Create/Join/Status/Leave、同機種の長機受注・受注時固定人員・全グループロック/通知、既存全任務・各UCID150/90/0を導入。schema4・累計は維持。新Hookの再配置とサーバーDCS再起動が必要で、接続先不明の新サーバーへの導入済みとは扱わない。
+
+Lua556ケース・14スイート、全結合検証にDYNAMICME1を追加。移行Python6ケースも確認。動的生成機の実ネットワーク識別、一覧非表示、Apache乗員・各基地の出撃と帰還はMAN-69/70で確認待ち。DCSの起動を試みたが、操作可能なゲームウィンドウを安定取得できず、実ゲーム検証済みとはしていない。
+
+## 2026-11-05 Air Interdictionの経路と編成を分離
+
+既存10経路を維持し、任意の3両編成TPLを別抽選して同じ道路・初期位置・向き・速度・WPタスクで生成できる拡張を追加。共通convoyTemplatesとApache個別上書きに対応し、空候補では従来の元車列・抽選回数・公開表示を維持する。実.mizへ編成TPLは追加していない。地域予約・観測・Cleanup・採点・Hook/schemaは維持する。
+
+模擬10ケースを追加し、Lua全532ケース・13スイートと全結合検証を実施。登録済みLuaのみSync/Checkし、ME配置は変更しない。新編成のDCS実走行はMAN-68として未実施。ユーザーからは既存Apache任務1件で車列が動いていそうとの報告があり、全経路・攻撃後の動作確認とは区別する。
+
 ## 2026-11-01 ApacheのAir Interdiction座標をMGRS 8桁へ変更
 
 ユーザー指定でApacheのTARGET AREAをDDMからMGRSへ変更。config.airInterdiction.helicopterのcoordinateFormat=MGRS / mgrsAccuracy=4を使い、MOOSE ToStringMGRSへ精度4を明示する。ゾーン・100 kmグリッド識別子・東4桁＋北4桁を表示し、先頭ゼロを保持して切り捨てる。周回中心の捜索点、誤差追加なし、60秒、Statusの公開済み本文再表示、達成後の座標除去は維持する。Hornetは従来DDMのまま。距離・目標・採点・ME配置を変更しない。

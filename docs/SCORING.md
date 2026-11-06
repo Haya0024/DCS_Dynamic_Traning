@@ -8,7 +8,7 @@ SEAD の対象レーダーと配置の仕様は [SEAD.md](SEAD.md) を参照す�
 
 ## 現在の実装と範囲
 
-マルチプレイの静的Clientスロットが対象。Hornetの既存6任務に加え、ApacheのAir Interdictionも同じ150/90/0とUCID別精算を使う。同一機の人間PLT/CPGには各自の満額を付与し、人数で分割しない。未確認UCIDの乗員には加点しない。FARP帰還は対象外。Apacheの実DCS確認は未実施。詳細は[APACHE.md](APACHE.md)。
+マルチプレイのDynamic Spawnと静的Client互換が対象。Hornetの既存6任務に加え、ApacheのAir Interdictionも同じ150/90/0とUCID別精算を使う。同一機の人間PLT/CPGには各自の満額を付与し、人数で分割しない。未確認UCIDの乗員には加点しない。FARP帰還は対象外。Apacheの実DCS確認は未実施。詳細は[APACHE.md](APACHE.md)。
 UCID の照合、グループ別 F10 メニュー、クリア後の帰還評価、100% / 60% / 0%の精算、
 重複防止、成績表示とサーバーHookによる永続保存はコードに実装済み。
 ユーザーから任務がゲーム内で動作しているとの報告あり。
@@ -70,7 +70,7 @@ DCS 標準 API を使う理由をコードにも記載する。
 
 UCID は空でない文字列のみ採用する。接続中の playerID は永続成績のキーにしない。
 実機でテンプレートの `unitId` とネットワークの `slot` の対応を確認する。
-ApacheはME unitIdと乗員席suffix（unitId_1 / unitId_2）を照合し、搭乗中の各UCIDを別参加者として固定する。同一機内の席交換は許可する。動的Clientスロットは対象外。乗員席の実ネットワーク動作はDCS内確認待ち。
+ApacheはME unitIdと乗員席suffix（unitId_1 / unitId_2）を照合し、搭乗中の各UCIDを別参加者として固定する。同一機内の席交換は許可する。動的生成機は更新済みHookのruntime情報と現在のネットワーク席・UCIDを照合する。詳細は[DYNAMIC_SPAWN.md](DYNAMIC_SPAWN.md)。乗員席の実ネットワーク動作はDCS内確認待ち。
 
 UCID が取得できない場合は「採点なし」と表示して訓練を継続する。
 名前・機体名・仮の UCID を成績のキーに使わない。

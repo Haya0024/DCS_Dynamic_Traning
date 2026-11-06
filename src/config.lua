@@ -69,9 +69,12 @@ return {
         fullReward = 150, cleanupRetrySeconds = 5,
         minDistanceNM = 20, maxDistanceNM = 100,
         templates = { "TPL_AI_01", "TPL_AI_02", "TPL_AI_03", "TPL_AI_04", "TPL_AI_05", "TPL_AI_06" },
+        -- Empty: keep each route's original vehicles. Add RED late-activated 3-vehicle ME groups here.
+        convoyTemplates = {},
         helicopter = {
             minDistanceNM = 3, maxDistanceNM = 13,
             coordinateFormat = "MGRS", mgrsAccuracy = 4, -- Four easting + four northing digits.
+            -- Optional convoyTemplates overrides the common pool; {} keeps original route vehicles.
             templates = { "TPL_AI_01", "TPL_AI_02", "TPL_AI_03", "TPL_AI_04", "TPL_AI_05", "TPL_AI_06",
                 "TPL_AI_07", "TPL_AI_08", "TPL_AI_09", "TPL_AI_10" }
         }

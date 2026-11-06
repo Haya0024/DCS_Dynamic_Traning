@@ -6,7 +6,7 @@
 
 同じDCSグループの人間プレイヤーが1任務を共有する。HornetはIntercept / CAP / SEAD / DEAD / Strike / Air Interdiction、ApacheはAir Interdictionに対応する。
 実ミッションはSOLO（Client ×1）とMP2（Client ×2）。4空港と空母に各1グループ、Hornetは計10グループ・15 Client機。Apacheは4空港にSOLO/MP2各1グループ、計8グループ・12 Client機を追加した。
-静的Clientスロットが対象。Apacheの人間PLT/CPGは同じ機体でもUCIDごとの参加者とし、受注時に固定する。MP2は2機編隊。動的Clientスロットは対象外。Apacheの詳細は[APACHE.md](APACHE.md)。
+Dynamic Spawnと静的Client互換が対象。別DCSグループはF10でMission Teamを組み、長機が受注する。Apacheの人間PLT/CPGは同じ機体でもUCIDごとの参加者とし、受注時に固定する。MP2は2機編隊。動的生成機には更新済みサーバーHookが必要。詳細は[DYNAMIC_SPAWN.md](DYNAMIC_SPAWN.md)。Apacheの詳細は[APACHE.md](APACHE.md)。
 コードと模擬テストは実装済み。ユーザーから任務がゲーム内で動作しているとの報告あり。
 MP2・複数ウィングの個別ケースの確認範囲は未記録。
 

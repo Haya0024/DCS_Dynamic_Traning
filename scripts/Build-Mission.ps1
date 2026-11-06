@@ -8,7 +8,7 @@ $modules = [ordered]@{
     config = 'Config'; notifications = 'Notifications'; map_overlay = 'MapOverlay'
     observations = 'Observations'; object_lifecycle = 'ObjectLifecycle'
     score_data = 'ScoreData'; player = 'Player'; scoring = 'Scoring'; persistence = 'Persistence'
-    missions = 'Missions'; air_targets = 'AirTargets'; intercept = 'Intercept'; cap = 'CAP'
+    missions = 'Missions'; training_wings = 'TrainingWings'; air_targets = 'AirTargets'; intercept = 'Intercept'; cap = 'CAP'
     sead_objective = 'SEADObjective'; sead = 'SEAD'; sead_sites = 'SEADSites'; dead = 'DEAD'
     strike = 'Strike'; air_interdiction = 'AirInterdiction'; recovery = 'Recovery'; mission_report = 'MissionReport'
 }

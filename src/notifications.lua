@@ -16,6 +16,11 @@ end
 function Notifications.Log(text)
     env.info("[DynamicTraining] " .. text)
 end
+function Notifications.Assignment(record, text, seconds)
+    if record.groups then
+        for _, group in pairs(record.groups) do Notifications.Group(group, text, seconds) end
+    else Notifications.Group(record.group, text, seconds) end
+end
 
 function Notifications.Debug(record, text)
     local id = record.id or (record.category .. " assignment " .. record.assignmentID)

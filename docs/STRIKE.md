@@ -76,7 +76,7 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 
 両方式ともMissions.strikeSitesで施設単位の排他を共有する。異なる施設では別WingのPP/TOOを並行可能。達成直後は残存物を削除せず、全員終了後に生成した7個/9個を全削除する。失敗時は予約を維持して5秒ごと再試行、実体削除確認後に解除する。保持・進行の永続化はしない。
 
-各自150／達成後事故90／達成前事故・Abort0、共有達成・個人精算・共通帰還を維持する。PPも同じstrikeScoreへ加算する。保存schema4は変更せず、この変更によるサーバーHook更新は不要。
+各自150／達成後事故90／達成前事故・Abort0、共有達成・個人精算・共通帰還を維持する。PPも同じstrikeScoreへ加算する。PP/TOOの変更自体は保存項目を増やさない。現在はCAS追加による保存schema5でstrikeScoreを継承し、CAS導入時のHook更新が必要。
 
 ## 任意の目標スモーク
 

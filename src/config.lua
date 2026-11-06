@@ -4,7 +4,8 @@ return {
     -- DCS type names are the detection contract, never Client group names.
     playerTypes = {
         ["FA-18C_hornet"] = { tasks = { "Intercept", "CAP", "SEAD", "DEAD", "Strike", "Air Interdiction" } },
-        ["AH-64D_BLK_II"] = { tasks = { "Air Interdiction" }, multicrew = true, interdictionProfile = "helicopter" }
+        ["AH-64D_BLK_II"] = { tasks = { "Air Interdiction", "CAS" }, multicrew = true,
+            interdictionProfile = "helicopter" }
     },
     pollSeconds = 1,
     playerScanSeconds = 2,
@@ -77,6 +78,20 @@ return {
             -- Optional convoyTemplates overrides the common pool; {} keeps original route vehicles.
             templates = { "TPL_AI_01", "TPL_AI_02", "TPL_AI_03", "TPL_AI_04", "TPL_AI_05", "TPL_AI_06",
                 "TPL_AI_07", "TPL_AI_08", "TPL_AI_09", "TPL_AI_10" }
+        }
+    },
+    cas = {
+        fullReward = 150, cleanupRetrySeconds = 5,
+        setupTimeoutSeconds = 10,
+        minDistanceNM = 3, maxDistanceNM = 13, coordinateFormat = "MGRS", mgrsAccuracy = 4,
+        sites = {
+            { id = "01", enemy = "TPL_CAS_ENEMY_01", friendly = "TPL_CAS_FRIENDLY_01", jtac = "TPL_CAS_JTAC_01",
+                friendlyDescription = "2 M113s and 1 truck.", enemyDescription = "2 BMP-2s and 1 truck." }
+        },
+        radioSlots = {
+            { laserCode = 1688, frequencyMHz = 133, modulation = 0, callname = 1, number = 1, label = "Axeman 1" },
+            { laserCode = 1687, frequencyMHz = 134, modulation = 0, callname = 1, number = 2, label = "Axeman 2" },
+            { laserCode = 1686, frequencyMHz = 135, modulation = 0, callname = 1, number = 3, label = "Axeman 3" }
         }
     },
     strike = {

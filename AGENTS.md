@@ -16,7 +16,7 @@ Intercept、SEAD、DEAD、Strike、CAS、Anti-Ship などの訓練ミッショ�
 - DCS World
 - Syria マップ
 - MOOSE Framework
-- プレイヤー機体: F/A-18C Lot 20 / AH-64D Apache（Air Interdiction）
+- プレイヤー機体: F/A-18C Lot 20 / AH-64D Apache（Air Interdiction / CAS）
 - BLUE Coalition: USA
 - RED Coalition: Russia
 
@@ -371,7 +371,7 @@ CAS: 720
 - 同じ累計時間30〜120秒から出現時刻を受注時に固定し、Config.intercept.templatesの3候補を暫定使用して1編隊だけ生成する。Zone外周から15〜25NM、15,000〜30,000ft、230m/sで空域へ進入・哨戒する。DT_CAP_<assignmentID>で他任務の敵と分離する。
 - 地上受注でも即ACTIVEで空域への到達待ち。CAPにInterceptの離陸待ち・20秒Spawn待ちを適用しない。個人中止でCAPをARMEDへ戻さない。
 - 既存Wing/UCIDロックと個別帰還を使い、満額150・達成後事故90・未達成事故/Abort0をCAP Scoreへ独立加算。全参加者終了で敵をCleanupし失敗を再試行する。
-- CAP導入時の保存schema2でcapScoreを追加した。現在はStrike・Air Interdictionも含むschema4とし、schema1/2/3の従来成績を未収録項目=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
+- CAP導入時の保存schema2でcapScoreを追加した。現在はStrike・Air Interdiction・CASも含むschema5とし、schema1/2/3/4の従来成績を未収録項目=0で読み込む。未知schemaはbackupへ巻き戻して上書きしない。missionとHookを同時更新し、Hook再導入とDCS再起動を行う。
 - 仕様はdocs/CAP.md、模擬検証はscripts/Test-CAP.lua（35ケース）。CAP以外の既存Luaスイートも実行する。実.mizの全出撃位置と追加円の検証はscripts/Test-ZoneCoverage.ps1で行い、Test-Allにも含める。CAPとSEADの全90組で円外縁の間隔を最大planningRangeNM（SA-6:15 / SA-8:8 NM）＋cap.samSafetyBufferNM（5 NM）以上とする。配置・飛行経路が円外へ出た場合の安全は保証しない。2026-10-09の旧中心の地形検査は履歴として保持。2026-10-14のユーザー移動後は全10地域・両SAM各50点を単一実行し、適合396/1,000・観測エラー0、全20組の実生成と削除を確認した。Morphou NorthのSA-8は適合1/50・初回43回目で不安定な候補。詳細はdocs/SEAD_PLACEMENT_CHECK.md。HARM交戦・抑制・精算と追加CAP哨戒はDCS内確認待ち。
 
 ---
@@ -460,7 +460,7 @@ Dynamic Training
 - `mission/persistant_and_dynamic_traning.miz`: 現在の実ミッション。
 - `vendor/MOOSE/Moose.lua`: 使用版を固定したMOOSE。
 
-将来はdifficulty、CAS、Anti-Ship等を独立したモジュールで追加する。
+将来はdifficulty、Hornet向けCAS、Anti-Ship等を独立したモジュールで追加する。
 
 ---
 
@@ -595,3 +595,23 @@ Apacheの受注・採点・帰還は既存の台帳・150/90/0・schema4を再�
 ユーザーが明示許可した今回限りの例外として、実.mizのmission/warehousesへDynamic Spawn設定を直接適用することを許可した。対象は4青空港＋空母のDynamic Spawn・対象機種別無制限在庫・9つのSOLO原本リンク、既存18プレイヤーグループのdynSpawnTemplate/passwordだけ。敵・地形・経路・天候・トリガー・辞書・リソース表・ニーボードを保持し、移行前.miz.dynamic-spawn.bakと構造差分検証を必須とする。通常のLua更新は従来のSync/Check。
 
 通常出撃はDynamic Slots、別機体の共有はMission TeamをF10で作成/加入して長機受注。受注時に全参加者と全DCSグループを固定し、目標共有・各UCID精算・150/90/0を維持する。更新Hookがslotとruntime IDを解決して識別情報を配信する。schema4を変更せず、実サーバーへのHook導入とDCS内検証は実施事実と区別する。仕様はdocs/DYNAMIC_SPAWN.md。
+
+## Dynamic Spawnの標準機体設定（2026-11-06追加指定）
+
+ユーザーの「標準でいいです」は、直前に提示した倉庫のテンプレート割り当て解除と旧原本削除を指示する。今回の限定例外として、旧BLUE_HORNET_/BLUE_APACHE_のプレイヤー用18グループ削除、4青空港＋空母の9件のlinkDynTempl解除を許可する。BLUE AWACS/給油機/空母・RED・Zone・経路・天候・トリガー・リソース表は保持する。直前の.miz.standard-spawn.bakと構造差分検証を必須とする。今後は旧SOLO/MP2原本を必須扱いしない。距離検証の旧駐機位置はテスト専用参考点であり、実際のDynamic Spawn駐機位置の証明ではない。
+
+## 2026-11-06 Apache限定CAS（training-17）
+
+- ユーザー指定で初版CASはApacheだけ。Hornetは既存6任務を維持し、メニュー・古いcallbackの両方でCASを拒否する。詳細はdocs/CAS.mdを正とする。
+- ユーザーがMEで用意したTPL_CAS_ENEMY_01 / FRIENDLY_01 / JTAC_01をその名前・座標・車種・経路のまま使う。敵3・味方3・JTAC1、全Late Activation / Weapon Hold / Disperse OFF。
+- 長機実位置から敵先頭車まで3～13 NMの近い2地域から使用可能な1つを抽選。現在はRamat付近の01だけ。地上でも即生成、座標はMGRS 8桁。地域と通信枠を全消失まで専有する。
+- F10 Task: CASで1688 / 1687 / 1686を選ぶ。Axeman 1/2/3、133/134/135 MHz AM。生成した敵Group IDを、独立コピーしたME FAC_EngageGroupへ設定してからJTACを生成する。原本・別任務の敵へ割り当てない。
+- src/cas.luaが3グループ・対象・地域・削除を、src/jtac.luaが通信枠・FACコピーを管理。独自の標準無線手順・照射は作らない。MOOSEのFACラッパーにないlaserCode/visibleを保持するためDCSタスク形式を使う理由をコメントする。
+- 指定敵3両の破壊、共有達成・個別150/90/0と既存帰還を使う。味方/JTAC喪失は通知し自力継続可。初版は誤射減点・自動失敗・補充を追加しない。Statusは公開済み本文のみ、達成後は座標なし。
+- 保存schema5でcasScoreを末尾追加し、schema1～4の未収録CASを0へ移行。mission/Hookを同時更新し、サーバーHook再導入・DCS再起動が必要。実成績は検証で変更しない。
+- Test-CAS 28件、CASME 3件、schema移行・保存を含めLua全586件/15スイートと全結合検証。動的JTACのDCS交信・実射は未確認。単独Apacheで離れた後にK型3発3中はユーザー報告で、動的統合の証明とは分ける。
+- 今回のME保存で標準倉庫の有限在庫行が復元されている。Dynamic Spawn検査は必要な9件の無制限在庫・参照解除・Cold Startと、その他の行が無制限でないことを照合する。他機種を出撃画面から完全に除外した証明にはしない。CAS実装では倉庫を直接編集しない。
+
+## CAS生成準備の修正（training-17.1）
+
+MOOSEのGetUnitsの順序をテンプレート順と同一視しない。CASは車種ごとの台数と固定ID・陣営で照合する。生成後の未有効状態・一覧未取得はPREPARINGで1秒ごとに再観測し、cas.setupTimeoutSeconds=10を超えた次の監視で回収する。採点開始は全検証後。準備中のStatusは準備通知だけ、Abort・機体変更・途中喪失でも部分生成と地域・通信枠を回収する。CAS34件、Lua592件/15スイート。旧17の配列順比較による失敗は模擬再現済みだが、今回の実ログはフィールド未記録のため直接原因の条件は断定しない。

@@ -39,23 +39,18 @@ local function eligible(category, origin)
     return found
 end
 local origins, slots = {}, 0
-for _, country in pairs(mission.coalition.blue.country) do
-    for _, group in pairs((country.plane or {}).group or {}) do
-        local start = group.route and group.route.points and group.route.points[1]
-        for _, unit in pairs(group.units) do
-            if unit.type == "FA-18C_hornet" and (unit.skill == "Client" or unit.skill == "Player")
-                and start and (start.airdromeId or start.linkUnit) then
-                local origin = { x = unit.x, y = unit.y }
-                local key = start.airdromeId and "airfield:" .. start.airdromeId or "carrier:" .. start.linkUnit
-                origins[key] = origins[key] or origin
-                for _, category in ipairs({ "cap", "sead" }) do
-                    local n = #eligible(category, origin)
-                    local maximum = category == "cap" and 3 or 4
-                    assert(n >= 2 and n <= maximum, unit.name .. ": " .. category .. " candidates=" .. n)
-                end
-                slots = slots + 1
-            end
+local departures = dofile("scripts/Departure-TestFixtures.lua")(mission, warehouses)
+for _, sample in ipairs(departures) do
+    if sample.aircraftType == "FA-18C_hornet" then
+        local origin = { x = sample.x, y = sample.y }
+        local key = (sample.baseCategory == "airports" and "airfield:" or "carrier:") .. sample.baseID
+        origins[key] = origins[key] or origin
+        for _, category in ipairs({ "cap", "sead" }) do
+            local n = #eligible(category, origin)
+            local maximum = category == "cap" and 3 or 4
+            assert(n >= 2 and n <= maximum, sample.label .. ": " .. category .. " candidates=" .. n)
         end
+        slots = slots + 1
     end
 end
 local bases = 0
@@ -89,8 +84,8 @@ for key, origin in pairs(origins) do
     end
     print("Coverage " .. key .. ": CAP=" .. #eligible("cap", origin) .. ", SEAD=" .. #eligible("sead", origin))
 end
-assert(bases == 5 and slots >= 5, "All four airfields and carrier slots must be covered")
-print("PASS: actual .miz slots have 2-3 CAP and 2-4 SEAD areas; every candidate accepts and spawns in simulation")
+assert(bases == 5 and slots >= 5, "All four airfields and current carrier reference samples must be covered")
+print("PASS: departure regression samples have 2-3 CAP and 2-4 SEAD areas; every candidate accepts and spawns in simulation")
 
 local s = scenario()
 local actual = {}

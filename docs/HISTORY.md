@@ -2,6 +2,12 @@
 
 現在のテスト件数・実行方法は [TESTING.md](TESTING.md)、保存方式・診断方法は [PERSISTENCE.md](PERSISTENCE.md) を参照する。以下は当時の版・設定・観測結果の記録であり、途中段階の未実装・未確認・診断仮説を現在の仕様として扱わない。過去の証跡と旧ファイル名はそのまま残す。
 
+## 2026-11-06 Dynamic Spawnを標準機体設定へ変更
+
+ユーザー指定でテンプレート割り当て9件を解除し、旧プレイヤー用SOLO/MP2の18グループ・27 Client機を削除。4青空港＋空母のDynamic Spawn・対象機種別無制限・Cold Startを維持する。BLUE AWACS/給油機/空母とRED全体、経路・天候・トリガー・ニーボードは保持。直前を.miz.standard-spawn.bakへ保存。採点・Mission Team・Hookは変更しない。
+
+距離の回帰検証は旧27駐機位置をテスト専用参考点として分離し、実.mizの地域・経路・現在の空母位置へ照合する。実際のDCS自動駐機位置の検証とは区別する。Lua556件・全結合検証、標準設定移行Python7件と限定差分・同期を確認。実ゲームのスポーン位置・標準装備は確認待ち。
+
 ## 2026-11-06 任務共有メニューをMission Teamへ改名
 
 ユーザー指定でCreate Training WingをCreate Mission Teamへ変更。Join Mission Team / Mission Team Status / Mission Team: <番号> / Leaveと作成・加入・退出・拒否通知も揃えた。DCS編隊やデータリンクを変更する機能ではなく、任務共有だけを表す名称とする。内部モジュール・台帳・採点・Hookは維持。既存DynamicPlayers 24ケースとSync/Checkで確認し、更新一式も再生成する。
@@ -416,3 +422,19 @@ DCS終了後のscores.datは34 bytes、codec検証成功、counter/session=1、r
 同日20:17〜20:56 JST、CAP対応schema2 Hookでrun2/source=primaryの接続を確認。CAP:1の達成後UnitLostで90点を精算し、SNAPSHOT_COMMITTED revision1。CAP:2の未達成UnitLostで0点を精算しrevision2、Stopで最終snapshotと確認成功。終了後scores.datを読取検証し、schema2/run2/revision2、Total/Career/CAP各90、任務2・Primary成功1・帰還失敗1・未達成失敗1・Death2を確認。実ポイント保存は確認済み。今回のrun開始時の旧成績は空だったため、得点を持つ旧schema移行・次セッションでの90点復元・帰還150点保存はまだ実DCSで未確認。保存fileの直接編集は行っていない。
 
 同日21:15〜21:16 JST、ユーザーからDCS更新後の保存障害の疑いが報告されたため、このPCの最新ログと保存fileを確認した。DCSは2.9.30.28718から2.9.30.28738へ更新済み。21:15:44にBOOTSTRAP_COMMITTED run3/source=primary、storage and acknowledgement confirmed、CONNECTED、21:16:47にStopの最終snapshot/確認成功を記録。Hookは生成bundleと同一hash、autoexec.cfgも既知のhashと一致。終了後primaryはschema2/run3/revision0、backupはschema2/run2/revision2で、両方codec検証に通りTotal/Career/CAP各90と既存統計を保持していた。更新後の初期接続・新runへの累計引継ぎ・正常終了は確認済み。このログではStatistics操作や新規精算がなく、更新後の新ポイント保存と画面表示は未確認。保存fileやHookへの修正は行っていない。
+
+## 2026-11-06 Apache限定CASを追加（training-17）
+
+ユーザーがMEで追加・修正した地域01の敵3両・味方3両・JTAC1両を使用し、Apacheだけにコード選択付きTask: CASを追加。Hornetは既存6任務を維持する。長機実位置から3～13 NM内の近い2地域から抽選し、元配置を保持して生成した敵Group IDを標準FACへ設定する。3コードの通信枠と地域を予約し、部分失敗・Abort・全員終了後は3グループを消失確認まで回収する。味方/JTAC喪失は通知し自力継続、初版の誤射減点なし。MGRS8桁、公開済みStatus、共有達成・UCID別150/90/0を既存処理へ接続した。
+
+casScoreをschema5末尾に追加しschema1～4を継承する。新Hookのサーバー再導入・DCS再起動が必要。開発検証で実成績は変更しない。CAS28件・保存2件を追加してLua586件/15スイート、全既存結合検証とCASME3件が通過。使い捨てZIPのFile.Replaceは制限付き環境で失敗し、通常権限環境で同じテストが完走した。現在のME保存で標準の有限在庫行が復元されていたため、Dynamic Spawn検査は必要9件の無制限在庫とその他の行の非無制限を確認する形へ修正。倉庫設定は変更していない。
+
+単独Apache試験のJTAC誘導は、ユーザーから離れた後のK型3発3中の報告あり。今回の動的JTACの交信・実射・実地LOSは未確認。MAN-71/72へ分離する。現在の確定仕様はCAS.md、CAS_JTAC_PLAN.mdは統合前の検討記録として残す。
+
+## 2026-11-06 RamatのCAS受注失敗を修正（training-17.1）
+
+最新ローカルログの21:56:20 / 21:56:55 JSTに、CASは距離選定と敵生成まで進み、Invalid generated CAS vehicleで中断していた。距離範囲外ではない。ログに条件の内訳がなかったため、順序・有効化状態のどちらが直接原因だったかは断定しない。MOOSEのGROUP:GetUnitsがpairsで列挙しており、旧実装は配列順に車種を比較していた。またUNIT:IsAliveはisActiveに依存するため、生成直後の未有効状態を即失敗としていた。
+
+車種ごとの台数照合へ変更し、有効化・一覧取得待ちをPREPARINGとして期限付きで監視する。固定ID・陣営・車種の不正は拒否し続け、失敗診断へ実測フィールドを追加。準備中のStatus・二重受注・中止・機体変更・途中喪失・timeoutと回収を検証した。旧bundleは逆順列挙の追加ケースで受注失敗を再現し、修正bundleは通過。CAS34件、Lua592件/15スイートと結合検証を対象にする。DCSでの修正版受注は再確認待ち。
+
+同ログに乗員確認不能・無採点の通知があり、ローカルHookにはPlayerDirectoryとCAS schemaが含まれていなかった。生成失敗とは別問題として、既存installerによるバックアップ付き更新を行う。実成績・autoexec.cfg・MissionScripting.luaは変更せず、反映にはDCS再起動が必要。証跡はbuild/cas-acceptance-failure-20261106.log。

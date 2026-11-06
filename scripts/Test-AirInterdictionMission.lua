@@ -95,82 +95,40 @@ local function candidates(position, selection)
     table.sort(found, function(a,b) return a.d == b.d and a.name < b.name or a.d < b.d end)
     return found
 end
-local hornetSlots = 0
-for _,country in pairs(mission.coalition.blue.country) do
-    for _,g in pairs((country.plane or {}).group or {}) do
-        for _,u in ipairs(g.units) do
-            if u.type=='FA-18C_hornet' and u.skill=='Client' then
-                hornetSlots=hornetSlots+1
-                local origin={x=u.x,y=0,z=u.y}; local eligible=candidates(origin,config)
-                assert(#eligible>0,u.name..': no Hornet route within 20-100 NM')
-                for draw=1,math.min(2,#eligible) do
-                    local s=scenario({playerPosition=origin,interdictionTemplates=templates})
-                    s.randomValues={draw}; s:command('Task: Air Interdiction'); local r=assert(s:mission())
-                    assert(r.interdictionPlan.site.name==eligible[draw].name)
-                    same(r.spawn.group.route,templates[eligible[draw].name].route)
-                    s:command('Abort Mission'); assert(r.spawn.group.destroyed); s:assertClean()
-                end
-                local labels={}
-                for _,item in ipairs(eligible) do labels[#labels+1]=string.format('%s %.3f NM',item.name,item.d) end
-                print('HORNET COVERAGE: '..u.name..': '..table.concat(labels,', '))
-            end
+-- Historical parking samples provide regression coverage after deleting the ME player originals.
+-- They do not assert where DCS will choose to spawn a new aircraft.
+local departures = dofile('scripts/Departure-TestFixtures.lua')(mission, warehouses)
+local hornetSamples, apacheSamples, apacheBases = 0, 0, {}
+for _, sample in ipairs(departures) do
+    local apache = sample.aircraftType == 'AH-64D_BLK_II'
+    local origin = {x = sample.x, y = 0, z = sample.y}
+    local selection = apache and profile or config
+    local eligible = candidates(origin, selection)
+    assert(#eligible > 0, sample.label .. ': no Air Interdiction route from regression reference')
+    if apache then apacheSamples = apacheSamples + 1; apacheBases[sample.baseID] = true
+    else hornetSamples = hornetSamples + 1 end
+    for draw = 1, math.min(2, #eligible) do
+        local s = scenario({aircraftType = sample.aircraftType, playerPosition = origin, interdictionTemplates = templates})
+        s.randomValues = {draw}; s:command('Task: Air Interdiction'); local r = assert(s:mission())
+        local selected = eligible[draw].name
+        assert(r.interdictionPlan.site.name == selected)
+        same(r.spawn.group.route, templates[selected].route)
+        if apache then
+            assert(r.interdictionPlan.location:match('^MGRS %d%d[A-Z] [A-Z][A-Z] %d%d%d%d %d%d%d%d$'))
+            for _, target in ipairs(r.interdictionPlan.targets) do target.unit.alive = false; s:event('Dead', target.unit) end
+            assert(r.state == 'RTB_PENDING')
         end
+        s:command('Abort Mission'); assert(r.spawn.group.destroyed and not s:mission()); s:assertClean()
     end
+    local labels = {}
+    for _, item in ipairs(eligible) do labels[#labels + 1] = string.format('%s %.3f NM', item.name, item.d) end
+    print('REFERENCE COVERAGE: ' .. sample.label .. ': ' .. table.concat(labels, ', '))
 end
-assert(hornetSlots==15)
-print('PASS: all fifteen Hornet parking positions have available 20-100 NM routes and use the nearest eligible choices')
-
-local airports, groups, slots, parking = {}, 0, 0, {}
-for _, country in pairs(mission.coalition.blue.country) do
-    for _, g in pairs((country.helicopter or {}).group or {}) do
-        if g.name:find('^BLUE_APACHE_') then
-            assert(country.name == 'USA' and not g.lateActivation and not g.uncontrolled)
-            local start = assert(g.route.points[1]); local base = assert(start.airdromeId)
-            assert(start.type == 'TakeOffParking' and start.action == 'From Parking Area' and not start.linkUnit)
-            local airport = assert(warehouses.airports[base] or warehouses.airports[tostring(base)])
-            assert(airport.coalition == 'BLUE', 'Apache start airport is not BLUE')
-            local kind = g.name:match('_(SOLO)_01$') or g.name:match('_(MP2)_01$')
-            assert(kind and #g.units == (kind == 'SOLO' and 1 or 2))
-            airports[base] = airports[base] or {}; assert(not airports[base][kind])
-            airports[base][kind] = true; groups = groups + 1
-            for _, u in ipairs(g.units) do
-                assert(u.type == 'AH-64D_BLK_II' and u.skill == 'Client')
-                assert(u.parking and u.parking_id)
-                local key = tostring(base) .. ':' .. tostring(u.parking)
-                assert(not parking[key], 'Duplicate Apache parking'); parking[key] = true
-                slots = slots + 1
-                local origin = {x = u.x, y = 0, z = u.y}; local eligible = candidates(origin)
-                assert(#eligible > 0, u.name .. ": no Apache route within 3-13 NM")
-                for draw = 1, math.max(1, math.min(2, #eligible)) do
-                    local s = scenario({aircraftType = u.type, playerPosition = origin, interdictionTemplates = templates})
-                    s.randomValues = {draw}; s:command('Task: Air Interdiction'); local r = s:mission()
-                    if #eligible == 0 then
-                        assert(not r and #s.spawns == 0)
-                        s:lastMessageContains('within 3-13 NM')
-                    else
-                        assert(r and r.interdictionPlan.site.name == eligible[draw].name)
-                        assert(r.interdictionPlan.location:match('^MGRS %d%d[A-Z] [A-Z][A-Z] %d%d%d%d %d%d%d%d$'))
-                        same(r.spawn.group.route, templates[eligible[draw].name].route)
-                        for _, target in ipairs(r.interdictionPlan.targets) do
-                            target.unit.alive = false; s:event('Dead', target.unit)
-                        end
-                        assert(r.state == 'RTB_PENDING'); s:command('Abort Mission')
-                        assert(r.spawn.group.destroyed and not s:mission())
-                    end
-                    s:assertClean()
-                end
-                local labels = {}
-                for _, item in ipairs(eligible) do labels[#labels + 1] = string.format('%s %.3f NM', item.name, item.d) end
-                print('COVERAGE: ' .. u.name .. ': ' .. (#labels > 0 and table.concat(labels, ', ') or 'NONE within 3-13 NM'))
-            end
-        end
-    end
-end
-local bases = 0
-for _, modes in pairs(airports) do assert(modes.SOLO and modes.MP2); bases = bases + 1 end
-assert(bases == 4 and groups == 8 and slots == 12)
+assert(hornetSamples == 15 and apacheSamples == 12)
+local bases = 0; for _ in pairs(apacheBases) do bases = bases + 1 end; assert(bases == 4)
 assert(dictionary[mission.sortie] == 'Persistent and Dynamic Training')
-print('PASS: actual .miz has four BLUE Apache airports, eight SOLO/MP2 groups, twelve Client aircraft and the requested title')
+print('PASS: all fifteen Hornet reference samples have eligible 20-100 NM routes')
+print('PASS: all twelve Apache reference samples at four BLUE airports have eligible 3-13 NM routes; mission title retained')
 
 local used = {}
 for _, name in ipairs(profile.templates) do

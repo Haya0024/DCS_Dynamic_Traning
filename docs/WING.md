@@ -4,8 +4,8 @@
 
 ## 現在の実装と対象
 
-同じDCSグループの人間プレイヤーが1任務を共有する。HornetはIntercept / CAP / SEAD / DEAD / Strike / Air Interdiction、ApacheはAir Interdictionに対応する。
-実ミッションはSOLO（Client ×1）とMP2（Client ×2）。4空港と空母に各1グループ、Hornetは計10グループ・15 Client機。Apacheは4空港にSOLO/MP2各1グループ、計8グループ・12 Client機を追加した。
+同じDCSグループの人間プレイヤーが1任務を共有する。HornetはIntercept / CAP / SEAD / DEAD / Strike / Air Interdiction、ApacheはAir Interdiction / CASに対応する。
+旧配置はSOLO（Client ×1）とMP2（Client ×2）。現在はDynamic Spawnで、以下のグループ数は削除前の参考記録。4空港と空母に各1グループ、Hornetは計10グループ・15 Client機。Apacheは4空港にSOLO/MP2各1グループ、計8グループ・12 Client機を追加した。
 Dynamic Spawnと静的Client互換が対象。別DCSグループはF10でMission Teamを組み、長機が受注する。Apacheの人間PLT/CPGは同じ機体でもUCIDごとの参加者とし、受注時に固定する。MP2は2機編隊。動的生成機には更新済みサーバーHookが必要。詳細は[DYNAMIC_SPAWN.md](DYNAMIC_SPAWN.md)。Apacheの詳細は[APACHE.md](APACHE.md)。
 コードと模擬テストは実装済み。ユーザーから任務がゲーム内で動作しているとの報告あり。
 MP2・複数ウィングの個別ケースの確認範囲は未記録。
@@ -156,3 +156,7 @@ Strikeも同じWing/UCIDロックを使用し、受注時の操縦中メンバ�
 ## Air Interdictionの地域予約
 
 受注時の人間参加者を固定し、同じWing/UCID排他を使う。最小機体番号の長機から近い2周回中心を先に固定し、その中の使用可能な経路を抽選する。Missions.interdictionSitesでTPL_AI名単位に1Wingへ予約し、3番目へ回さない。別地域の車列・他カテゴリは並行可能。今回の3実体のみを共有目標とし、途中参加者・AIを精算へ追加しない。達成後も各人の帰還・事故・Abortまで予約を維持し、全員終了と車列削除確認後に解除する。削除失敗中は5秒ごとの再試行を継続し、他Wingへ同じ地域を渡さない。
+
+## Apache限定CAS（training-17）
+
+ApacheはAir InterdictionとCASに対応する。Hornetの6任務は維持する。CASでも受注時の人間PLT/CPG・Mission Team参加者を固定し、指定敵3両の達成を共有、帰還・事故・150/90/0をUCIDごとに精算する。各機のDCSグループへ通知し、全員終了まで敵・味方・JTACの地域と通信枠を保持する。詳細は[CAS.md](CAS.md)。

@@ -907,3 +907,39 @@ Existing public mission briefing, coordinates, objective result and settlement w
 New pre-mission F10 commands: Create Mission Team, Join Mission Team <id>: <leader>, Mission Team Status, Mission Team: <id> / Leave. Leader-only Task menus are hidden from wing members; stale Task callbacks still reject acceptance. A created wing shows `Mission team <id> created. Other pilots may join via F10. Leader accepts the mission.` for 20 seconds. Joining shows `Joined mission team <id>. Wait for the leader to accept a mission.` for 20 seconds and tells the leader `A group joined mission team <id>. Check Mission Team Status before accepting.` Status lists current names and the leader group for 20 seconds. Leaving shows `Left mission team.` for 10 seconds.
 
 Expected refusals such as `Only the mission team leader may accept a mission.`, `Team membership is locked during an assignment.`, `Verified UCID required to join a mission team. Check the server hook.` and `This mission team is no longer current.` appear locally for 20 seconds. Internal Lua path prefixes are removed. Missing runtime identity never borrows a UCID; existing unscored notifications remain applicable. The Hook logs only a generic `Runtime identity delivery unavailable; unverified sorties remain unscored.` on changing delivery failures, without names, UCIDs or roster contents.
+
+## CAS / native JTAC (training-17, Apache only)
+
+F10 adds `Task: CAS` with `Laser 1688`, `Laser 1687`, `Laser 1686` child commands only for Apache. The normal registered-aircraft/UCID notices still apply. Successful generation sends `CAS mission accepted.` for 10 seconds, followed once by this cached briefing for coordinateBriefingSeconds (default 60):
+
+```text
+CAS MISSION
+FRIENDLY LOCATION: <MGRS grid + four easting and four northing digits>
+TARGET AREA: <same format, enemy first vehicle>
+FRIENDLIES: 2 M113s and 1 truck.
+TARGETS: 2 BMP-2s and 1 truck.
+JTAC: <Axeman 1/2/3> / <133.000/134.000/135.000> MHz AM / LASER <1688/1687/1686>
+OBJECTIVE: Destroy all 3 designated enemy vehicles; then RTB.
+Reward per pilot: 150 points.
+Registered pilots: <count>.
+```
+
+All three assigned enemies destroyed publishes `CAS Objective Complete`, `All 3 designated enemy vehicles destroyed.`, then the shared BLUE airfield/carrier recovery instruction and `Reward per pilot: 150 points; recovery failure: 90 points.` for 20 seconds. Status recalls the cached briefing while active, then only this result without coordinates. It adds no live target count or reservation data.
+
+| Trigger | Message | Seconds |
+|---|---|---:|
+| No eligible/free nearest site | `No available CAS sites among the two nearest sites within 3-13 NM. Change position or retry later.` | 20 |
+| Selected radio/code reserved | `The selected CAS laser code or radio slot is in use. Choose another code or retry later.` | 20 |
+| Setup exception, spawn/LOS failure | `ERROR: CAS setup failed. See DCS log; select 'Task: CAS' to retry.` | 20 |
+| JTAC confirmed lost | `CAS JTAC lost. Continue the mission using your own sensors and designation.` | 20 |
+| Each friendly vehicle confirmed lost | `CAS friendly vehicle lost. Confirm target identification before firing.` | 20 |
+
+Support losses are announced once per fixed object ID without inferring who caused them. While active, the latest public support notice is retained alongside the briefing. After completion, an incidental support notice does not replace the stored completion/recovery result. Settlement uses the existing result message with category CAS. Initialization/setup/cleanup errors go to ERROR logs; `CAS started; site=<id> laser=<code>` goes to DEBUG. Observation failures log once per unavailable episode; cleanup retries do not repeat settlement. Screen text also receives the ordinary MESSAGE log mirror.
+
+DCS native JTAC dialogue, radio menus, Laser On and target changes are controlled by DCS and are separate from these Lua messages. Their voice/subtitle history is not captured by Mission Status. Full policy: [CAS.md](CAS.md).
+
+## CAS activation readiness (training-17.1)
+
+When DCS has returned a group before its units are active, show `CAS mission accepted. Preparing JTAC.` for 10 seconds and cache only this notice. Poll readiness on the mission timer without spawning the same role twice. Once all roles and FAC are validated, send the ordinary acceptance and coordinate briefing. Failure after setupTimeoutSeconds (10 seconds, evaluated on the next tick) uses the existing CAS setup failure message and rolls back the groups and resources. A participant aircraft change during preparation shows `CAS preparation cancelled. Player aircraft changed or unavailable.` for 20 seconds. No scoring ID is allocated until readiness succeeds.
+
+`CAS awaiting activation: <role>: <details>` logs only when the observed reason changes. Invalid generated vehicle diagnostics include role, ID, active/alive flag, ground flag, side and actual type. Type counts are compared independently of MOOSE unit enumeration order.

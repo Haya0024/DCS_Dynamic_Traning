@@ -251,12 +251,18 @@ Player Statisticsの表示時間25秒・カテゴリ別Score非表示と、カ�
 
 ## Strike
 
-Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strikeScore・Total Score・Career Pointsを更新する。TOOはコンテナ4個のうち任意2個／司令部1個／トラック2両、PBは司令部／燃料タンク／弾薬庫から指定1個の破壊とし、周辺設備の破壊を必須にしない。目標達成前の帰還は精算せず、受注を維持する。個人事故・Abort・MP2の共有達成と個別精算は既存ルールを使う。カテゴリ別ScoreはPlayer Statisticsへ追加表示しない。schema4で保存し、schema1/2のStrikeは0として復元する。
+Strikeも各自150／達成後事故90／達成前事故・Abort0とし、strikeScore・Total Score・Career Pointsを更新する。TOOはコンテナ4個のうち任意2個／司令部1個／トラック2両、PPは司令部／燃料タンク／弾薬庫から指定1個の破壊とし、周辺設備の破壊を必須にしない。目標達成前の帰還は精算せず、受注を維持する。個人事故・Abort・MP2の共有達成と個別精算は既存ルールを使う。カテゴリ別ScoreはPlayer Statisticsへ追加表示しない。schema5で保存し、schema1/2のStrikeは0として復元する。
 
 ## Air Interdiction
 
-今回生成した車列3両の全滅で共有達成とする。損傷だけでは達成せず、未達成で帰還しても任務を維持する。各自150／達成後事故90／達成前事故・Abort0をairInterdictionScore・Total Score・Career Pointsへ加算し、共通の任務・帰還・喪失統計を1回更新する。MP2は共有達成と個人精算、第三者の対象撃破も数える。カテゴリ別Scoreは画面へ追加しない。schema4で保存し、schema1/2/3のAir Interdictionは0として復元する。満額はairInterdiction.fullReward。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
+今回生成した車列3両の全滅で共有達成とする。損傷だけでは達成せず、未達成で帰還しても任務を維持する。各自150／達成後事故90／達成前事故・Abort0をairInterdictionScore・Total Score・Career Pointsへ加算し、共通の任務・帰還・喪失統計を1回更新する。MP2は共有達成と個人精算、第三者の対象撃破も数える。カテゴリ別Scoreは画面へ追加しない。schema5で保存し、schema1/2/3のAir Interdictionは0として復元する。満額はairInterdiction.fullReward。詳細は[AIR_INTERDICTION.md](AIR_INTERDICTION.md)。
 
 ## 観測不能時の帰還（training-13）
 
 Recoveryは位置・速度の有限Vec3、InAirのboolean、基地所属・空母の元IDを確認する。例外・nil・NaN/Infinityでは帰還成功にせず、停止計測だけを解除して同じ着地文脈で再試行する。所属不明も敵基地確定とは分ける。別参加者の評価は継続する。正常観測間隔がpollSecondsの2倍（初期2秒）を超えた場合と時計逆行でも計測をやり直す。BLUE離脱・離陸など確認済みの不適合は従来どおり着地文脈を解除し、再着地を要求する。REL-07〜11/13/16/19、SCORE/PAR/DEADで回帰検証する。
+
+## CAS（Apache限定、training-17）
+
+今回生成した指定敵3両の全滅で共有達成とし、各自150／達成後事故90／未達成事故・Abort0をcasScore・Total Score・Career Pointsへ加算する。Mission Teamと同一Apacheの人間PLT/CPGを受注時に固定し、帰還・事故・精算はUCIDごとに一度だけ扱う。第三者の対象撃破も数える。味方車両・JTAC喪失は通知し、初版は誤射減点や自動失敗を追加しない。カテゴリ別ScoreはStatisticsへ追加表示しない。
+
+保存はschema5。schema1～4は未収録CAS=0で読み込み既存成績を維持する。更新Hookの再導入・DCS再起動が必要。任務中の地域・生成物は保存しない。詳細は[CAS.md](CAS.md)。

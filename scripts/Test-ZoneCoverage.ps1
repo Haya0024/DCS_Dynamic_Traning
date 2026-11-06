@@ -6,8 +6,11 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 if (-not $LuaPath) { $LuaPath = 'C:/Program Files (x86)/Steam/steamapps/common/DCSWorld/bin/luae.exe' }
 $archive = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $projectRoot 'mission/persistant_and_dynamic_traning.miz'))
 try {
-    $reader = [System.IO.StreamReader]::new($archive.GetEntry('mission').Open())
-    try { $missionSource = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    $missionSource = ''
+    foreach ($name in @('mission', 'warehouses')) {
+        $reader = [System.IO.StreamReader]::new($archive.GetEntry($name).Open())
+        try { $missionSource += $reader.ReadToEnd() + "`n" } finally { $reader.Dispose() }
+    }
 } finally { $archive.Dispose() }
 $checks = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Test-ZoneCoverage.lua'))
 Push-Location -LiteralPath $projectRoot

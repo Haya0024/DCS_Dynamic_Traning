@@ -101,3 +101,11 @@ Total Score, Career Points, category scores, and accumulated mission and recover
 BLUEのDynamic Slotsから基地と機種を選択してください。ApacheのCPGは生成済み機体のSpawn Slotsから空席へ参加します。協力する場合はF10のCreate Mission Team → 僚機のJoin Mission Team → 長機のTask受注。参加者は受注時に固定され、目標は共有、帰還・採点は各自です。ソロおよびApache同乗者だけならウィング作成は不要です。
 
 この文書はME用の案内文で、今回の限定設定変更では.mizの既存ブリーフィング辞書へ自動転記していません。
+
+## CAS追加（training-17）
+
+Apache専用の `Task: CAS` からコード1688 / 1687 / 1686を選ぶ。受注時の実位置から3～13 NM内の近い2地域のうち1つを使う。現在の地域01はRamat付近。ブリーフィングの味方位置・敵地域はMGRS 8桁、連絡先はAxeman 1 / 133 MHz AM（1688）、Axeman 2 / 134 MHz AM（1687）、Axeman 3 / 135 MHz AM（1686）。無線で標準JTACへ連絡し、指定敵3両を破壊して帰還する。Mission Statusで案内を再表示でき、達成後は帰還指示だけになる。味方・JTAC喪失後も継続可能。初版の誤射減点は未実装。HornetのCASは未対応。
+
+Apache-only CAS: choose a laser code under Task: CAS, contact the assigned native JTAC, identify friendly forces and destroy all three designated enemy vehicles before returning to a BLUE base. Search coordinates use MGRS with four easting and four northing digits. Initial site 01 is near Ramat, eligible at 3–13 NM from the accepting leader. Full specification: [CAS.md](CAS.md).
+
+本節は説明文の更新元。本実装では.miz辞書・ME設定を直接変更せず、登録済みLuaだけを同期する。

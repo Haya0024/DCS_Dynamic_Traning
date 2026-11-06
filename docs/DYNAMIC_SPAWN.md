@@ -6,7 +6,7 @@
 
 MultiplayerでBLUEへ参加し、Dynamic Slotsから基地と機種を選ぶ。Incirlik / Akrotiri / Beirut / Ramat DavidはHornetとApache、空母はHornetに対応。1回に1機を生成する。Cold Startを維持し、機体在庫は対象機種ごとに無制限。同時機数の独自上限は設けず、DCSの駐機場・サーバー人数等の制約は受ける。
 
-従来の18グループ・27 Client機はME設定原本として残し、dynSpawnTemplateとテンプレート専用passwordを設定する。通常の固定枠として搭乗させず、9つのSOLOグループを各基地・機種のlinkDynTemplに割り当てる。MP2原本も保持するが、動的生成に2機グループとして使わない。配置座標・経路・初期の空パイロン・無線・機体固有設定を消さない。倉庫の全機種一括無制限を解除し、対象機種だけ個別unlimited=trueとする。燃料・武器在庫は既存設定を維持する。
+ユーザー指定で機体設定はDCS標準を使う。旧SOLO/MP2の18グループ・27 Client機を削除し、全9件のlinkDynTemplを0（テンプレートなし）へ変更した。旧原本の無線プリセット・データリンク・塗装・機体固有設定・搭載物は引き継がない。武装・燃料等は出撃画面や地上再武装で選ぶ。DCSが駐機位置を自動割り当てする。対象機種だけ個別unlimited=true、Cold Start、燃料・武器在庫を維持する。
 
 Apacheの2人目は、新しく機体を生成せず、Spawn Slotsから生成済み機体の空席へ参加する。乗員全員が搭乗し、サーバーHookの識別情報が届いてからウィング作成・受注する。[ED公式のDynamic Spawnと乗員参加手順](https://forum.dcs.world/topic/352814-dynamic-spawn-guide/)
 
@@ -31,16 +31,24 @@ Apacheの2人目は、新しく機体を生成せず、Spawn Slotsから生成�
 
 ミッションは最大3秒の識別情報を使い、現在のネットワークUCID・陣営・席、実機の名前・グループ・機種・runtime IDを再照合する。Apache同一機内の席交換を許可する。不明・古い・曖昧な情報では他人のUCIDや表示名へ置換せず、ソロは明示的な無採点、Mission Teamの作成/加入は拒否する。静的スロットの従来照合は互換用に残す。
 
-Hookは1秒間隔で識別情報を更新する。識別配信は成績ファイルI/Oから分離し、保存不能で他人の成績を使わない。席・接続情報は揮発データで、scores.datへは保存しない。成績schema4、保存データ、採点率は変更しない。Hookの配信には既存のuserhooks→mission API許可を使い、MissionScripting.luaは変更しない。
+Hookは1秒間隔で識別情報を更新する。識別配信は成績ファイルI/Oから分離し、保存不能で他人の成績を使わない。席・接続情報は揮発データで、scores.datへは保存しない。Dynamic Spawn自体の導入時はschema4を維持した。現在はCAS追加によるschema5を使い、旧成績と採点率を維持する。Hookの配信には既存のuserhooks→mission API許可を使い、MissionScripting.luaは変更しない。
 
 ## サーバー更新
 
-今回の.mizと更新したbuild/DynamicTrainingPersistenceHook.luaを組にして使う。新Hookはサーバーの使用中Saved Games/DCS.../Scripts/Hooksへ配置し、DCSを再起動する。新PCではInstall-PersistenceHook.ps1 -SavedGamesPath <使用中フォルダー> -ConfigureHostを使う。[導入手順](PERSISTENCE.md#導入)
+今回の.mizと更新したbuild/DynamicTrainingPersistenceHook.luaを組にして使う。新Hookはサーバーの使用中Saved Games/DCS.../Scripts/Hooksへ配置し、DCSを再起動する。標準機体設定への切り替え時はHook変更なしだったが、現在のtraining-17はCAS/schema5のためHook再導入とサーバーDCS再起動が必要。新PCではInstall-PersistenceHook.ps1 -SavedGamesPath <使用中フォルダー> -ConfigureHostを使う。[導入手順](PERSISTENCE.md#導入)
 
 旧Hookでは動的生成機の識別配信ができないため、配置先が不明なサーバーへ自動導入済みとは扱わない。クライアントへのHook配置は不要。
 
 ## 移行と検証
 
-ユーザーが2026-11-06に許可した限定例外として、scripts/configure_dynamic_spawn.pyでmission/warehousesの必要フィールドだけを変更した。既定は読み取り専用プレビュー、--applyで適用。変更前は.miz.dynamic-spawn.bakに保存し、既存バックアップの上書き・途中での外部変更・想定外レイアウトは拒否する。トリガー・敵・経路・天候・辞書・リソース対応表・ニーボードは保持する。通常のLua更新は引き続きBuild→Sync→Check。
+ユーザーが2026-11-06に許可した限定例外として、scripts/configure_dynamic_spawn.pyでmission/warehousesの必要フィールドだけを変更した。既定は読み取り専用プレビュー、--applyで適用。変更前は.miz.dynamic-spawn.bakに保存し、既存バックアップの上書き・途中での外部変更・想定外レイアウトは拒否する。トリガー・敵・経路・天候・辞書・リソース対応表・ニーボードは保持する。標準設定への切り替えはユーザーの追加指定により--standard-aircraft --applyを使い、旧18グループ削除と9参照の解除だけを行った。直前バックアップは.miz.standard-spawn.bak。通常のLua更新は引き続きBuild→Sync→Check。
 
-Test-DynamicPlayers.luaは実bundleで動的機体・人間乗員・別グループ共有・全任務・個人精算・異常系を模擬検証する。Test-DynamicSpawnMission.ps1は実.mizの5拠点・9リンク・18原本・機種別無制限を検証する。test_dynamic_spawn_config.pyは移行の6ケース。DCS実機テストはTESTING.mdのMAN-69/70で別管理する。
+Test-DynamicPlayers.luaは実bundleで動的機体・人間乗員・別グループ共有・全任務・個人精算・異常系を模擬検証する。Test-DynamicSpawnMission.ps1は実.mizの5拠点・9機種選択・テンプレート参照なし・固定Clientなし・機種別無制限を検証する。test_dynamic_spawn_config.pyは標準設定移行の7ケース。DCS実機テストはTESTING.mdのMAN-69/70で別管理する。
+
+距離の回帰検証には、削除直前の27駐機位置をscripts/Departure-TestFixtures.luaへテスト専用の参考点として保存した。実.mizのZone・車列経路・現在の空母位置と組み合わせて検査し、実際のDynamic Spawn駐機位置を保証するものではない。受注時の距離は引き続き操作中の機体の現在位置で判定する。
+
+## training-17のCASとME再保存
+
+ApacheだけにCASを追加し、動的機体の識別・Mission Team・乗員別採点を再利用する。CAS専用成績がschema5のため、training-16 Hookを使い続けず新しいHookをサーバーへ再導入してDCSを再起動する。既存の成績は通常の接続で継承する。
+
+ME再保存後のwarehousesには標準カタログの有限在庫行が再生成されている。検証は9件の対応機種・基地の無制限在庫、テンプレート参照なし、Cold Startと、他行が無制限でないことを確認する。「出撃画面に9選択肢しか出ない」という保証はしない。CAS実装で倉庫は編集しない。

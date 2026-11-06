@@ -1,26 +1,27 @@
 # 実装構成と設計上の約束
 
-更新日: 2026-11-01
+更新日: 2026-11-06
 
 ## 対象
 
-Intercept / CAP / SEAD / DEAD / Strike / Air Interdictionの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
+Intercept / CAP / SEAD / DEAD / Strike / Air Interdiction / CASの現在の実装を説明する。訓練の条件は各機能仕様書、出力は [MESSAGES.md](MESSAGES.md)、検証は [TESTING.md](TESTING.md) を正とする。日本語の出力タイムラインと分岐の索引は [MESSAGE_FLOW.md](MESSAGE_FLOW.md) を参照する。将来案は実装済みの機能と分ける。
 
-この構成は`training-16`で実装済み。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
+この構成は`training-17.1`で実装済み。Apache限定CASとschema5を追加した。DCS内での確認範囲は [HISTORY.md](HISTORY.md) の実測記録とTESTINGの手動ケースを参照する。修正版のDCS確認は未実施。
 
-通常出撃はDynamic Spawn。以下の18グループは非表示の設定原本であり、固定搭乗枠ではない。実ミッションのプレイヤー配置原本は、4空港と空母のSOLO（Client ×1）・MP2（Client ×2）、Hornetは計10グループ・15 Client機、Apacheは4空港にSOLO/MP2の8グループ・12 Client機、総計18グループ・27 Client機。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
+通常出撃はDynamic SpawnのDCS標準設定。4青空港にHornet/Apache、空母にHornetの計9機種選択を設ける。旧SOLO/MP2の18グループ・27 Client機とテンプレート参照は削除済み。駐機位置はDCSが自動割り当てし、受注・採点は実際に生成された機体を動的に検出する。AI2は2026-10-13にMEで削除済み。搭乗者検出は名前に依存せず、人間のみを登録する既存の処理を使う。
 
 ## 責務と依存
 
 | 層 | モジュール | 責務 |
 |---|---|---|
-| 設定 | `config.lua` | 訓練値・時間・候補・報酬。各任務の設定は`intercept` / `cap` / `sead` / `dead` / `strike` / `airInterdiction`に置く |
+| 設定 | `config.lua` | 訓練値・時間・候補・報酬。各任務の設定は`intercept` / `cap` / `sead` / `dead` / `strike` / `airInterdiction` / `cas`に置く |
 | 搭乗者 | `player.lua` | BLUE Hornet/Apacheの動的列挙、Hookからのruntime照合情報、Apache乗員席、UCID・機体・イベント照合 |
 | 共有ウィング | `training_wings.lua` | 別DCSグループの作成/加入/脱退、機体・UCIDの再照合、受注時の参加者固定 |
 | 任務台帳 | `missions.lua` | 複数DCSグループ/Wing/UCIDロック、受注順、活動中任務とSiteの参照 |
 | 訓練地域 | 実ミッションのME Trigger Zone | 全19円の中心・半径の唯一の定義元。各任務はZONE:FindByNameで参照し、Configの候補名・距離制限で選定 |
 | 固定施設 | `strike.lua` | ME Static取得・54原本除去、PP/TOO・近い2施設の抽選、TOO7/PP9物体生成、DDM/DMS・標高、施設予約・削除再試行 |
 | 移動車列 | `air_interdiction.lua` | ME周回中心の算出、機種別候補と距離条件、近い2経路と任意の編成候補を独立抽選、元経路と車両設定を合成して3両生成・破壊観測、地域予約・削除再試行 |
+| 近接航空支援 | `cas.lua` / `jtac.lua` | Apache専用のME3グループ検証・近い2地域抽選・実IDによる標準FAC担当設定・通信枠予約・敵3両観測・味方/JTAC喪失通知・全グループ削除確認 |
 | 観測契約 | `observations.lua` | 有限数・Vec3・固定IDの生死確認、連続観測の時間境界。公開・採点判断は呼出元に残す |
 | 実体削除 | `object_lifecycle.lua` | Destroy後の消失確認、固有aliasの部分生成回収と削除待ち。Site予約は所有しない |
 | 空中目標 | `air_targets.lua` | Intercept/CAPの生成済み機体のID固定、喪失イベント、生存観測 |
@@ -52,7 +53,7 @@ MissionReportは公開済みブリーフィングと最新の開始／達成通�
 
 任務の`state`は全体phase、参加者の`state`は各人のphase、Siteの`state`は車両の観測状態、`disposition`は保持・使用・削除方針。これらを同じ値として扱わない。特にSEADの`primaryResult`は主要レーダーの達成履歴であり、Site全滅の証拠ではない。
 
-通常はARMED → ACTIVE → RTB_PENDING、地上Intercept/SEADはTAKEOFF_DELAY、SEADの地点選定はPLANNINGを挟む。CAP・Strike・Air Interdictionは受注後すぐACTIVE。Immediate DEADは元SEADのRTB_PENDING → DEAD_ACTIVE → RTB_PENDING。参加者だけLANDING_CHECKを持つ。すべての精算・中止後に台帳から解放し、終端状態のrecordを新任務に再利用しない。
+通常はARMED → ACTIVE → RTB_PENDING、地上Intercept/SEADはTAKEOFF_DELAY、SEADの地点選定はPLANNINGを挟む。CAP・Strike・Air Interdictionは受注後すぐACTIVE。CASはPREPARINGで3グループの有効化をタイマー観測し、FAC担当と固定IDの検証後にACTIVEへ進む。初期10秒の上限を持ち、期限切れ・途中離脱・中止で部分生成を回収する。Missions.casSites / jtacSlotsが地域・通信枠を全消失まで保持する。Immediate DEADは元SEADのRTB_PENDING → DEAD_ACTIVE → RTB_PENDING。参加者だけLANDING_CHECKを持つ。すべての精算・中止後に台帳から解放し、終端状態のrecordを新任務に再利用しない。
 
 ## 命名とデータ契約
 
@@ -94,7 +95,7 @@ training-3では実行入口をmain.luaへ改名し、Interceptの敵削除再�
 
 Strikeは6施設・54原本をキャッシュ・除去し、受注時にPP/TOOを固定する。最寄り候補は司令部配置点から近い2施設。TOOは従来7物体と4/1/2対象・2/1/2必要数を維持し、PPは9物体を生成して司令部/タンク/弾薬庫から指定1個を対象にする。Missions.strikeSitesの予約を方式間で共有する。TOOのplan.pointは司令部基準点、PPは指定目標そのもののME位置。公開時にDDM3桁またはDMS2桁＋地表標高ft MSLを確定し、Statusでは再計算しない。元7構成の不備は両方式、PP追加構成だけの不備はsite.ppValidでPPだけを無効化する。原本/生成物の削除が未確認なら予約を維持する。詳細は[STRIKE.md](STRIKE.md)。
 
-保存schema4は従来のstrikeScoreの次にairInterdictionScoreを追加。schema1/2/3は各旧列を厳密検証して読み、未収録項目を0で補う。missionとHookを同時更新する。
+保存schema5はairInterdictionScoreの次にcasScoreを追加。schema1/2/3/4は各旧列を厳密検証して読み、未収録項目を0で補う。missionとHookを同時更新する。
 
 Strikeの任意スモークはstrike.luaのMark/StopMark/Sweepで管理する。plan.smokeは最後の要求、Strike.marksは停止待ちの視覚効果だけを保持する。MOOSE COORDINATE:Smoke/StopSmokeを使い、予約・Static削除・採点と寿命を分離する。main.luaでACTIVE・受注Wing・操縦中未精算参加者を照合し、成功/連打/失敗の通常通知を出す。公開ブリーフィングの再表示用キャッシュは変更しない。F10項目は9件ごとにMoreを作って次ページへ送り、MP2と任意項目を含め各ページ10件以内に保つ。
 

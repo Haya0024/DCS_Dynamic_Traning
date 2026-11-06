@@ -158,24 +158,73 @@ def configure(mission_data, warehouse_data):
     return after_mission.encode(), after_warehouse.encode(), {'templateGroups': len(groups), 'locations': report}
 
 
+def configure_standard(mission_data, warehouse_data):
+    """Remove only the former BLUE player originals and clear their warehouse links."""
+    mission, warehouse = LuaData(mission_data, 'mission'), LuaData(warehouse_data, 'warehouses')
+    expected_mission, expected_warehouse = copy.deepcopy(mission.root.value), copy.deepcopy(warehouse.root.value)
+    removed, removed_ids = [], set()
+    countries = mission.root.fields['coalition'].fields['blue'].fields['country']
+    for country_id, country in countries.fields.items():
+        for category in ('plane', 'helicopter'):
+            if category not in country.fields:
+                continue
+            node = country.fields[category]
+            kept = {}
+            for _, group in sorted(node.value.get('group', {}).items()):
+                if group['name'].startswith(('BLUE_HORNET_', 'BLUE_APACHE_')):
+                    assert all(u['skill'] == 'Client' for u in group['units'].values()), 'Refuse to remove non-player group'
+                    removed.append(group['name'])
+                    removed_ids.add(group['groupId'])
+                else:
+                    kept[len(kept) + 1] = copy.deepcopy(group)
+            mission.set(node, 'group', kept)
+            expected_mission['coalition']['blue']['country'][country_id][category]['group'] = kept
+    assert len(removed) in (0, 18), 'Unexpected player layout; standard migration refused'
+    locations, cleared = [], 0
+    for category, base in [('airports', 6), ('airports', 16), ('airports', 30), ('airports', 44), ('warehouses', 12)]:
+        node = warehouse.root.fields[category].fields[base]
+        assert str(node.value['coalition']).lower() == 'blue' and node.value['dynamicSpawn']
+        kinds = set()
+        for subcategory, types in node.fields['aircrafts'].fields.items():
+            for kind, entry in types.fields.items():
+                kinds.add(kind)
+                assert entry.value['unlimited'] and entry.value['initialAmount'] > 0
+                if entry.value.get('linkDynTempl', 0):
+                    assert entry.value['linkDynTempl'] in removed_ids, 'Refuse to clear an unrelated template link'
+                    cleared += 1
+                warehouse.set(entry, 'linkDynTempl', 0)
+                expected_warehouse[category][base]['aircrafts'][subcategory][kind]['linkDynTempl'] = 0
+        assert kinds == ({'FA-18C_hornet', 'AH-64D_BLK_II'} if category == 'airports' else {'FA-18C_hornet'})
+        locations.append({'category': category, 'id': base, 'aircraftTypes': sorted(kinds)})
+    assert cleared in (0, 9), 'Unexpected warehouse template links'
+    assert mission.root.value == expected_mission and warehouse.root.value == expected_warehouse
+    after_mission, after_warehouse = mission.render(), warehouse.render()
+    assert LuaData(after_mission, 'mission').root.value == expected_mission
+    assert LuaData(after_warehouse, 'warehouses').root.value == expected_warehouse
+    return after_mission.encode(), after_warehouse.encode(), {
+        'removedGroups': sorted(removed), 'clearedLinks': cleared, 'locations': locations, 'aircraftSettings': 'DCS default'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mission', type=Path, default=Path('mission/persistant_and_dynamic_traning.miz'))
     parser.add_argument('--apply', action='store_true')
+    parser.add_argument('--standard-aircraft', action='store_true', help='Remove former player originals and use DCS defaults')
     args = parser.parse_args()
     source = args.mission.read_bytes()
     with ZipFile(args.mission) as archive:
         assert archive.testzip() is None and len(archive.namelist()) == len(set(archive.namelist()))
         contents = {name: archive.read(name) for name in archive.namelist()}
         infos = archive.infolist()
-    new_mission, new_warehouse, report = configure(contents['mission'].decode(), contents['warehouses'].decode())
+    operation = configure_standard if args.standard_aircraft else configure
+    new_mission, new_warehouse, report = operation(contents['mission'].decode(), contents['warehouses'].decode())
     replacements = {'mission': new_mission, 'warehouses': new_warehouse}
     changed = [name for name, data in replacements.items() if data != contents[name]]
     report.update({'changedEntries': changed, 'sourceSHA256': hashlib.sha256(source).hexdigest(), 'apply': args.apply})
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if not args.apply or not changed:
         return
-    backup = Path(str(args.mission) + '.dynamic-spawn.bak')
+    backup = Path(str(args.mission) + ('.standard-spawn.bak' if args.standard_aircraft else '.dynamic-spawn.bak'))
     assert not backup.exists(), 'Migration backup already exists; inspect it before another migration'
     handle, temporary = tempfile.mkstemp(dir=args.mission.parent, suffix='.tmp')
     os.close(handle)

@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-16" }
+DynamicTrainingRuntime = { version = "training-17.1" }
 Persistence.Publish()
 DynamicTrainingPlayers = { protocol = 1, Update = Player.UpdateDirectory }
 
@@ -42,6 +42,8 @@ local function Close(record)
         Strike.Close(record.strikePlan)
     elseif record.category == "Air Interdiction" then
         AirInterdiction.Close(record.interdictionPlan)
+    elseif record.category == "CAS" then
+        CAS.Close(record.casPlan)
     elseif record.site then
         SEADSites.CloseAssignment(record.site, record.assignmentID)
     elseif record.spawn then
@@ -124,6 +126,8 @@ local function PrimaryComplete(record, time, result)
         title, objective = "Strike Objective Complete", "Assigned targets destroyed."
     elseif record.category == "Air Interdiction" then
         title, objective = "Air Interdiction Objective Complete", "All 3 convoy vehicles destroyed."
+    elseif record.category == "CAS" then
+        title, objective = "CAS Objective Complete", "All 3 designated enemy vehicles destroyed."
     end
     PublishMission(record, "complete", title .. "\n" ..
         objective .. "\nEach pilot: return to a BLUE airfield or carrier.\n" ..
@@ -244,7 +248,18 @@ local function Start(record)
         " formation=" .. spawn.formation .. "/" .. spawn.formationSpacing)
 end
 
-local function Generate(groupName, category)
+local function FinishCASPreparation(record, spawn)
+    local briefing = CAS.Briefing(record.casPlan)
+    BeginScoring(record, record.casPlan.fullReward)
+    record.spawn, record.casBriefing, record.state = spawn, briefing, "ACTIVE"
+    MissionMessage(record, "CAS mission accepted.", 10)
+    PublishMission(record, "briefing", briefing .. string.format(
+        "\nReward per pilot: %d points.\nRegistered pilots: %d.", record.fullReward, #record.participants),
+        Config.coordinateBriefingSeconds)
+    DebugLog(record, "CAS started; site=" .. record.casPlan.site.id .. " laser=" .. record.casPlan.radio.laserCode)
+end
+
+local function Generate(groupName, category, laserCode)
     category = category or "Intercept"
     local group = GROUP:FindByName(groupName)
     local okRoster, roster, problem, trainingWing = pcall(TrainingWings.Roster, groupName)
@@ -265,6 +280,33 @@ local function Generate(groupName, category)
     if not acquired then Message(group, blocked); return end
     Notifications.RegisteredAircraft(record)
     if problem then MissionMessage(record, problem, 15) end
+    if category == "CAS" then
+        record.owner, record.state = roster[1], "PREPARING"
+        local unavailable
+        local ok, problem = pcall(function()
+            record.casPlan, unavailable = CAS.Plan(record.owner.unit:GetVec3(), record.assignmentID, laserCode)
+            if not record.casPlan then return end
+            local spawn = CAS.Spawn(record.casPlan)
+            if spawn then FinishCASPreparation(record, spawn) end
+        end)
+        if not ok or not record.casPlan then
+            Close(record)
+            if not ok then
+                env.error("[DynamicTraining] CAS setup: " .. tostring(problem))
+                MissionMessage(record, "ERROR: CAS setup failed. See DCS log; select 'Task: CAS' to retry.", 20)
+            elseif unavailable == "RADIO" then
+                MissionMessage(record, "The selected CAS laser code or radio slot is in use. Choose another code or retry later.", 20)
+            else
+                MissionMessage(record, string.format("No available CAS sites among the two nearest sites within %g-%g NM. Change position or retry later.",
+                    Config.cas.minDistanceNM, Config.cas.maxDistanceNM), 20)
+            end
+            return
+        end
+        if record.state == "PREPARING" then
+            PublishMission(record, "notice", "CAS mission accepted. Preparing JTAC.", 10)
+        end
+        return
+    end
     if category == "Air Interdiction" then
         record.owner = roster[1]
         local ok, problem = pcall(function()
@@ -553,7 +595,8 @@ local function Abort(groupName, target, assignment)
             Message(group, "Only your own sortie may be aborted from another wing."); return
         end
         SettleParticipant(record, target, "ABORT", "Individual sortie aborted. No reward.")
-        if record.category ~= "CAP" and not record.spawn and record.state ~= "PLANNING" and Missions.IsActive(record) then
+        if record.category ~= "CAP" and not record.spawn and record.state ~= "PLANNING"
+            and record.state ~= "PREPARING" and Missions.IsActive(record) then
             record.spawnAt, record.state = nil, "ARMED"
         end
     else
@@ -628,6 +671,11 @@ ScanPlayers = function()
                 MENU_GROUP_COMMAND:New(group, label, page, callback)
                 entries = entries + 1
             end
+            local function AddSubmenu(label)
+                if entries == 9 then page, entries = MENU_GROUP:New(group, "More", page), 0 end
+                entries = entries + 1
+                return MENU_GROUP:New(group, label, page)
+            end
             for _, command in ipairs({
                 { "Task: Intercept", Generate },
                 { "Task: CAP", function(groupName) Generate(groupName, "CAP") end },
@@ -635,6 +683,7 @@ ScanPlayers = function()
                 { "Task: DEAD", function(groupName) Generate(groupName, "DEAD") end },
                 { "Task: Strike", function(groupName) Generate(groupName, "Strike") end },
                 { "Task: Air Interdiction", function(groupName) Generate(groupName, "Air Interdiction") end },
+                { "Task: CAS" },
                 { "Mission Status", Status },
                 { "Abort Mission", Abort }, { "Player Statistics", Statistics }
             }) do
@@ -642,9 +691,19 @@ ScanPlayers = function()
                 local category = label:match("^Task: (.+)$")
                 if (not category or Player.CanTask(taskRoster, category))
                     and (not category or not trainingWing or trainingWing.leader == name) then
-                    AddCommand(label, function()
-                        Safe(label, group, function() action(name); ScanPlayers() end)
-                    end)
+                    if category == "CAS" then
+                        local parent = AddSubmenu(label)
+                        for _, slot in ipairs(Config.cas.radioSlots) do
+                            local code = slot.laserCode
+                            MENU_GROUP_COMMAND:New(group, "Laser " .. code, parent, function()
+                                Safe("Task: CAS", group, function() Generate(name, "CAS", code); ScanPlayers() end)
+                            end)
+                        end
+                    else
+                        AddCommand(label, function()
+                            Safe(label, group, function() action(name); ScanPlayers() end)
+                        end)
+                    end
                 end
             end
             local capturedGroupID = group:GetID()
@@ -752,7 +811,29 @@ end
 
 local function TickMission(record, time)
     if not Missions.IsActive(record) then return end
-    if record.state == "PLANNING" then
+    if record.category == "CAS" and record.spawn then
+        for _, text in ipairs(CAS.SupportMessages(record.casPlan)) do
+            if record.state == "ACTIVE" then PublishMission(record, "notice", text, 20)
+            else MissionMessage(record, text, 20) end
+        end
+    end
+    if record.state == "PREPARING" and record.category == "CAS" then
+        local controlling = Ready(record)
+        if not controlling then
+            Close(record)
+            MissionMessage(record, "CAS preparation cancelled. Player aircraft changed or unavailable.", 20)
+            return
+        end
+        local ok, problem = pcall(function()
+            local spawn = CAS.Step(record.casPlan, time)
+            if spawn then FinishCASPreparation(record, spawn) end
+        end)
+        if not ok then
+            Close(record)
+            env.error("[DynamicTraining] CAS setup: " .. tostring(problem))
+            MissionMessage(record, "ERROR: CAS setup failed. See DCS log; select 'Task: CAS' to retry.", 20)
+        end
+    elseif record.state == "PLANNING" then
         -- Spread bounded terrain/scenery checks across ticks to avoid a long frame.
         local controlling = Ready(record)
         if not controlling then
@@ -851,6 +932,8 @@ local function TickMission(record, time)
                 if Strike.Remaining(record.strikePlan) == 0 then PrimaryComplete(record, time) end
             elseif record.category == "Air Interdiction" then
                 if AirInterdiction.Remaining(record.interdictionPlan) == 0 then PrimaryComplete(record, time) end
+            elseif record.category == "CAS" then
+                if CAS.Remaining(record.casPlan) == 0 then PrimaryComplete(record, time) end
             elseif record.deadTargets then
                 if DEAD.Remaining(record) == 0 then DeadComplete(record, time) end
             elseif record.category == "SEAD" then
@@ -915,6 +998,8 @@ local function HandleEvent(record, event)
                 if Strike.RecordLoss(record.strikePlan, event) then PrimaryComplete(record, time) end
             elseif record.category == "Air Interdiction" then
                 if AirInterdiction.RecordLoss(record.interdictionPlan, event) then PrimaryComplete(record, time) end
+            elseif record.category == "CAS" then
+                if CAS.RecordLoss(record.casPlan, event) then PrimaryComplete(record, time) end
             elseif record.deadTargets then
                 if DEAD.RecordLoss(record, event) then DeadComplete(record, time) end
             else
@@ -971,6 +1056,7 @@ local function Tick(_, time)
     Safe("CAP enemy cleanup", nil, function() CAP.Sweep(time) end)
     Safe("Strike facility cleanup", nil, function() Strike.Sweep(time) end)
     Safe("Air Interdiction cleanup", nil, function() AirInterdiction.Sweep(time) end)
+    Safe("CAS cleanup", nil, function() CAS.Sweep(time) end)
     Safe("Partial group cleanup", nil, function() ObjectLifecycle.Sweep(time) end)
     return time + Config.pollSeconds
 end
@@ -978,6 +1064,7 @@ end
 MapOverlay.RefreshFriendlyAirbases()
 Safe("Strike template initialization", nil, Strike.Initialize)
 Safe("Air Interdiction template initialization", nil, AirInterdiction.Initialize)
+Safe("CAS template initialization", nil, CAS.Initialize)
 Safe("Initial player menu scan", nil, ScanPlayers)
 timer.scheduleFunction(Tick, nil, timer.getTime() + Config.pollSeconds)
 Log("Runtime initialized; version=" .. DynamicTrainingRuntime.version .. "; MOOSE event subscriber retained.")

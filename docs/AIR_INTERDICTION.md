@@ -72,7 +72,7 @@ Hornetの候補なしは `No available Air Interdiction routes among the two nea
 
 ## 保存・導入
 
-保存schema4にairInterdictionScoreを追加。schema1/2/3を各旧列数・checksumで厳密に読み、未収録項目を0で補う。未知schemaは拒否しprimaryを保護する。共有codecを結合したサーバーHookの更新とDCS再起動が必要。既存の保存データを開発作業で直接変更しない。
+Air Interdiction導入時のschema4にairInterdictionScoreを追加した。現在はCAS追加によるschema5で継承し、schema1/2/3/4を各旧列数・checksumで厳密に読み、未収録項目を0で補う。未知schemaは拒否しprimaryを保護する。共有codecを結合したサーバーHookの更新とDCS再起動が必要。既存の保存データを開発作業で直接変更しない。
 
 ## 検証
 

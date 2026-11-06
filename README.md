@@ -1,7 +1,7 @@
 # Persistent and Dynamic Training
 
 DCS World の Syria マップで、F/A-18C の迎撃・戦闘空中哨戒・防空制圧・防空サイト破壊・固定施設攻撃・移動車列攻撃を繰り返し練習するための動的訓練ミッションです。
-AH-64D Apacheでは近距離のAir Interdictionに対応します。SOLO・2機編隊と同一機の人間PLT/CPGで、既存の受注・共有目標・UCID別採点を利用できます。詳細は[Apache仕様](docs/APACHE.md)。
+AH-64D Apacheでは近距離のAir InterdictionとCASに対応します。SOLO・2機編隊と同一機の人間PLT/CPGで、既存の受注・共有目標・UCID別採点を利用できます。詳細は[Apache仕様](docs/APACHE.md)。
 F10から任務を受注し、任務ごとの条件で敵を配置します。目標達成後は味方基地や空母への帰還まで評価します。
 
 ソロと編隊・Apacheの複数乗員でのマルチプレイに対応しています。出撃場所と兵装を選び、自分たちのペースで訓練できます。
@@ -34,7 +34,7 @@ SEADでは受注時にTOO / PBを等確率で選びます。TOOは機種不明�
 4. F10の `Dynamic Training` から任務を選びます。
 5. 目標を達成したら、BLUEの基地または空母に帰還して精算します。
 
-Dynamic Spawnは各自1機ずつ生成します。元の18グループ・27 Client機は一覧非表示の設定原本として保持し、9つのSOLO原本を基地・機種へ割り当てています。機体在庫は対象機種ごとに無制限。ApacheのCPGは生成済み機体の空席へ参加します。
+Dynamic Spawnは各自1機ずつ生成します。機体設定はDCS標準を使い、旧SOLO/MP2原本18グループとテンプレート参照は削除済みです。機体在庫は対象機種ごとに無制限。ApacheのCPGは生成済み機体の空席へ参加します。
 編隊・同一機の人間乗員とも、参加する全員が搭乗してから受注してください。
 
 Intercept / SEADを地上で受注した場合は、登録参加者全員の離陸を待ち、離陸検出から20秒後に敵を生成します。
@@ -52,6 +52,7 @@ Dynamic Training
 ├─ Task: DEAD
 ├─ Task: Strike
 ├─ Task: Air Interdiction
+├─ Task: CAS → Laser 1688 / 1687 / 1686（Apacheのみ）
 ├─ Mission Status
 ├─ Abort Mission
 └─ Player Statistics
@@ -72,7 +73,7 @@ BLUEの4空港・CVN-71・給油機2機の航法情報は[ニーボード画像]
 敵は同じ累計時間の30〜120秒で1編隊出現します。累計120秒と敵機全滅の両方で達成し、100%でも敵が残っていれば戦闘を続けます。達成後の帰還成功150／事故90ポイントをCAP Scoreに記録します。仕様は [CAP](docs/CAP.md) を参照してください。
 
 コードと模擬テストは実装済みです。2026-10-06のDCSログでGolanの進捗・敵生成/交戦・達成後90点/未達成0点・CAP Score保存と次セッションへの90点引継ぎを確認しました。退出停止/再開、帰還150、MP2はゲーム内確認待ちです。
-現在の保存形式version4はversion1/2/3を読み込み、未収録のCAP/Strike/Air Interdiction成績を0で補います。Air Interdiction導入時はサーバーの保存Hookも更新し、DCSを再起動してください。
+現在の保存形式version5はversion1/2/3/4を読み込み、未収録のCAP/Strike/Air Interdiction/CAS成績を0で補います。CAS対応ではサーバーの保存Hookも更新し、DCSを再起動してください。
 
 ## Strike — 固定施設への攻撃
 
@@ -81,7 +82,7 @@ BLUEの4空港・CVN-71・給油機2機の航法情報は[ニーボード画像]
 - **TOO**：コンテナ4個のうち任意2個／司令部1個／トラック2両。従来の施設基準点DDM（分の小数3桁）で捜索し、見出しは`STRIKE MISSION (TOO)`。標高・座標誤差・目標条件は変更しません。
 - **PP**：司令部／燃料タンク／弾薬庫の1個。`STRIKE MISSION (PP)`で、抽選した目標そのもののDMS（秒の小数2桁）と地表標高ft MSLを案内し、JDAM/JSOWのPP入力に使います。
 
-地上でも即生成。全54原本を起動時に除去し、TOOは従来の7個、PPは追加建物も含む9個をME位置へ生成します。1施設につき1Wingで、近い2施設が使用不可なら3番目へ回しません。全員終了後に周辺設備も含めて削除し、帰還150／達成後事故90／未達成事故・Abort0を共通のStrike Scoreへ記録します。詳細は[Strike仕様](docs/STRIKE.md)。PP実入力・実射・3D配置は確認待ちです。保存形式はschema4を維持します。
+地上でも即生成。全54原本を起動時に除去し、TOOは従来の7個、PPは追加建物も含む9個をME位置へ生成します。1施設につき1Wingで、近い2施設が使用不可なら3番目へ回しません。全員終了後に周辺設備も含めて削除し、帰還150／達成後事故90／未達成事故・Abort0を共通のStrike Scoreへ記録します。詳細は[Strike仕様](docs/STRIKE.md)。PP実入力・実射・3D配置は確認待ちです。CAS追加後は保存形式schema5で既存のStrike成績を継承します。
 
 F10の`Mark Strike Target`で、TOOは従来の施設案内点、PPは抽選した目標の北50 mに赤煙を約120秒出せます。Mission Statusは公開済みブリーフィング、達成後は座標なしの帰還指示を再表示します。
 
@@ -92,6 +93,12 @@ F10の`Mark Strike Target`で、TOOは従来の施設案内点、PPは抽選し�
 Hornetは全15駐機位置で候補あり。IncirlikはAI_02（約92.9 NM）、AkrotiriはAI_06（約25.0 NM）、BeirutはAI_05/04（約73.5/77.5 NM）、RamatはAI_05（約48.8 NM）、空母初期位置はAI_06（約92.6 NM）。ApacheはTPL_AI_01〜10のうち、受注時の長機から周回中心まで3〜13 NMの近い2地域を使います。現配置ではIncirlikにTPL_AI_09（約3.71〜3.80 NM）とTPL_AI_01（約9.25〜9.30 NM）の2候補、AkrotiriにTPL_AI_10（約7.86〜7.90 NM）、BeirutにTPL_AI_08（約10.90〜10.96 NM）、RamatにTPL_AI_07（約12.51〜12.52 NM）が各1候補あります。全4青空港のApache駐機位置で受注でき、保存座標は維持しています。ApacheのTARGET AREAはMGRS 8桁（東4桁＋北4桁、ゾーン・グリッド識別子付き）で表示し、HornetはDDM・分小数3桁を使います。
 
 地上でも即生成し、MEの経路・速度・周回指示・車間距離を維持します。1地域につき1Wingで、全員終了後に削除します。Statusは公開済みの中心座標、達成後は座標なしの帰還指示です。報酬は各自150／達成後事故90／未達成事故・Abort0。詳細は[Air Interdiction仕様](docs/AIR_INTERDICTION.md)。実走行・橋の通過・散開後の復帰・実射は確認待ちです。
+
+## CAS — ApacheのJTAC連携
+
+ApacheのF10 `Task: CAS → Laser 1688 / 1687 / 1686`で受注します。3～13 NM内の近い2地域から使用可能な1地域を選び、敵3両・味方3両・JTAC1両を生成します。現在はRamat付近の1地域。MGRS 8桁の味方位置・敵地域を確認し、指定された標準JTACへ無線で連絡して敵3両を全滅させ、帰還してください。Mission Teamと同一機の人間PLT/CPGに対応し、報酬は各自150／達成後事故90／未達成事故・Abort0。Hornetでは受注できません。
+
+初期通信枠はAxeman 1 / 133 MHz AM / 1688、Axeman 2 / 134 MHz AM / 1687、Axeman 3 / 135 MHz AM / 1686。全生成物の削除確認まで地域と枠を保持します。CAS成績はschema5へ追加するため、サーバーHookの再導入とDCS再起動が必要です。動的JTACのDCS交信・実射は確認待ち。詳細は[CAS仕様](docs/CAS.md)。
 
 ## SEADの後は、帰還も継続攻撃も選べる
 
@@ -151,7 +158,8 @@ UCIDを照合できない場合も訓練は続けられますが、採点は行�
 マルチプレイのDynamic Spawnと静的Client互換に対応しています。動的生成機のUCID照合には今回更新したサーバーHookが必要です。新しい.mizとHookを配置し、サーバーDCSを再起動してください。実サーバーでのDynamic Spawn・共有・採点は確認待ちです。
 任務がゲーム内で動作しているとの報告はありますが、全ケースのDCS内確認は完了していません。自動テストの検証範囲と手動確認項目はテスト仕様書にまとめています。
 
-今後は難易度・Threat Budget、CAS / Anti-Shipなどの訓練を追加する予定です。
+今後は難易度・Threat Budget、Hornet向けCAS / Anti-Shipなどの訓練を追加する予定です。
+Apache限定CASの確定仕様は[CAS](docs/CAS.md)、統合前の検討・試験履歴は[CAS / JTAC 試験計画](docs/CAS_JTAC_PLAN.md)を参照してください。動的JTACのDCS実射は確認待ちです。
 
 | ドキュメント | 内容 |
 |---|---|

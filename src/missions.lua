@@ -1,6 +1,7 @@
 -- Shared assignment state. Every mission category must acquire this blocker
 -- before reserving or spawning; locks survive individual participant settlement.
-local Missions = { wings = {}, groupLocks = {}, pilots = {}, sites = {}, strikeSites = {}, interdictionSites = {}, sequence = 0 }
+local Missions = { wings = {}, groupLocks = {}, pilots = {}, sites = {}, strikeSites = {}, interdictionSites = {},
+    casSites = {}, jtacSlots = {}, sequence = 0 }
 
 function Missions.Blocker(groupName, roster)
     local record = Missions.groupLocks[groupName] or Missions.wings[groupName]
@@ -14,7 +15,8 @@ function Missions.Blocker(groupName, roster)
     end
     if record then
         local category = record.category or "Intercept"
-        local pending = record.state == "ARMED" or record.state == "TAKEOFF_DELAY" or record.state == "PLANNING"
+        local pending = record.state == "ARMED" or record.state == "TAKEOFF_DELAY"
+            or record.state == "PLANNING" or record.state == "PREPARING"
         return pending and (category .. " mission is already armed. Wing assignment blocked.")
             or (category .. " mission is already active (including return to base). Wing assignment blocked.")
     end

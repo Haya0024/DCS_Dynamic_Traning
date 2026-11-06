@@ -325,6 +325,7 @@ local function scenario(options)
     end }
     dofile("scripts/Strike-TestFixtures.lua")(s, env, options, newUnit)
     dofile("scripts/AirInterdiction-TestFixtures.lua")(s, env, options, newUnit)
+    dofile("scripts/CAS-TestFixtures.lua")(s, env, options, newUnit)
     local function runBundle()
         local chunk = assert(loadfile("build/DynamicTraining.lua")); setfenv(chunk, env)()
     end

@@ -4,7 +4,7 @@
 本文・タイミングは現在の実装に合わせる。実画面のキャプチャではない。2026-10-15の変更でPBのTHREAT AREAを推定座標へ統一し、抑制条件を30秒へ短縮した。DEADの座標をラベルと同じ行へまとめ、受注本文の並び順も更新した。
 
 対象は実装済みの Intercept / CAP / SEAD / Immediate DEAD / Follow-on DEAD / Strike / Air Interdiction。
-CAS / Anti-Ship は未実装なので、現在の受注通知やクリア通知はない。
+CASはtraining-18.1の依頼式AUTOLASEを含め末尾に記載。Anti-Shipは未実装。
 画面の英語本文とDCSログの詳細例は [MESSAGES.md](MESSAGES.md) も参照。
 
 ## 読み方と共通タイミング
@@ -592,21 +592,21 @@ AI-02はcoordinateBriefingSeconds設定を使う。攻撃中のStatusはAI-02と
 
 2026-11-06 / training-16では、Mission Teamで受注した任務の自動通知を登録済みの全DCSグループへ配信する。Mission Statusは各グループから公開済み本文を再表示し、受注時の人員だけを共有・採点する。Create/Join/Leaveの文面はMESSAGES.md、手順と制限はDYNAMIC_SPAWN.mdを参照。
 
-## CAS（training-17、Apache限定）
+## CAS（training-18.1、Apache限定AUTOLASE）
 
 | ID | タイミング・分岐 | 表示・時間 |
 |---|---|---|
 | CAS-01 | F10 Task: CASでLaserコードを選び、生成・担当設定が成功 | `CAS mission accepted.`、10秒 |
-| CAS-02 | CAS-01直後 | CAS MISSION、味方位置MGRS8桁、敵地域MGRS8桁、敵味方の特徴、JTAC連絡先・レーザーコード、敵3両破壊→RTB、150点、登録人数。初期60秒 |
+| CAS-02 | CAS-01直後 | CAS MISSION、味方位置MGRS8桁、敵の特徴、JTAC待機・レーザーコード・Request laser案内、敵3両破壊→RTB、150点、登録人数の7行。初期60秒 |
 | CAS-03 | 指定敵3両の破壊確認 | CAS Objective Complete、全3両破壊、各自帰還、150/90点。20秒 |
 | CAS-04 | 3～13 NMに候補なし、近傍候補が使用中/不正 | No available CAS sites among the two nearest sites within 3-13 NM. Change position or retry later.、20秒。生成・採点なしで解除 |
 | CAS-05 | 希望コード・無線枠が使用中 | The selected CAS laser code or radio slot is in use. Choose another code or retry later.、20秒。別コードへ勝手に変更しない |
-| CAS-06 | 生成・固定ID・LOS・ブリーフィング準備などで例外 | ERROR: CAS setup failed. See DCS log; select 'Task: CAS' to retry.、20秒。部分生成を回収、削除確認まで地域・通信枠を保持 |
+| CAS-06 | 生成・固定ID・AUTOLASE初期化・ブリーフィング準備などで例外 | ERROR: CAS setup failed. See DCS log; select 'Task: CAS' to retry.、20秒。部分生成を回収、削除確認まで地域・通信枠を保持 |
 | CAS-07 | JTAC喪失を確認 | CAS JTAC lost. Continue the mission using your own sensors and designation.、20秒。1回のみ、自力継続可 |
 | CAS-08 | 味方車両喪失を確認 | CAS friendly vehicle lost. Confirm target identification before firing.、各車両1回・20秒。初版は減点・自動失敗なし |
 
-攻撃中のStatusはCAS-02と最新の公開済み支援通知、達成後は座標なしCAS-03だけ。未公開残数・現在位置・予約を追加しない。人間PLT/CPGとMission Teamも登録時に固定し、結果・個人150/90/0は共通メッセージを使う。標準JTACの交信手順と音声はDCS側に任せ、Statusの再表示対象にはしない。正確な本文は[MESSAGES.md](MESSAGES.md#cas--native-jtac-training-17-apache-only)、仕様は[CAS.md](CAS.md)。
+攻撃中のStatusはCAS-02と最新の公開済み支援通知、達成後は座標なしCAS-03だけ。未公開残数・現在位置・予約を追加しない。人間PLT/CPGとMission Teamも登録時に固定し、結果・個人150/90/0は共通メッセージを使う。CAS-02は選択コードと待機/Request laserの案内を1行にまとめ、TARGET AREA・FRIENDLIES・JTAC識別の行を省く。受注後は待機し、F10 CAS JTACのRequest laserで依頼、Stop laserで停止する。停止後は再依頼まで再開しない。標準音声9-line・無線照射依頼は使わない。照射開始・失視・照射不能・停止の短文は変化時に10秒通知し、Status本文は置き換えない。正確な本文は[MESSAGES.md](MESSAGES.md#cas--autolase-jtac-training-181-apache-only)、仕様は[CAS.md](CAS.md)。
 
 ## CAS準備中（training-17.1）
 
-DCSの生成直後に実体が未有効なら `CAS mission accepted. Preparing JTAC.`（10秒）を表示し、Statusでは準備通知だけを再表示する。生成済みの役割を重複Spawnせず1秒ごとに再観測し、全3グループとFACの検証後にCAS-01/02へ進む。初期10秒を超えた次の監視でCAS-06へ失敗解除する。機体変更・離脱で準備解除する場合は `CAS preparation cancelled. Player aircraft changed or unavailable.`（20秒）。準備完了前は採点IDを割り当てない。
+DCSの生成直後に実体が未有効なら `CAS mission accepted. Preparing JTAC.`（10秒）を表示し、Statusでは準備通知だけを再表示する。生成済みの役割を重複Spawnせず1秒ごとに再観測し、全3グループとAUTOLASE初期化の検証後にCAS-01/02へ進む。初期10秒を超えた次の監視でCAS-06へ失敗解除する。機体変更・離脱で準備解除する場合は `CAS preparation cancelled. Player aircraft changed or unavailable.`（20秒）。準備完了前は採点IDを割り当てない。

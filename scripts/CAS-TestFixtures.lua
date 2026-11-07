@@ -1,6 +1,7 @@
 -- MOOSE boundary simulation only; the bundled production CAS logic is exercised.
 return function(s, env, options, newUnit)
     local copy = env.UTILS.DeepCopy
+    dofile('scripts/CAS-Autolase-TestBoundary.lua')(s, env)
     s.casTemplates = {}
     local kinds = { enemy = { 'BMP-2', 'BMP-2', 'Ural-375' }, friendly = { 'M-113', 'M 818', 'M-113' },
         jtac = { 'M1045 HMMWV TOW' } }
@@ -53,6 +54,12 @@ return function(s, env, options, newUnit)
                     if s.casLOSError then error('LOS observation failed') end
                     return s.casLOS ~= false
                 end
+                function unit:GetCoord()
+                    local c=env.COORDINATE:NewFromVec3(self.position); c.unit=self; return c
+                end
+                unit.GetPointVec3=unit.GetCoord
+                function unit:GetHeight() return self.position.y end
+                function unit:GetThreatLevel() return self.threat or (self.kind=='BMP-2' and 4 or 1) end
                 g.units[i] = unit
             end
             function g:GetID() return self.id end
@@ -84,4 +91,15 @@ return function(s, env, options, newUnit)
             return g
         end }
     end
+    function env.COORDINATE:Get3DDistance(other)
+        return math.sqrt((self.x-other.x)^2+(self.y-other.y)^2+(self.z-other.z)^2)
+    end
+    function env.COORDINATE:IsLOS(other,offset)
+        assert(offset==2.5)
+        if s.casLOSError then error('LOS observation failed') end
+        if s.casLOSNil then return nil end
+        return s.casLOS~=false and (not other.unit or other.unit.los~=false)
+    end
+    function env.COORDINATE:AddY(v) self.y=self.y+v; return self end
+    function env.COORDINATE:AddX(v) self.x=self.x+v; return self end
 end

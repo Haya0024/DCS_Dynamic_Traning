@@ -83,6 +83,7 @@ return {
     cas = {
         fullReward = 150, cleanupRetrySeconds = 5,
         setupTimeoutSeconds = 10,
+        autolase = { maxDistanceNM = 3, scanSeconds = 1, laseSeconds = 300, notificationSeconds = 10 },
         minDistanceNM = 3, maxDistanceNM = 13, coordinateFormat = "MGRS", mgrsAccuracy = 4,
         sites = {
             { id = "01", enemy = "TPL_CAS_ENEMY_01", friendly = "TPL_CAS_FRIENDLY_01", jtac = "TPL_CAS_JTAC_01",

@@ -98,9 +98,9 @@ Hornetは全15駐機位置で候補あり。IncirlikはAI_02（約92.9 NM）、A
 
 ## CAS — ApacheのJTAC連携
 
-ApacheのF10 `Task: CAS → Laser 1688 / 1687 / 1686`で受注します。3～13 NM内の近い2地域から使用可能な1地域を選び、敵3両・味方3両・JTAC1両を生成します。現在はRamat付近の1地域。MGRS 8桁の味方位置・敵地域を確認し、指定された標準JTACへ無線で連絡して敵3両を全滅させ、帰還してください。Mission Teamと同一機の人間PLT/CPGに対応し、報酬は各自150／達成後事故90／未達成事故・Abort0。Hornetでは受注できません。
+ApacheのF10 `Task: CAS → Laser 1688 / 1687 / 1686`で受注します。3～13 NM内の近い2地域から使用可能な1地域を選び、敵3両・味方3両・JTAC1両を生成します。現在はRamat付近の1地域。受注後のJTACは待機します。攻撃準備ができたら `Dynamic Training → CAS JTAC → Request laser` で依頼すると、見通せる指定敵を1両ずつ照射します。停止は `Stop laser`、再開は再依頼です。無線チェックインは不要です。MGRS 8桁の味方位置・敵の特徴と照射通知を確認し、選択コードをLSTで捕捉して攻撃、敵3両を全滅させて帰還してください。Mission Teamと同一機の人間PLT/CPGに対応し、報酬は各自150／達成後事故90／未達成事故・Abort0。Hornetでは受注できません。
 
-初期通信枠はAxeman 1 / 133 MHz AM / 1688、Axeman 2 / 134 MHz AM / 1687、Axeman 3 / 135 MHz AM / 1686。全生成物の削除確認まで地域と枠を保持します。CAS成績はschema5へ追加するため、サーバーHookの再導入とDCS再起動が必要です。動的JTACのDCS交信・実射は確認待ち。詳細は[CAS仕様](docs/CAS.md)。
+照射枠はAxeman 1 / 1688、Axeman 2 / 1687、Axeman 3 / 1686。training-18.1は同梱MOOSE AUTOLASEの判定とSPOTをCAS専用に接続し、指定3両以外へ照射せず、観測不能・中止・達成時の停止と回収を管理します。保存schema5・正常な17.3 Hookは維持し、今回の更新ではHook再導入は不要です。更新.mizでミッションを再開始してください。DCSのLST・実射は確認待ち。詳細は[CAS仕様](docs/CAS.md)、[AUTOLASE設計](docs/CAS_AUTOLASE.md)。
 
 ## SEADの後は、帰還も継続攻撃も選べる
 

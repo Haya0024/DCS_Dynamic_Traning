@@ -360,6 +360,7 @@ local function scenario(options)
         for _, scheduled in ipairs(self.timers) do
             if scheduled.due and scheduled.due <= time then scheduled.due = scheduled.callback(scheduled.arg, time) end
         end
+        if self.runMoose then self:runMoose(time) end
     end
     function s:event(name, unit, place, time, raw)
         local id = assert(env.EVENTS[name])

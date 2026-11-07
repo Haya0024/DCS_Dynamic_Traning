@@ -1,6 +1,8 @@
-# CAS / 標準JTAC
+# CAS / AUTOLASE JTAC
 
-training-17.3。CASを実装し、単独試験で使用したDCS標準FAC / JTACへ接続する。単独Apacheで離隔後にAGM-114Kが3発3中だったことはユーザー報告。動的生成したJTACの交信・照射・実射はDCS内確認待ち。
+training-18.1。受注後は照射せず待機し、F10 `Dynamic Training → CAS JTAC → Request laser` で依頼してから、指定した敵3両をMOOSE AUTOLASEの距離・LOS判定とSPOTで1両ずつ照射する。`Stop laser` で停止・再依頼が可能。標準JTACとの無線交信は不要。固定ID・単一照射・観測不能・通知・回収をCAS専用アダプターで管理する。詳細な設計と境界は[CAS_AUTOLASE.md](CAS_AUTOLASE.md)。実DCSでのLST・Hellfire誘導は確認待ち。
+
+旧training-17.3では交信・レーザー捕捉後もTADS指示点と着弾が手前へずれるとのユーザー報告があった。単独Apacheの別配置でのAGM-114K 3発3中という報告、2026-11-07のサーバーログは履歴として維持し、AUTOLASEで修復済みとは扱わない。
 
 ## 受注・地域・生成
 
@@ -10,8 +12,8 @@ training-17.3。CASを実装し、単独試験で使用したDCS標準FAC / JTAC
 - 近い2地域を固定し、その中の使用可能な地域を等確率で1つ抽選する。1候補ならそれを使い、候補なし・使用中・不正な近傍2地域では採点せず解除する。3番目や距離範囲外へ拡張しない。
 - 現在は地域01だけ。ApacheはRamat付近からの利用を想定する。出撃空港名をロジックの条件にしない。
 - 地上 / 空中とも受注時に生成準備を開始する。離陸待ち・20秒待ちは設けない。DCSで新しい車両が有効になるまでPREPARINGを維持し、1秒ごとに再観測する。setupTimeoutSeconds（初期10秒）を超えた次の監視で失敗解除する。
-- 状態は `PREPARING → ACTIVE → RTB_PENDING → 終了`。全3グループとJTAC担当設定が成立して初めてACTIVE・採点開始とする。
-- DCSのUnit IDは正の整数または十進文字列を許可する。固定対象には元のIDを保持し、重複検査は数値へ正規化して行う。Group IDはFACタスクへの設定前に数値化する。不正ID・実体欠落・有効化未完了は準備待ちとし、IDのLua型・実体の有無も診断へ記録する。
+- 状態は `PREPARING → ACTIVE → RTB_PENDING → 終了`。全3グループとAUTOLASE初期化が成立して初めてACTIVE・採点開始とする。実照射はACTIVEかつRequest laser依頼中に限る。準備中・達成後は依頼できない。
+- DCSのUnit IDは正の整数または十進文字列を許可する。固定対象には元のIDを保持し、重複検査とGroup ID診断は数値へ正規化する。不正ID・実体欠落・有効化未完了は準備待ちとし、IDのLua型・実体の有無も診断へ記録する。
 
 ## Mission EditorのTPL
 
@@ -23,25 +25,31 @@ training-17.3。CASを実装し、単独試験で使用したDCS標準FAC / JTAC
 
 全グループがLate Activation、単一の停止WP、Weapon Hold、Disperse under fire OFF。初版は敵の反撃・移動を追加しない。座標・向き・車間・兵器マスク・その他のME設定は継承し、Luaに代替座標を置かない。地域を増やすときは3グループを同じ地域番号で複製し、Config.cas.sitesへ明示追加する。名前の自動走査で未登録地域を採用しない。
 
-JTACの初期WPには有効な `FAC_EngageGroup` を1つだけ置き、同地域の敵原本Groupを指定する。DesignationはLaser、VisibleはON。原本は有効化せず、固有alias `DT_CAS_<assignmentID>_<role>` でコピーする。
+現在のJTAC原本の初期WPには有効な `FAC_EngageGroup` が1つあり、同地域の敵原本Groupを指定している。DesignationはLaser、VisibleはON。この対応を検証したうえで動的コピーからFACを除去し、標準FACとの二重照射を防ぐ。原本は有効化せず、固有alias `DT_CAS_<assignmentID>_<role>` でコピーする。
 
-生成順は敵 → 味方 → JTAC。敵の実Group IDを取得してから、JTACコピーのFAC対象をそのIDへ置換し、予約したコールサイン・無線・コードを設定してJTACを生成する。元TPLを変更しない。MOOSEラッパーで欠けるlaserCode / visibleなどのME保存フィールドを維持するため、FACタスクだけDCS形式のコピーを扱う。生成・座標・LOS・削除はMOOSEを使う。
+生成順は敵 → 味方 → JTAC。元TPLを変更せず、JTACコピーはFACを除去した状態で生成する。全実体検証後、今回のJTACと固定した敵3両をCASAutolaseへ渡し、選択したコードで単一照射を管理する。既定はJTAC→目標3 NM、選定監視1秒、照射300秒。対象を保持して追従し、撃破・失視・未知・時間切れで停止・再選定する。別任務の車両を候補にしない。
 
 全実体の陣営・数・車種・IDを照合する。MOOSEのGetUnitsは取得順を保証しないため、車種ごとの台数で構成を照合し、テンプレートの配列順とは比較しない。有効化途中の実体や未取得の一覧は期限内で再観測し、期限切れ・実体の観測不正は部分生成を回収する。
 
-敵の検出・照射可否はDCS標準FACに任せる。MOOSE UNIT:IsLOSは両端に2 mを足す地形レイの簡易判定であり、MEの視線表示やFACの検出・照射状態そのものではない。全3車両の簡易LOS通過を生成条件にしない。全実体検証後の次の監視で1回だけDEBUGへ記録し、false・nil・例外でもCASを解除せず、座標案内・Status・採点を維持する。診断には対象ID、各端点のx/yMSL/z、地表高・AGL、2 m offset、visible/UNKNOWNを含める。中止・回収中は診断しない。配置は動かさず、実射はME配置とDCSで別途確認する。
+AUTOLASEのCanLaseは対象ごとに距離と2.5 m offsetの地形LOSを検査する。MOOSE SPOTは発射側相対2 m・目標位置+1 mを使う。既存のUNIT:IsLOSによる両端2 mの診断は全実体検証後の次の監視で1回だけDEBUGへ記録し、生成条件にはしない。false・nil・例外でもCASを解除せず、座標案内・Status・採点を維持する。中止・回収中は診断しない。配置は動かさず、実射はME配置とDCSで別途確認する。
+
+2026-11-07の実サーバーでは12:36と13:19 JSTの2生成とも、BMP-2の2両がvisible=false、Ural-375だけtrueだった。生成後の各位置は保存済みTPLと一致し、JTACの地表高は130.78 m、敵は119.63 / 119.80 / 122.53 m、AGLはほぼ0 m。生成位置・高度のずれを示す結果ではなく、現配置での地形遮蔽を優先して調べる根拠となる。ただし診断は実レーザー点・照射対象・車体の照射部位を取得しておらず、着弾ずれの原因確定ではない。
+
+インストール済みMEのme_action_param_panels.luaでは、FACのgetTerrainLOSが対象グループの1両でも見えればtrueを返す。従ってLaserのproblem: no LOS警告が消えても全3両の見通しを保証しない。配置検証では車両別の見通しを確認する。今回の調査では原本の配置・FAC設定を変更していない。
+
+CASME-4は実.mizと同梱MOOSEのSpawn/Prepare/DATABASE関数を通し、coalition.addGroupへ渡る座標・向き・車種・Skill・WPとFAC除去を検査する。CASME-2とCAS追加ケースでは実AUTOLASE Constructor / CanLase / SPOT関数を実行し、選択コード・対象限定・追従・停止を検証する。native生成・spot・scheduler・イベント処理は模擬境界であり、実レーザー表示や誘導弾命中を再現する検査ではない。
 
 ## 無線・コード枠
 
-| 選択コード | コールサイン | 無線 |
-|---|---|---|
-| 1688 | Axeman 1 | 133.000 MHz AM |
-| 1687 | Axeman 2 | 134.000 MHz AM |
-| 1686 | Axeman 3 | 135.000 MHz AM |
+| 選択コード | JTAC識別 |
+|---|---|
+| 1688 | Axeman 1 |
+| 1687 | Axeman 2 |
+| 1686 | Axeman 3 |
 
 地域と通信枠は同時使用不可。希望コードが使用中なら別コードへ自動変更せず、生成・採点なしでロックを戻す。全生成物の削除確認まで枠を保持する。現在のBLUE AWACS / 給油機の251 / 251.1 / 251.2 MHzとは重複しない。空港管制など他の無線との完全な周波数管理を行うものではない。
 
-標準JTACへの交信・Laser OnなどはDCSの無線メニューで実施する。独自の9-lineや照射機構を追加しない。他のBLUEプレイヤーから標準JTACへの接触を完全に禁止する機能はなく、ブリーフィングで担当を明示する。自機レーザーとのコード競合は搭乗者が調整する。
+AUTOLASEの開始・対象切替は自動。標準JTACの音声9-line・無線メニュー・Laser On依頼は使わない。設定内の旧無線値は予約互換用に残すが、音声通信は行わず公開ブリーフィングにも周波数を表示しない。自機レーザーとのコード競合は搭乗者が調整する。
 
 ## 達成・帰還・支援喪失
 
@@ -59,10 +67,8 @@ JTACの初期WPには有効な `FAC_EngageGroup` を1つだけ置き、同地域
 ```text
 CAS MISSION
 FRIENDLY LOCATION: <味方先頭車の座標>
-TARGET AREA: <敵先頭車の座標>
-FRIENDLIES: 2 M113s and 1 truck.
 TARGETS: 2 BMP-2s and 1 truck.
-JTAC: Axeman 1 / 133.000 MHz AM / LASER 1688
+JTAC standing by. LASER 1688. F10 CAS JTAC > Request laser when ready.
 OBJECTIVE: Destroy all 3 designated enemy vehicles; then RTB.
 Reward per pilot: 150 points.
 Registered pilots: <人数>.
@@ -81,8 +87,8 @@ Reward per pilot: 150 points; recovery failure: 90 points.
 
 ## 終了・保存・検証
 
-全参加者終了、Abort、準備失敗でJTAC・味方・敵をすべて削除する。部分生成やMOOSE登録前の生成失敗も固有aliasで回収し、削除未確認は5秒ごとに再試行する。全消失まで地域・通信枠を解放しない。古いcallbackと削除中の喪失イベントを新任務や目標達成へ適用しない。
+目標達成で照射を停止し、帰還評価は維持する。全参加者終了、Abort、準備失敗でも照射を停止してJTAC・味方・敵をすべて削除する。部分生成やMOOSE登録前の生成失敗も固有aliasで回収し、削除未確認は5秒ごとに再試行する。native IR/Laserと監視・全生成物の回収完了まで地域・通信枠を解放しない。古いcallbackと削除中の喪失イベントを新任務や目標達成へ適用しない。
 
 CAS ScoreはcasScoreへ独立加算する。保存schema5で末尾へ追加し、schema1～4は従来の値を保持してCASを0へ移行する。missionとHookを同時更新し、サーバーHookの再導入・DCS再起動が必要。開発テストは実成績ファイルを変更しない。途中の任務・地域・JTACは再起動後に復元しない。
 
-自動検証はTest-CAS.lua、実.mizの構成検査はTest-CASMission.ps1、保存はTest-Persistence.lua。全既存スイートとBuild / Sync / Installも確認する。DCS内では動的JTACの登録・交信・対象追従、Apache K / L、複数JTAC、支援喪失、終了後の残留を別途確認する。Hornet対応は将来の追加対象。
+自動検証はTest-CAS.lua、実.mizの構成検査はTest-CASMission.ps1、保存はTest-Persistence.lua。全既存スイートとBuild / Sync / Installも確認する。DCS内では自動照射通知・LST・対象追従、Apache K / L、複数JTAC、支援喪失、終了後の残留を別途確認する。training-18は保存schema5とHookを変更しないため、正常な17.3 Hookはそのまま利用できる。Hornet対応は将来の追加対象。

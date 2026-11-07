@@ -9,7 +9,7 @@ for side, co in pairs(mission.coalition) do for _, country in pairs(co.country o
         if role then
             assert(not templates[group.name] and group.lateActivation == true, 'CAS TPL missing Late Activation or duplicated')
             assert(side == (role == 'enemy' and 'red' or 'blue') and country.name == (role == 'enemy' and 'Russia' or 'USA'))
-            group.CoalitionID, group.CategoryID = role == 'enemy' and 1 or 2, 2
+            group.CoalitionID, group.CategoryID, group.CountryID = role == 'enemy' and 1 or 2, 2, country.id
             templates[group.name] = group
         end
     end
@@ -26,8 +26,11 @@ for _, site in ipairs(config.sites) do
         assert(r.state == 'ACTIVE' and #r.casPlan.targets == 3 and #s.spawns == 3)
         local jtac = r.casPlan.instances.jtac.group; local fac
         for _, task in ipairs(jtac.data.route.points[1].task.params.tasks) do if task.id=='FAC_EngageGroup' then fac=task.params end end
-        assert(fac and fac.groupId == r.spawn.group:GetID() and fac.groupId ~= templates[site.enemy].groupId)
-        assert(fac.laserCode==slot.laserCode and fac.frequency==slot.frequencyMHz*1000000 and fac.visible and fac.datalink)
+        assert(not fac, 'Native FAC must be absent from the AUTOLASE clone')
+        assert(r.casPlan.autolase.engine:GetLaserCode(r.casPlan.jtac.unit:GetName())==slot.laserCode)
+        s:tick(1); assert(not r.casPlan.autolase.spot, 'Acceptance must remain on standby')
+        s:command('Request laser')
+        assert(r.casPlan.autolase.spot.SpotLaser.code==slot.laserCode)
         for _, role in ipairs({'enemy','friendly','jtac'}) do
             local generated = r.casPlan.instances[role].group.data
             for i, u in ipairs(generated.units) do
@@ -41,7 +44,7 @@ for _, site in ipairs(config.sites) do
         s:assertClean()
     end
 end
-print('PASS: CASME-2 actual templates retain geometry for every code, bind live enemy IDs and complete/clean up')
+print('PASS: CASME-2 actual templates retain geometry, omit native FAC, lase with each selected code and complete/clean up')
 
 local samples = dofile('scripts/Departure-TestFixtures.lua')(mission, warehouses)
 local nearby = 0
@@ -57,3 +60,7 @@ for _, sample in ipairs(samples) do
 end
 assert(nearby==3)
 print('PASS: CASME-3 Ramat historical parking samples have CAS within 3-13 NM; actual Dynamic Spawn and LOS remain DCS checks')
+
+local audited=dofile('scripts/CAS-MOOSE-TestBoundary.lua')(templates,config)
+assert(audited==#config.sites*#config.radioSlots)
+print('PASS: CASME-4 pinned MOOSE Spawn/Prepare/DATABASE preserve geometry and omit native FAC at the addGroup boundary')

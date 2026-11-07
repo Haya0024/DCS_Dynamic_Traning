@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-17.3" }
+DynamicTrainingRuntime = { version = "training-18.1" }
 Persistence.Publish()
 DynamicTrainingPlayers = { protocol = 1, Update = Player.UpdateDirectory }
 
@@ -103,6 +103,7 @@ local function PrimaryComplete(record, time, result)
     if not Missions.IsActive(record) or record.state ~= "ACTIVE" then return end
     record.primaryCompletedAt, record.state = time, "RTB_PENDING"
     if record.category == "Strike" then Strike.StopMark(record.strikePlan) end
+    if record.category == "CAS" then CASAutolase.Stop(record.casPlan) end
     if record.category == "SEAD" then
         record.primaryResult = result or "DESTROYED"
         SEADSites.PrimaryComplete(record.site, record.primaryResult)
@@ -485,6 +486,30 @@ local function CanManage(groupName, target)
     return false
 end
 
+local function CanControlCAS(groupName, record)
+    if not Missions.IsActive(record) or Missions.groupLocks[groupName] ~= record
+        or record.category ~= "CAS" or record.state ~= "ACTIVE" then return false end
+    local state = record.casPlan and record.casPlan.autolase
+    if not state or state.stopped or record.casPlan.closing then return false end
+    for _, p in ipairs(record.participants) do
+        if not p.done and p.owner.groupName == groupName and CanManage(groupName, p)
+            and Player.IsControlling(p.owner) then return true end
+    end
+    return false
+end
+
+local function ControlCAS(groupName, record, groupID, requested)
+    local group = GROUP:FindByName(groupName)
+    if not group or group:GetID() ~= groupID or not CanControlCAS(groupName, record) then
+        Message(group, "CAS laser control is no longer available for this sortie.", 10); return
+    end
+    local time = timer.getTime()
+    CASAutolase.SetRequested(record.casPlan, requested, time)
+    for _, text in ipairs(CASAutolase.Tick(record.casPlan, time)) do
+        MissionMessage(record, text, Config.cas.autolase.notificationSeconds)
+    end
+end
+
 local function CanMarkStrike(groupName, record)
     if not Missions.IsActive(record) or record.groupName ~= groupName or record.category ~= "Strike"
         or record.state ~= "ACTIVE" then return false end
@@ -638,6 +663,9 @@ ScanPlayers = function()
         local canPreserve = canContinue and followOn.site.disposition == "CLEANUP"
         local strike = Missions.groupLocks[name] or Missions.wings[name]
         local canMarkStrike = CanMarkStrike(name, strike)
+        local cas = Missions.groupLocks[name]
+        local canControlCAS = CanControlCAS(name, cas)
+        signature = signature .. ":casLaser:" .. tostring(canControlCAS)
         signature = signature .. ":strikeMark:" .. tostring(canMarkStrike)
         signature = signature .. ":follow:" .. tostring(canContinue) .. ":preserve:" .. tostring(canPreserve)
         local reservations = {}
@@ -707,6 +735,18 @@ ScanPlayers = function()
                 end
             end
             local capturedGroupID = group:GetID()
+            if canControlCAS then
+                local record = cas
+                local parent = AddSubmenu("CAS JTAC")
+                for _, choice in ipairs({ { "Request laser", true }, { "Stop laser", false } }) do
+                    local label, requested = choice[1], choice[2]
+                    MENU_GROUP_COMMAND:New(group, label, parent, function()
+                        Safe(label, group, function()
+                            ControlCAS(name, record, capturedGroupID, requested); ScanPlayers()
+                        end)
+                    end)
+                end
+            end
             local function WingCommand(label, operation)
                 AddCommand(label, function()
                     Safe(label, group, function()
@@ -812,6 +852,11 @@ end
 local function TickMission(record, time)
     if not Missions.IsActive(record) then return end
     if record.category == "CAS" and record.spawn then
+        if record.state == "ACTIVE" then
+            for _, text in ipairs(CASAutolase.Tick(record.casPlan, time)) do
+                MissionMessage(record, text, Config.cas.autolase.notificationSeconds)
+            end
+        end
         for _, text in ipairs(CAS.SupportMessages(record.casPlan)) do
             if record.state == "ACTIVE" then PublishMission(record, "notice", text, 20)
             else MissionMessage(record, text, 20) end

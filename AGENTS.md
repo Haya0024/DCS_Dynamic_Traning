@@ -625,3 +625,13 @@ DCS Unit:getIDの正の整数/十進文字列をObservations.IDNumberで検証�
 MOOSE UNIT:IsLOSは両端2 mの地形レイであり、全敵への通過をCAS生成条件にしない。標準FACへ検出・照射判断を任せ、全実体の検証後の次の監視でID・座標・地表高・AGL・visibleを一度だけDEBUGへ記録する。false/nil/例外でCASや公開済み座標・採点を取り消さず、回収中は診断しない。生成実体のID/陣営/構成/生存検証は維持する。
 
 Hook配置は結合済みbuild/DynamicTrainingPersistenceHook.luaだけ。serverの同名ファイルは編集部品で単独配置できない。Install-PersistenceHook.ps1のHookBundlePath指定ならリポジトリなしで生成済みbundleを導入でき、ヘッダー/全6モジュールを検査してからbackup・配置する。不完全bundleではHook/backup/autoexecを変更しない。Lua602件/15スイート、CAS41・DynamicPlayers27とINSTALL7。実サーバーへの17.3導入とCAS実射・乗員照合は未確認。
+
+## 2026-11-07 CAS AUTOLASE移行（training-18）
+
+ユーザー承認で標準FAC交信からAUTOLASEへ移行する。旧FAC_EngageGroupはME原本に残し、動的コピーからだけ除去する。src/cas_autolase.luaが同梱MOOSE AUTOLASEの実Constructor・CanLaseとSPOTをCAS専用に接続する。既定の全周INTEL検索・自律Monitor・広域メニュー/通知・nilを死亡にするCleanupは使わず、固定3両・元ID・RED groundだけを1両ずつ選択コードで照射する。対象を保持し、喪失・未知・LOS/距離不成立・期限で停止/再選定。目標達成・中止・終了で停止し、scheduler/event解除とnative IR/Laserの部分失敗回収・再試行完了まで地域/コード枠を保持する。MOOSE本体・ME配置・保存schema5・Hook・150/90/0は維持する。標準9-line/チェックイン/Laser On依頼は使わず、短い照射通知をAssignmentへ配信しStatus本文は置き換えない。設定はConfig.cas.autolase、仕様はdocs/CAS_AUTOLASE.md。CAS55件、Lua616件/15スイートと全結合検証を通す。実DCSの照射表示・LST・命中・長時間運用は自動検証と分ける。
+
+## CASの依頼式照射（training-18.1）
+
+ユーザー指定により受注後はSTANDBYとし、F10 Dynamic Training → CAS JTAC → Request laserで照射を依頼する。Stop laserは再依頼まで停止する可逆操作、任務達成/終了のStopは永久停止として分離する。停止時のnative回収失敗は待機中も再試行し、再依頼でも回収未完了なら新spotを作らない。SPOTの依頼世代を固定し、停止前のcallbackは再依頼後も拒否する。メニューと操作時の両方でACTIVE任務・登録未精算者・現在の機体/UCID・Group IDを照合し、Teamの各登録グループへ提供する。F10はグループ共有のため個人の押下者は特定できない。準備中/達成後/途中参加者だけ/個人終了/別機/旧任務の操作を拒否する。配置・コード・採点・Status本文を維持し、CAS63件とLua624件/15スイートを検証する。
+
+CASの受注/Statusはユーザー指定の7行へ短縮する。CAS MISSION、FRIENDLY LOCATION、TARGETS、JTAC standing by. LASER <code>. F10 CAS JTAC > Request laser when ready.、OBJECTIVE、Reward per pilot、Registered pilotsの順とし、TARGET AREA・FRIENDLIES・JTAC識別の独立行は出さない。照射制御・採点・表示60秒は維持する。

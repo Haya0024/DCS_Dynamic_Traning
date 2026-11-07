@@ -1,5 +1,35 @@
 # 検証・診断履歴
 
+## 2026-11-07 CASブリーフィング短縮（training-18.1 shortbrief）
+
+ユーザー指定の7行へ短縮。TARGET AREA・FRIENDLIES・JTAC識別行を除き、JTAC待機・選択コード・Request laser案内を1行にまとめた。受注時とMission Statusを同じ本文にし、既存のCAS表示テストで全文と3コードを照合する。配置・照射制御・採点・60秒表示は維持。照射制御の実DCS検査は直前のtraining-18.1と共通の履歴であり、この文面のゲーム内見た目を確認した記録ではない。
+
+## 2026-11-07 CASの照射をF10依頼式へ変更（training-18.1）
+
+ユーザー指定により受注後は照射せず待機し、CAS JTACのRequest laserで照射、Stop laserで再依頼まで停止する。可逆な依頼フラグと任務終了の永久停止を分離し、旧依頼の追従callbackは世代番号で拒否する。停止中のnative回収失敗も監視で再試行し、回収中に新spotを重ねない。操作時にACTIVE任務・固定参加者の機体/UCID・Group IDを再照合し、Mission Teamの登録グループから操作可能とする。配置・対象・コード・共有目標・150/90/0・Hookを維持する。
+
+Lua624件/15スイート（CAS63）と全結合検証が通過。実DCS 2.9.31.29434 / Syriaの新規隔離プロファイルで16:46～16:47 JSTに3コードすべての受注後待機、依頼、停止後待機、再依頼、8秒後のnative点と目標+1 mの一致（誤差0.000 m）、終了回収・コード解放を確認し、COMPLETE standby=3 pause=3 spots=3 cleanup=3で完了した。検査DCSだけを終了し、通常設定/Hook/成績は使わない。F10押下は模擬検証、Apache搭乗/LST/実射は未実施。更新.mizの変更は登録済みDynamicTraining.luaだけとする。旧training-18のZIPとbefore-request-laserバックアップを残す。
+
+## 2026-11-07 CASへAUTOLASEを接続（training-18）
+
+ユーザー承認により、標準FAC方式から同梱MOOSE AUTOLASEの判定とSPOT追従を使うCAS専用接続へ移行。先にCAS_AUTOLASE.mdで対象・状態・終了方針を定義し、src/cas_autolase.luaへ固定3両・1両ずつ・選択コード固定・観測不能時の停止と回収を分離した。AUTOLASEの既定の全周INTEL検索・自律監視・広域メニュー/通知・nilを死亡とするCleanupは使用せず、既存CASの監視と固定ID観測へ接続する。標準FACは動的コピーからだけ除去し、ME原本・配置・MOOSE本体を保持する。
+
+SPOT作成前に所有ハンドルを確保し、IRだけ生成できた部分失敗も回収する。追従前の所有権・固定ID・生存・有限座標・距離・LOS・期限検査、停止時のscheduler/event解除、native spot破棄失敗の参照保持と再試行を実装。達成後も帰還評価を維持し、照射エラーで任務・採点を取り消さない。公開ブリーフィングはAUTOLASE・チェックイン不要へ変更し、短い照射通知はStatus本文を置換しない。保存schema5・Hook・150/90/0を維持する。
+
+Lua全616ケース/15スイート（CAS55）、BUILD2・SYNC3・INSTALL7・ZONES3・STRIKEME2・INTERDICTIONME5・DYNAMICME1・CASME4が通過。同梱MOOSEの実AUTOLASE/INTEL Constructor・CanLase・SPOT生成/追従関数を使い、単一照射・対象維持/切替・未知/例外/ID変更・部分失敗・旧callback・コード分離・回収再試行を検証した。CAPの初期化ログ検査はruntime版表記だけ更新した。制限付き環境では使い捨てZIPのFile.Replaceが拒否され、通常実行環境で全体検証を完走した。実成績は変更しない。
+
+実DCS 2.9.31.29434 / Syriaの隔離プロファイルでも3コードを順次検査し、各8秒後のnative spot座標が静止目標位置+1 mと誤差0.000 mで一致、全3回の回収・コード枠解放とCOMPLETEを確認した。2 m地形診断falseと2.5 m CanLase通過が両立する境界的な配置だった。通常設定・Hook・成績は使用せず、検査DCSだけを終了した。実LST・ビーム経路・命中の証明とは分ける。再現手順はCAS_AUTOLASE.md。
+
+## 2026-11-07 動的CASの地形遮蔽とMOOSE生成境界を調査
+
+ユーザー提供のサーバーログではtraining-17.3の12:36と13:19 JSTの生成が成立し、いずれもBMP-2×2の地形レイはfalse、Ural-375はtrue。同一TPLに対して同じ座標・結果を再現した。JTACの地表高130.78 m、敵119.63 / 119.80 / 122.53 m、AGLほぼ0 mで、保存済み位置と一致する。単に生成直後の位置未確定・高度未反映とする根拠は得られなかった。ユーザーからはJTACのみのレーザー・DIRで捕捉後もTADSと着弾が手前へずれるとの報告がある。実レーザー点をログで取得していないため、地形遮蔽を有力な調査対象とし、原因確定や修復済みとはしない。
+
+インストール済みDCSのMissionEditor/modules/me_action_param_panels.luaのgetTerrainLOS（4567行付近）は対象のどれか1両が見えればtrueを返し、FAC:setGroup（4836行付近）がその結果でno LOS警告を切り替える。全3両への視線が通る検査ではなく、今回のトラックのみtrueという結果とMEの警告なしは両立する。
+
+実.mizの3TPL・全3通信枠を、同梱MOOSEのNewFromTemplate/Spawn/SpawnWithIndex/Prepare/DATABASEの実関数へ渡すCASME-4を追加。native addGroup直前で元の車両位置・向き・種類・Skill・WPと、生成した敵Group IDを指すFAC・予約した通信設定の保持を確認する。native生成・登録・イベント境界は模擬であり、DCSレーザー照射の正常動作を証明しない。ゲーム側コード・ME原本・埋め込みLuaはこの調査で変更しない。
+
+同じ実ログのidentity=mission-unit-id-v2、CASの登録参加者1名、13:19 JSTのscored=trueのAbortとSNAPSHOT_COMMITTED run=4 revision=1を確認。修正版Hookの接続・当該Abort精算の保存確認が得られた。満額150の実RTB精算・再起動後の成績復元とは分ける。
+
 ## 2026-11-07 CASのLOS中断とHook部品の誤配置を修正（training-17.3）
 
 新サーバーログでは11:55・11:58 JSTのCASがID検証を通過し、MOOSEの地形LOS assertで回収された。ユーザーはMEでは全敵への視線が通ると報告。使用中MOOSEのUNIT:IsLOSは両端2 mを足すland.isVisibleであり、標準FACの検出状態とは異なる。旧ログに端点座標がないため、falseになった地形・高度・生成直後の状態は断定しない。

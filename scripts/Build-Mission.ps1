@@ -10,7 +10,7 @@ $modules = [ordered]@{
     score_data = 'ScoreData'; player = 'Player'; scoring = 'Scoring'; persistence = 'Persistence'
     missions = 'Missions'; training_wings = 'TrainingWings'; air_targets = 'AirTargets'; intercept = 'Intercept'; cap = 'CAP'
     sead_objective = 'SEADObjective'; sead = 'SEAD'; sead_sites = 'SEADSites'; dead = 'DEAD'
-    strike = 'Strike'; air_interdiction = 'AirInterdiction'; jtac = 'JTAC'; cas = 'CAS'
+    strike = 'Strike'; air_interdiction = 'AirInterdiction'; jtac = 'JTAC'; cas_autolase = 'CASAutolase'; cas = 'CAS'
     recovery = 'Recovery'; mission_report = 'MissionReport'
 }
 $builder = [System.Text.StringBuilder]::new()

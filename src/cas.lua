@@ -49,7 +49,7 @@ function CAS.Initialize()
             end
             assert(type(cfg.friendlyDescription) == "string" and cfg.friendlyDescription ~= ""
                 and type(cfg.enemyDescription) == "string" and cfg.enemyDescription ~= "", "CAS identification text missing.")
-            site.jtacTemplate, site.fac, site.facIndex = JTAC.Extract(site.templates.jtac, site.templates.enemy.groupId)
+            site.jtacTemplate = JTAC.Extract(site.templates.jtac, site.templates.enemy.groupId)
             local function rejectFAC(value)
                 if type(value) ~= "table" then return end
                 assert(type(value.id) ~= "string" or not value.id:find("^FAC"), "FAC task in a non-JTAC template.")
@@ -170,8 +170,7 @@ function CAS.Step(plan, time)
     for _, role in ipairs(roles) do
         local instance = plan.instances[role]
         if not instance.attempted then
-            local template = role == "jtac" and JTAC.Bind(plan.site.jtacTemplate, plan.site.fac,
-                plan.site.facIndex, plan.enemyGroupID, plan.radio) or UTILS.DeepCopy(plan.site.templates[role])
+            local template = UTILS.DeepCopy(role == "jtac" and plan.site.jtacTemplate or plan.site.templates[role])
             spawnRole(plan, role, template)
         end
         if not instance.targets then
@@ -195,8 +194,8 @@ function CAS.Step(plan, time)
             assert(Observations.TargetAlive(target, true) == true, "CAS vehicle lost during preparation: " .. role)
         end
     end
-    -- Native FAC owns detection/designation. MOOSE's terrain ray is only a
-    -- diagnostic: it is not ME's visibility test and must not veto this spawn.
+    CASAutolase.Start(plan)
+    -- A terrain report must not veto the mission or its scoring.
     plan.visibilityReportAt = time + Config.pollSeconds
     return { group = plan.instances.enemy.group, units = plan.targets }
 end
@@ -208,9 +207,10 @@ function CAS.Spawn(plan)
 end
 
 function CAS.Briefing(plan)
-    return "CAS MISSION\nFRIENDLY LOCATION: " .. plan.friendlyLocation .. "\nTARGET AREA: " .. plan.targetLocation ..
-        "\nFRIENDLIES: " .. plan.site.config.friendlyDescription .. "\nTARGETS: " .. plan.site.config.enemyDescription ..
-        "\nJTAC: " .. JTAC.Contact(plan.radio) .. "\nOBJECTIVE: Destroy all 3 designated enemy vehicles; then RTB."
+    return "CAS MISSION\nFRIENDLY LOCATION: " .. plan.friendlyLocation ..
+        "\nTARGETS: " .. plan.site.config.enemyDescription ..
+        "\nJTAC standing by. LASER " .. plan.radio.laserCode .. ". F10 CAS JTAC > Request laser when ready." ..
+        "\nOBJECTIVE: Destroy all 3 designated enemy vehicles; then RTB."
 end
 
 local function observe(target)
@@ -250,6 +250,7 @@ function CAS.RecordLoss(plan, event)
     end
     for _, target in ipairs(plan.friendlies) do if Player.EventMatches(target, event) then target.lost = true end end
     if plan.jtac and Player.EventMatches(plan.jtac, event) then plan.jtac.lost = true end
+    CASAutolase.Interrupt(plan)
     if not matched then return false end
     for _, target in ipairs(plan.targets) do if not target.lost then return false end end
     return true
@@ -264,6 +265,12 @@ end
 function CAS.Sweep(time)
     local closing = {}
     for _, plan in pairs(Missions.casSites) do
+        local designator = plan.autolase
+        if not plan.closing and designator and designator.stopped
+            and time >= (designator.retryAt or 0) then
+            CASAutolase.Stop(plan)
+            designator.retryAt = time + Config.cas.cleanupRetrySeconds
+        end
         if not plan.closing and plan.visibilityReportAt and time >= plan.visibilityReportAt then
             plan.visibilityReportAt = nil -- One report, after the spawning frame.
             local ok, report = pcall(JTAC.VisibilityReport, plan.jtac.unit, plan.targets)
@@ -274,7 +281,8 @@ function CAS.Sweep(time)
     end
     for _, plan in ipairs(closing) do
         plan.cleaning = true
-        local allRemoved, problem = true, nil
+        local allRemoved, problem = CASAutolase.Stop(plan), nil
+        if not allRemoved then problem = "AUTOLASE spot/scheduler cleanup unconfirmed." end
         -- Stop the designator first; attempt every group even if one removal fails.
         for _, role in ipairs({ "jtac", "friendly", "enemy" }) do
             local instance = plan.instances[role]

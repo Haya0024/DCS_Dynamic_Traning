@@ -21,6 +21,7 @@ end
 local function accept(s, code, player)
     s:command('Laser ' .. (code or 1688), player); return assert(s:mission(player))
 end
+local function request(s, player) s:command('Request laser', player) end
 local function kill(s, unit) unit.alive = false; unit.life = 0; s:event('Dead', unit) end
 local function complete(s, r) for _, t in ipairs(r.casPlan.targets) do kill(s, t.unit) end end
 local function recover(s, unit)
@@ -70,16 +71,21 @@ test('ground acceptance immediately creates seven units and publishes MGRS brief
     local s = apache(); local r = accept(s)
     assert(r.category == 'CAS' and r.state == 'ACTIVE' and #s.spawns == 3 and #r.casPlan.targets == 3)
     local m = s.messages[#s.messages]; assert(m.seconds == 60 and m.text:find('CAS MISSION\nFRIENDLY LOCATION: MGRS', 1, true))
-    assert(m.text:find('TARGET AREA: MGRS', 1, true) and m.text:find('Axeman 1 / 133.000 MHz AM / LASER 1688', 1, true))
-    assert(m.text:find('Reward per pilot: 150 points.\nRegistered pilots: 1.', 1, true)); s:assertClean()
+    assert(m.text == 'CAS MISSION\nFRIENDLY LOCATION: ' .. r.casPlan.friendlyLocation ..
+        '\nTARGETS: 2 BMP-2s and 1 truck.' ..
+        '\nJTAC standing by. LASER 1688. F10 CAS JTAC > Request laser when ready.' ..
+        '\nOBJECTIVE: Destroy all 3 designated enemy vehicles; then RTB.' ..
+        '\nReward per pilot: 150 points.\nRegistered pilots: 1.')
+    s:command('Mission Status'); assert(s.messages[#s.messages].text == m.text); s:assertClean()
 end)
 
-test('FAC uses the actual enemy group and selected radio without mutating source templates', function()
+test('clones omit native FAC and AUTOLASE fixes the selected code without mutating templates', function()
     for _, code in ipairs({1688, 1687, 1686}) do
-        local s = apache(); local r = accept(s, code); local p = fac(r.casPlan.instances.jtac.group)
-        assert(p.groupId == r.spawn.group:GetID() and p.groupId ~= 501 and p.laserCode == code)
-        assert(p.visible and p.designation == 'Laser' and p.weaponType == 9663676414 and p.datalink)
-        assert(p.frequency == (133 + 1688 - code) * 1000000 and p.number == 1689 - code)
+        local s = apache(); local r = accept(s, code); local engine = r.casPlan.autolase.engine
+        assert(not fac(r.casPlan.instances.jtac.group))
+        assert(engine:GetLaserCode(r.casPlan.jtac.unit:GetName()) == code and engine.maxlasing == 1)
+        assert(s.messages[#s.messages].text:find('JTAC standing by. LASER '..code..'. F10 CAS JTAC > Request laser when ready.',1,true))
+        assert(next(engine.RecceSet.Set) == r.casPlan.instances.jtac.group:GetName())
         assert(s.casTemplates.TPL_CAS_JTAC_01.route.points[1].task.params.tasks[1].params.groupId == 501)
         assert(s.casTemplates.TPL_CAS_JTAC_01.route.points[1].task.params.tasks[1].params.laserCode == 1688)
         for _, role in ipairs({'enemy', 'friendly', 'jtac'}) do
@@ -114,7 +120,7 @@ test('parallel teams cannot share a code or site but can use independent resourc
     s:command('Laser 1688', p); assert(not s:mission(p) and #s.spawns == 3)
     s:lastMessageContains('radio slot is in use'); assert(not module(s, 'Missions').pilots['ucid-b'])
     local b = accept(s, 1687, p); assert(a.casPlan.site ~= b.casPlan.site and #s.spawns == 6)
-    assert(fac(b.casPlan.instances.jtac.group).groupId == b.spawn.group:GetID())
+    assert(not fac(b.casPlan.instances.jtac.group) and b.casPlan.autolase.engine:GetLaserCode(b.casPlan.jtac.unit:GetName())==1687)
     kill(s, a.casPlan.targets[1].unit); assert(module(s, 'CAS').Remaining(b.casPlan) == 3); s:assertClean()
 end)
 
@@ -217,7 +223,7 @@ test('failures before, during and after each spawn clean every created group and
     end
 end)
 
-test('terrain LOS false or unobservable is diagnostic and cannot cancel native FAC setup', function()
+test('terrain LOS false or unobservable pauses designation and cannot cancel CAS setup', function()
     for _, mode in ipairs({'blocked', 'error'}) do local s = apache()
         if mode == 'blocked' then s.casLOS = false else s.casLOSError = true end
         local r=accept(s); assert(r.state=='ACTIVE' and #s.spawns==3)
@@ -382,11 +388,10 @@ test('DCS decimal-string unit IDs activate CAS and keep target identity through 
     complete(s,r); recover(s); s:score(150); clean(s); s:assertClean()
 end)
 
-test('decimal-string group IDs bind a numeric FAC target ID without mutating native identity', function()
+test('decimal-string group IDs retain CAS identity while native FAC remains absent', function()
     local s=apache(); s.casStringUnitIDs=true; s.casStringGroupID=true; local r=accept(s)
     assert(r.state=='ACTIVE')
-    local p=fac(r.casPlan.instances.jtac.group)
-    assert(type(p.groupId)=='number' and p.groupId==tonumber(r.spawn.group:GetID()))
+    assert(not fac(r.casPlan.instances.jtac.group) and type(r.spawn.group:GetID())=='string')
     s:command('Abort Mission'); clean(s); s:assertClean()
 end)
 
@@ -450,4 +455,242 @@ test('aborted preparation never schedules a later visibility diagnostic for remo
     s:assertClean()
 end)
 
-print(string.format('All %d CAS tests passed (simulated DCS/MOOSE boundaries).', count))
+local function activeLasers(s)
+    local count=0
+    for _,spot in ipairs(s.nativeSpots) do if spot.kind=='laser' and not spot.destroyed then count=count+1 end end
+    return count
+end
+
+test('pinned AUTOLASE constructor has one Recce, fixed code and no autonomous pending jobs', function()
+    for _,code in ipairs({1688,1687,1686}) do
+        local s=apache(); local r=accept(s,code); local a=r.casPlan.autolase
+        local n=0; for _,group in pairs(a.engine.RecceSet.Set) do n=n+1; assert(group==r.casPlan.instances.jtac.group) end
+        assert(n==1 and a.engine.maxlasing==1 and a.engine.forcecooldown~=true)
+        for _,task in ipairs(s.mooseTasks) do assert(task.cancelled) end
+        assert(#s.nativeSpots==0); s:tick(1); assert(#s.nativeSpots==0); request(s)
+        assert(activeLasers(s)==1 and a.spot.SpotLaser.code==code)
+        s:command('Abort Mission'); assert(activeLasers(s)==0 and next(s.mooseSubscriptions)==nil); clean(s); s:assertClean()
+    end
+end)
+
+test('actual MOOSE SPOT tracks the chosen unit at plus one metre and keeps that target', function()
+    local s=apache(); local r=accept(s); request(s); s:tick(1); local a=r.casPlan.autolase
+    local first=a.target; local laser=a.spot.SpotLaser
+    assert(laser.point.x==first.unit.position.x and laser.point.y==first.unit.position.y+1)
+    first.unit.position.x=first.unit.position.x+10
+    r.casPlan.targets[3].unit.threat=10; s:tick(2)
+    assert(a.target==first and a.spot.SpotLaser==laser and laser.updates>0)
+    assert(laser.point.x==first.unit.position.x and activeLasers(s)==1)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('only designated visible RED targets may be selected and all blocked targets pause safely', function()
+    local s=apache(); local r=accept(s); local p=r.casPlan
+    p.targets[1].unit.los=false; p.targets[2].unit.los=false
+    p.friendlies[1].unit.threat=100
+    request(s); s:tick(1); assert(p.autolase.target==p.targets[3] and activeLasers(s)==1)
+    kill(s,p.targets[3].unit); s:tick(2)
+    assert(p.autolase.status=='WAITING' and activeLasers(s)==0 and r.state=='ACTIVE')
+    p.targets[1].unit.los=true; s:tick(3); assert(p.autolase.target==p.targets[1])
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('unknown, exceptions, invalid coordinates, side changes and reused IDs stop tracking without credit', function()
+    for _,mode in ipairs({'nil','lifeError','id','position','side','losNil','losError'}) do
+        local s=apache(); local r=accept(s); request(s); s:tick(1); local p=r.casPlan; local target=p.autolase.target
+        for _,t in ipairs(p.targets) do if t~=target then t.unit.los=false end end
+        local u=target.unit; local oldSpot=p.autolase.spot
+        if mode=='nil' then u.alive=nil elseif mode=='lifeError' then u.lifeError=true
+        elseif mode=='id' then u.id=u.id+100 elseif mode=='position' then u.position.x=0/0
+        elseif mode=='side' then u.side=2 elseif mode=='losNil' then s.casLOSNil=true else s.casLOSError=true end
+        s.time=2; s:runMoose(2)
+        assert(not oldSpot.Lasing and activeLasers(s)==0)
+        s:tick(2); assert(r.state=='ACTIVE' and not target.lost); s:score(0)
+        s:command('Abort Mission'); clean(s); s:assertClean()
+    end
+end)
+
+test('confirmed target death switches to another target while a JTAC loss stops all designation', function()
+    local s=apache(); local r=accept(s); request(s); s:tick(1); local p=r.casPlan; local first=p.autolase.target
+    kill(s,first.unit); assert(activeLasers(s)==0); s:tick(2)
+    assert(p.autolase.target~=first and activeLasers(s)==1)
+    kill(s,p.jtac.unit); assert(activeLasers(s)==0); s:tick(3)
+    assert(r.state=='ACTIVE'); complete(s,r); recover(s); s:score(150); clean(s); s:assertClean()
+end)
+
+test('partial native spot creation is cleaned and cannot multiply lasers during a destroy failure', function()
+    local s=apache(); local r=accept(s); s.spotCreateFailure='laser'; s.time=1; request(s)
+    assert(#s.nativeSpots==1 and s.nativeSpots[1].destroyed and activeLasers(s)==0 and r.state=='ACTIVE')
+    s.spotCreateFailure=nil; s:tick(2); assert(activeLasers(s)==1)
+    local laser=r.casPlan.autolase.spot.SpotLaser; laser.destroyFalse=true; s.casLOS=false
+    s:tick(3); local n=#s.nativeSpots; s.casLOS=true; s:tick(4)
+    assert(#s.nativeSpots==n and r.casPlan.autolase.spot.SpotLaser==laser)
+    laser.destroyFalse=nil; s:tick(5); assert(laser.destroyed and activeLasers(s)==1)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('IR creation failure leaves no spot and a later healthy scan recovers', function()
+    local s=apache(); local r=accept(s); s.spotCreateFailure='ir'; s.time=1; request(s)
+    assert(activeLasers(s)==0 and #s.nativeSpots==0 and r.state=='ACTIVE')
+    s.spotCreateFailure=nil; s:tick(2); assert(activeLasers(s)==1)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('primary completion stops spots immediately and stale tracking cannot resume in a new CAS', function()
+    local s=apache(); local r=accept(s); request(s); s:tick(1); local old=r.casPlan.autolase.spot
+    complete(s,r); assert(r.state=='RTB_PENDING' and activeLasers(s)==0)
+    assert(old:OnBeforeLasing()==false); recover(s); clean(s)
+    s.player.position={x=81000-8*1852,y=0,z=800}
+    local b=accept(s,1687); request(s); s:tick(s.time+1); local laser=b.casPlan.autolase.spot.SpotLaser
+    old:__Lasing(0.1); s:runMoose(s.time+1)
+    assert(not old.Lasing and not laser.destroyed and activeLasers(s)==1)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('spot cleanup failure after abort retains the code and site through the bounded retry', function()
+    local s=apache(); local r=accept(s); request(s); s:tick(1); local spot=r.casPlan.autolase.spot.SpotLaser
+    spot.destroyFailures=1; s:command('Abort Mission')
+    assert(not s:mission() and module(s,'Missions').jtacSlots[1688]==r.casPlan)
+    assert(not spot.destroyed and not r.casPlan.autolase.spot.Lasing)
+    s:tick(6); assert(spot.destroyed); clean(s)
+    for _,task in ipairs(s.mooseTasks) do assert(task.cancelled) end
+    assert(next(s.mooseSubscriptions)==nil)
+end)
+
+test('spot cleanup also retries during RTB without changing its completed reward', function()
+    local s=apache(); local r=accept(s); request(s); s:tick(1); local spot=r.casPlan.autolase.spot.SpotLaser
+    spot.destroyFailures=2; complete(s,r); assert(r.state=='RTB_PENDING')
+    s:tick(6); s:tick(11); assert(spot.destroyed and activeLasers(s)==0)
+    recover(s); s:score(150); clean(s); s:assertClean()
+end)
+
+test('parallel designators keep distinct codes, targets and notification audiences', function()
+    local s=apache(); addSites(s); local a=accept(s)
+    local pilot=s:addPilot('Other','ucid-b',20); pilot.kind='AH-64D_BLK_II'
+    pilot.position=s.env.UTILS.DeepCopy(s.player.position); request(s); s:tick(1)
+    local b=accept(s,1687,pilot); request(s,pilot); s:tick(2)
+    assert(a.casPlan.autolase.target~=b.casPlan.autolase.target and activeLasers(s)==2)
+    assert(a.casPlan.autolase.spot.SpotLaser.code==1688 and b.casPlan.autolase.spot.SpotLaser.code==1687)
+    for _,m in ipairs(s.messages) do if m.text:find('CAS JTAC: Lasing',1,true) then
+        assert(m.text:find(m.group==s.player.group.name and '1688' or '1687',1,true))
+    end end
+    s:command('Abort Mission'); assert(activeLasers(s)==1)
+    s:command('Abort Mission',pilot); assert(activeLasers(s)==0); clean(s); s:assertClean()
+end)
+
+test('designation notices preserve Mission Status and do not flood stable or blocked scans', function()
+    for _,blocked in ipairs({false,true}) do
+        local s=apache(); s.casLOS=not blocked; local r=accept(s); local briefing=s.messages[#s.messages].text
+        request(s); s:tick(1); local n=#s.messages; s:tick(2); s:tick(3); assert(#s.messages==n)
+        s:command('Mission Status'); assert(s.messages[#s.messages].text==briefing)
+        s:command('Abort Mission'); clean(s); s:assertClean()
+    end
+end)
+
+test('a missing AUTOLASE engine rolls back setup before reward activation', function()
+    local s=apache(); s.env.AUTOLASE=nil; s:command('Laser 1688')
+    assert(not s:mission()); clean(s); s:score(0)
+    assert(table.concat(s.errors,'\n'):find('AUTOLASE/SPOT unavailable',1,true))
+end)
+
+test('the SPOT update guard enforces the configured designation deadline', function()
+    local s=apache(); local r=accept(s); request(s); s:tick(1); local old=r.casPlan.autolase.spot
+    s.time=301; s:runMoose(301); assert(not old.Lasing and activeLasers(s)==0)
+    s:tick(301); assert(activeLasers(s)==1 and r.casPlan.autolase.spot~=old)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('ground and airborne acceptances remain on standby until an explicit request', function()
+    for _,airborne in ipairs({false,true}) do
+        local s=apache(); s.player.airborne=airborne; local r=accept(s)
+        assert(s.messages[#s.messages].text:find('JTAC standing by. LASER 1688. F10 CAS JTAC > Request laser when ready.',1,true))
+        for t=1,10 do s:tick(t) end
+        assert(#s.nativeSpots==0 and not r.casPlan.autolase.requested and r.state=='ACTIVE')
+        request(s); assert(activeLasers(s)==1 and #s.spawns==3)
+        s:command('Abort Mission'); clean(s); s:assertClean()
+    end
+end)
+
+test('stop is immediate, stays stopped, and re-request cannot revive stale tracking', function()
+    local s=apache(); local r=accept(s); local briefing=s.messages[#s.messages].text
+    request(s); local old=r.casPlan.autolase.spot; local n=#s.nativeSpots; local notices=#s.messages
+    request(s); assert(#s.nativeSpots==n and #s.messages==notices)
+    s:command('Stop laser'); assert(activeLasers(s)==0 and not old.Lasing)
+    notices=#s.messages; s:command('Stop laser'); assert(#s.messages==notices)
+    for t=1,10 do s:tick(t) end
+    assert(#s.nativeSpots==n and not r.casPlan.autolase.requested)
+    request(s); local current=r.casPlan.autolase.spot; assert(current~=old and activeLasers(s)==1)
+    old:__Lasing(0.1); s:runMoose(11); assert(not old.Lasing and current.Lasing and activeLasers(s)==1)
+    s:command('Mission Status'); assert(s.messages[#s.messages].text==briefing)
+    assert(#s.spawns==3 and r.casPlan.radio.laserCode==1688); s:score(0)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('shutdown failure retries on standby without silently enabling designation', function()
+    local s=apache(); local r=accept(s); request(s); local a=r.casPlan.autolase
+    local old=a.spot; local native=old.SpotLaser; native.destroyFalse=true
+    s:command('Stop laser'); assert(not a.requested and not old.Lasing and a.spot==old)
+    s:lastMessageContains('shutdown pending'); local n=#s.nativeSpots
+    s:tick(1); s:tick(2); assert(#s.nativeSpots==n and a.spot==old)
+    native.destroyFalse=nil; s:tick(3); assert(not a.spot and native.destroyed and activeLasers(s)==0)
+    s:tick(4); assert(#s.nativeSpots==n and a.status=='STANDBY')
+    request(s); assert(activeLasers(s)==1)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('request during pending cleanup waits and old request generations remain invalid', function()
+    local s=apache(); local r=accept(s); request(s); local a=r.casPlan.autolase
+    local old=a.spot; old.SpotLaser.destroyFalse=true; s:command('Stop laser')
+    local n=#s.nativeSpots; request(s); assert(#s.nativeSpots==n and a.spot==old)
+    assert(old:OnBeforeLasing()==false)
+    old.SpotLaser.destroyFalse=nil; s:tick(1); assert(a.spot~=old and activeLasers(s)==1)
+    old:__Lasing(0.1); s:runMoose(2); assert(not old.Lasing and a.spot.Lasing)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('stale menu callbacks cannot request after completion, abort or replacement', function()
+    local s=apache(); local r=accept(s); local oldRequest=s.commands[s.player.group.name]['Request laser']
+    complete(s,r); oldRequest(); assert(#s.nativeSpots==0 and not r.casPlan.autolase.requested)
+    s:command('Abort Mission'); oldRequest(); assert(#s.nativeSpots==0)
+    local b=accept(s,1687); local oldStop=s.commands[s.player.group.name]['Stop laser']
+    s:command('Abort Mission'); local c=accept(s,1686); request(s); local spot=c.casPlan.autolase.spot
+    oldRequest(); oldStop(); assert(c.casPlan.autolase.spot==spot and activeLasers(s)==1)
+    assert(b.casPlan.autolase.stopped)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('late joiners, changed aircraft and replaced groups cannot use captured laser controls', function()
+    for _,mode in ipairs({'late','aircraft','group'}) do
+        local s=apache(); local r=accept(s); local callback=s.commands[s.player.group.name]['Request laser']
+        if mode=='late' then
+            s:occupyWing(); s.player.name=nil; s.connections[10]=nil
+        elseif mode=='aircraft' then s.player.id=s.player.id+1
+        else s.player.group.id=s.player.group.id+1 end
+        callback(); assert(#s.nativeSpots==0 and not r.casPlan.autolase.requested)
+        s:lastMessageContains('no longer available'); s:assertClean()
+    end
+end)
+
+test('registered team wings can control shared designation until their personal sortie closes', function()
+    local s=apache(); local p=s:addPilot('Other','ucid-b',20); p.kind='AH-64D_BLK_II'
+    p.position=s.env.UTILS.DeepCopy(s.player.position); s:tick(2)
+    s:command('Create Mission Team'); s:command('Join Mission Team 1: Pilot',p)
+    local r=accept(s); request(s,p); assert(activeLasers(s)==1)
+    local callback=s.commands[p.group.name]['Request laser']; s:command('Stop laser',p)
+    s:abortSortie(p,p); callback(); assert(activeLasers(s)==0)
+    request(s); assert(activeLasers(s)==1 and r.state=='ACTIVE')
+    for _,pages in pairs(s.menuPages) do for _,page in ipairs(pages) do assert(page.entries<=10) end end
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('preparation exposes no laser controls and completion removes them on refresh', function()
+    local s=apache(); s.casInactiveUntil=2; local r=accept(s)
+    assert(r.state=='PREPARING' and not s.commands[s.player.group.name]['Request laser'])
+    s:tick(1); assert(#s.nativeSpots==0)
+    s:tick(2)
+    assert(r.state=='ACTIVE' and #s.nativeSpots==0)
+    complete(s,r); s:tick(4); assert(not s.commands[s.player.group.name]['Request laser'])
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+print(string.format('All %d CAS tests passed (pinned MOOSE policy/SPOT; simulated engine boundaries).', count))

@@ -1,4 +1,4 @@
--- Native FAC owns radio procedures and lasing; Lua only binds it to our targets.
+-- Template validation, code reservations and public JTAC identity.
 local JTAC = {}
 local finite = Observations.Finite
 
@@ -59,27 +59,12 @@ function JTAC.Extract(template, enemyID)
     check(template)
     local copy = UTILS.DeepCopy(template)
     table.remove(copy.route.points[1].task.params.tasks, index)
+    for i, task in ipairs(copy.route.points[1].task.params.tasks) do task.number = i end
     return copy, fac, index
 end
 
-function JTAC.Bind(template, fac, index, groupID, radio)
-    assert(finite(groupID) and groupID > 0 and groupID % 1 == 0, "Generated enemy group ID unavailable.")
-    local copy, task = UTILS.DeepCopy(template), UTILS.DeepCopy(fac)
-    -- MOOSE's FAC task builder omits ME's laserCode/visible fields. Preserve the
-    -- native task data, replacing only the actual target ID and reserved radio.
-    local p = task.params
-    p.groupId, p.laserCode = groupID, radio.laserCode
-    p.frequency, p.modulation = radio.frequencyMHz * 1000000, radio.modulation
-    p.callname, p.number = radio.callname, radio.number
-    local tasks = copy.route.points[1].task.params.tasks
-    table.insert(tasks, index, task)
-    for i, action in ipairs(tasks) do action.number = i end
-    return copy
-end
-
 function JTAC.Contact(radio)
-    return string.format("%s / %.3f MHz %s / LASER %d", radio.label, radio.frequencyMHz,
-        radio.modulation == 0 and "AM" or "FM", radio.laserCode)
+    return string.format("%s / AUTOLASE / LASER %d", radio.label, radio.laserCode)
 end
 
 function JTAC.VisibilityReport(observer, targets)

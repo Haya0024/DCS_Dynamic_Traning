@@ -37,7 +37,7 @@ return {
         fullReward = 150,
         cleanupRetrySeconds = 5, -- Failed setup before a site can own the group.
         suppressionHoldSeconds = 30,
-        modes = { "TOO", "PB" },
+        modes = { "TOO", "PB" }, -- F10 choice order; never randomly selected.
         templates = {
             { name = "TPL_SEAD_SA6", type = "SA-6", pbCode = 108, primaryUnitType = "Kub 1S91 str", planningRangeNM = 15 },
             { name = "TPL_SEAD_SA8", type = "SA-8", pbCode = 117, primaryUnitType = "Osa 9A33 ln", planningRangeNM = 8 }
@@ -97,7 +97,7 @@ return {
     },
     strike = {
         fullReward = 150, cleanupRetrySeconds = 5,
-        modes = { "TOO", "PP" },
+        modes = { "TOO", "PP" }, -- F10 choice order; objectives still randomize.
         smoke = { color = "Red", northOffsetMeters = 50, durationSeconds = 120 },
         sites = {
             { id = "SITE01" }, { id = "SITE02" }, { id = "SITE03" },

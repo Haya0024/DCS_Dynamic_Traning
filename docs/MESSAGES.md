@@ -8,7 +8,7 @@ The separate placement diagnostic mission logs `[SEADPlacementCheck] START`, one
 
 This catalogue shows the actual English message bodies with concrete example values. Names, mission IDs, coordinates, counts and scores are illustrative, not captures from a live DCS run. Timing and wording follow the current implementation.
 
-Hornet exposes all six tasks; Apache exposes only `Task: Air Interdiction`, with the shared Status/Abort/Statistics controls. Registered pilots include human Apache CPGs. The six F10 task commands are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, `Task: DEAD`, `Task: Strike`, and `Task: Air Interdiction`. Retry and site-release messages refer to these labels. Acceptance, spawning, objectives, recovery and scoring follow the feature specifications.
+Hornet exposes all six tasks; Apache exposes `Task: Air Interdiction` and `Task: CAS`, with the shared Status/Abort/Statistics controls. Registered pilots include human Apache CPGs. The six Hornet F10 task entries are `Task: Intercept`, `Task: CAP`, `Task: SEAD`, `Task: DEAD`, `Task: Strike`, and `Task: Air Interdiction`. SEAD and Strike are two-choice submenus: `Task: SEAD > TOO / PB` and `Task: Strike > TOO / PP`. The selected mode is fixed at acceptance; there is no random/default mode. Missing or invalid choices show `Select TOO or PB from Task: SEAD.` or `Select TOO or PP from Task: Strike.` for 15 seconds before any lock or random draw. Retry and site-release messages refer to the parent labels. Acceptance, spawning, objectives, recovery and scoring follow the feature specifications.
 
 ## Output channels
 
@@ -823,7 +823,7 @@ Implementation and mock tests are distinct from live DCS verification.
 
 ## Screen: Strike acceptance, briefing and completion
 
-`Task: Strike` selects TOO or PP equally, fixes the nearest two facility references, selects one available site and then one of that mode's three objectives equally. Acceptance remains `Strike mission accepted.` for 10 seconds followed once by a five-line briefing for coordinateBriefingSeconds (default 60):
+`Task: Strike > TOO / PP` accepts the chosen mode, fixes the nearest two facility references, selects one available site and then one of that mode's three objectives equally. Acceptance remains `Strike mission accepted.` for 10 seconds followed once by a five-line briefing for coordinateBriefingSeconds (default 60):
 
 ```text
 STRIKE MISSION (TOO)

@@ -4,8 +4,9 @@ local function Log(text)
     env.info("[DynamicTraining] SEAD " .. text)
 end
 
-function SEAD.Begin(assignmentID, missionID, playerPosition)
+function SEAD.Begin(assignmentID, missionID, playerPosition, attackMode)
     assert(assignmentID, "SEAD assignment identity unavailable.")
+    assert(attackMode == "TOO" or attackMode == "PB", "Select SEAD TOO or PB before acceptance.")
     local settings = Config.sead
     assert(Observations.Finite(settings.cleanupRetrySeconds) and settings.cleanupRetrySeconds > 0,
         "Invalid SEAD cleanup interval.")
@@ -70,9 +71,8 @@ function SEAD.Begin(assignmentID, missionID, playerPosition)
         else Log("zone missing; skipped " .. zone) end
     end
     assert(#zones > 0, "No SEAD zones within acceptance distance limits.")
-    local mode = settings.modes[math.random(1, #settings.modes)]
     local zoneName = zones[math.random(1, #zones)]
-    local plan = { missionType = "SEAD", id = missionID, attackMode = mode, template = name,
+    local plan = { missionType = "SEAD", id = missionID, attackMode = attackMode, template = name,
         samType = selected.type, pbCode = selected.pbCode, primaryUnitType = selected.primaryUnitType,
         zoneName = zoneName, areaLabel = (settings.zoneLabels or {})[zoneName] or zoneName,
         acceptancePosition = { x = playerPosition.x, y = playerPosition.z } }

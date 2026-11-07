@@ -25,9 +25,9 @@ local function setup(options)
     end
     return s
 end
-local function begin(s, index, zone, player)
-    s.randomValues = { index or 1, 1, zone or 1 }
-    s:command("Task: SEAD", player); s:tick(s.time + 1)
+local function begin(s, index, zone, player, mode)
+    s.seadMode = mode or "TOO"; s.randomValues = { index or 1, zone or 1 }
+    s:command("Task: SEAD > " .. (s.seadMode or "PB"), player); s:tick(s.time + 1)
     return assert(s:mission(player))
 end
 local function destroy(s, unit, event)
@@ -134,10 +134,10 @@ end)
 test("immediate DEAD uses the same record, ID, group, plan, life and radar without spawn or draws", function()
     for _, mode in ipairs({ "TOO", "PB" }) do
         local s = setup()
-        module(s, "Config").sead.modes = { mode, mode == "TOO" and "PB" or "TOO" }
+        -- Select the SEAD mode through its actual F10 child command.
         module(s, "Config").coordinateBriefingSeconds = 90
         s.env.COORDINATE.ToStringLLDMS = function() error("Immediate DEAD must display DDM") end
-        local r = begin(s, 1); primary(s, r, true)
+        local r = begin(s, 1, nil, nil, mode); primary(s, r, true)
         local site, g = r.site, r.spawn.group
         local location = s.env.COORDINATE:NewFromVec2(r.plan.actualSpawnPoint):ToStringLLDDM({ LL_Accuracy = 3 })
         local estimate = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
@@ -383,7 +383,7 @@ test("DEAD obeys the existing Wing and UCID blocker across all three categories"
     local s = setup(); local r = begin(s)
     s:command("Task: DEAD"); s:lastMessageContains("SEAD mission is already active")
     primary(s, r, false); s:command("Preserve Site for DEAD"); recover(s); r = followOnDead(s)
-    for _, command in ipairs({ "Task: DEAD", "Task: SEAD", "Task: Intercept" }) do
+    for _, command in ipairs({ "Task: DEAD", "Task: SEAD > " .. (s.seadMode or "PB"), "Task: Intercept" }) do
         s:command(command); s:lastMessageContains("DEAD mission is already active")
     end
     s:occupyWing("SameAccount", "ucid-a")

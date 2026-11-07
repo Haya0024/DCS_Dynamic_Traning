@@ -67,8 +67,8 @@ for key, origin in pairs(origins) do
         for index, name in ipairs(candidates) do
             s.player.position = { x = origin.x, y = 0, z = origin.y }
             s.player.airborne = category == "sead"
-            s.randomValues = category == "cap" and { index, 1, 30 } or { 2, 2, index }
-            s:command(category == "cap" and "Task: CAP" or "Task: SEAD")
+            s.randomValues = category == "cap" and { index, 1, 30 } or { 2, index }
+            s:command(category == "cap" and "Task: CAP" or "Task: SEAD > PB")
             local record = assert(s:mission(), key .. " cannot accept " .. name)
             if category == "cap" then
                 assert(record.capPlan.name == name and record.state == "ACTIVE")
@@ -104,10 +104,10 @@ assert(record.capPlan.zone == s.zones[record.capPlan.name], "CAP must use the ex
 s:command("Abort Mission")
 -- SEAD also needs an actual eligible ME zone; no runtime fallback may rescue it.
 s.zones = {}
-s:command("Task: SEAD")
+s:command("Task: SEAD > PB")
 assert(not s:mission() and #s.spawns == 0 and #s.errors == 2)
 s.zones = actual
-s:command("Task: SEAD")
+s:command("Task: SEAD > PB")
 record = assert(s:mission(), "Missing SEAD zones must not leave an acceptance lock")
 s:tick(s.time + 1)
 assert(record.state == "ACTIVE" and record.spawn.group.fromVec2 and #s.spawns == 1)

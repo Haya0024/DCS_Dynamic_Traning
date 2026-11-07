@@ -1,5 +1,7 @@
 # SEAD → DEAD follow-on仕様
 
+training-19のSEAD方式はF10でTOO/PBを明示選択する。DEADはその元SEADの固定計画・生成済みGroup・損傷を継承し、方式を再選択/抽選しない。Immediate/Follow-onの状態遷移・終了/保持方針・採点は維持する。
+
 更新日: 2026-10-14
 
 2026-10-14のZone改名はSEAD由来の地域名に反映する。既存Siteの継承・保持・全対象破壊・帰還精算の状態遷移と終了方針は変更しない。

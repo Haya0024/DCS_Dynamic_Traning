@@ -20,7 +20,7 @@ local function sead(s,index)
         function z:IsVec2InZone(p) return (p.x-self.center.x)^2+(p.y-self.center.y)^2<=3000^2 end
         s.zones['SEAD_ZONE_'..name]=z
     end
-    s.randomValues={index or 1,1,1}; s:command('Task: SEAD'); s:tick(s.time+1)
+    s.seadMode="TOO"; s.randomValues={index or 1,1}; s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:tick(s.time+1)
     return s:mission()
 end
 local function cap(s)
@@ -52,7 +52,7 @@ test('SEAD setup failure retains a group when its first deletion fails',function
     s:tick(6); assert(s.spawns[1].destroyed)
 end)
 test('a different dead static identity cannot satisfy Strike',function()
-    local s=scenario(); s.randomValues={2,1,2}; s:command('Task: Strike'); local r=assert(s:mission())
+    local s=scenario(); s.strikeMode="PP"; s.randomValues={1,2}; s:command("Task: Strike > " .. (s.strikeMode or "TOO")); local r=assert(s:mission())
     local u=r.strikePlan.targets[1].unit; u.id=u.id+10000; u.alive=false
     s:tick(1); assert(r.state=='ACTIVE')
 end)
@@ -194,8 +194,8 @@ test('repeated MP2 sorties release every mission/site/cleanup reference while pr
                     s:command('Continue as DEAD')
                 end
             else
-                if category=='Strike' then s.randomValues={cycle%2+1,1,cycle%3+1} end
-                s:command('Task: '..category); r=assert(s:mission())
+                if category=="Strike" then s.strikeMode=cycle%2==0 and "TOO" or "PP"; s.randomValues={1,cycle%3+1} end
+                s:command(category=='Strike' and ('Task: Strike > '..s.strikeMode) or ('Task: '..category)); r=assert(s:mission())
             end
             local targets=r.deadTargets or r.spawn.units
             for _,target in ipairs(targets) do target.unit.alive=false; s:event('Dead',target.unit) end

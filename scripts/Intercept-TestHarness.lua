@@ -304,7 +304,9 @@ local function scenario(options)
     env.MENU_GROUP = { New = function(_, group, title, parent)
         local gname = group:GetName()
         if not parent then s.commands[gname] = {}; s.menuPages = s.menuPages or {}; s.menuPages[gname] = {} end
-        local menu = { title = title, parent = parent, entries = 0, Remove = function() s.commands[gname] = nil end }
+        local path = parent and (title == "More" and parent.path
+            or (parent.path == "" and title or parent.path .. " > " .. title)) or ""
+        local menu = { title = title, path = path, parent = parent, entries = 0, Remove = function() s.commands[gname] = nil end }
         if parent then parent.entries = parent.entries + 1 end
         table.insert(s.menuPages[gname], menu)
         return menu
@@ -312,6 +314,7 @@ local function scenario(options)
     env.MENU_GROUP_COMMAND = { New = function(_, group, title, menu, callback)
         menu.entries = menu.entries + 1
         s.commands[group:GetName()][title] = callback
+        if menu.path ~= "" then s.commands[group:GetName()][menu.path .. " > " .. title] = callback end
     end }
     env.EVENTS = { Crash = 1, Dead = 2, PilotDead = 3, Ejection = 4, UnitLost = 5,
         RunwayTouch = 6, Land = 7, Takeoff = 8, RunwayTakeoff = 9 }

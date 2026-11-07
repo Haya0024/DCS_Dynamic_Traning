@@ -9,7 +9,7 @@ if not BASE or not SPAWN or not MENU_GROUP then
     GlobalMessage("ERROR: Load MOOSE before DynamicTraining.", 15)
     return
 end
-DynamicTrainingRuntime = { version = "training-18.1" }
+DynamicTrainingRuntime = { version = "training-19" }
 Persistence.Publish()
 DynamicTrainingPlayers = { protocol = 1, Update = Player.UpdateDirectory }
 
@@ -260,7 +260,7 @@ local function FinishCASPreparation(record, spawn)
     DebugLog(record, "CAS started; site=" .. record.casPlan.site.id .. " laser=" .. record.casPlan.radio.laserCode)
 end
 
-local function Generate(groupName, category, laserCode)
+local function Generate(groupName, category, selection)
     category = category or "Intercept"
     local group = GROUP:FindByName(groupName)
     local okRoster, roster, problem, trainingWing = pcall(TrainingWings.Roster, groupName)
@@ -271,6 +271,11 @@ local function Generate(groupName, category, laserCode)
     end
     local blocker = Missions.Blocker(groupName, roster)
     if blocker then Message(group, blocker); return end
+    if category == "SEAD" and selection ~= "TOO" and selection ~= "PB" then
+        Message(group, "Select TOO or PB from Task: SEAD.", 15); return
+    elseif category == "Strike" and selection ~= "TOO" and selection ~= "PP" then
+        Message(group, "Select TOO or PP from Task: Strike.", 15); return
+    end
     local record = { group = group, groupName = groupName, category = category, participants = {},
         state = "ARMED", trainingWing = trainingWing, nextTakeoffCheck = timer.getTime() }
     -- Freeze membership at acceptance, including those still on the ground.
@@ -285,7 +290,7 @@ local function Generate(groupName, category, laserCode)
         record.owner, record.state = roster[1], "PREPARING"
         local unavailable
         local ok, problem = pcall(function()
-            record.casPlan, unavailable = CAS.Plan(record.owner.unit:GetVec3(), record.assignmentID, laserCode)
+            record.casPlan, unavailable = CAS.Plan(record.owner.unit:GetVec3(), record.assignmentID, selection)
             if not record.casPlan then return end
             local spawn = CAS.Spawn(record.casPlan)
             if spawn then FinishCASPreparation(record, spawn) end
@@ -344,7 +349,7 @@ local function Generate(groupName, category, laserCode)
     if category == "Strike" then
         record.owner = roster[1]
         local ok, problem = pcall(function()
-            record.strikePlan = Strike.Plan(record.owner.unit:GetVec3(), record.assignmentID)
+            record.strikePlan = Strike.Plan(record.owner.unit:GetVec3(), record.assignmentID, selection)
             if not record.strikePlan then return end
             record.spawn = Strike.Spawn(record.strikePlan)
             record.strikeBriefing = Strike.Briefing(record.strikePlan)
@@ -439,7 +444,7 @@ local function Generate(groupName, category, laserCode)
         local _, airborne = Ready(record)
         record.airborneAtAcceptance = airborne
         local ok, job = pcall(function()
-            return SEAD.Begin(record.assignmentID, record.id, record.owner.unit:GetVec3())
+            return SEAD.Begin(record.assignmentID, record.id, record.owner.unit:GetVec3(), selection)
         end)
         if not ok then
             Close(record)
@@ -707,9 +712,9 @@ ScanPlayers = function()
             for _, command in ipairs({
                 { "Task: Intercept", Generate },
                 { "Task: CAP", function(groupName) Generate(groupName, "CAP") end },
-                { "Task: SEAD", function(groupName) Generate(groupName, "SEAD") end },
+                { "Task: SEAD" },
                 { "Task: DEAD", function(groupName) Generate(groupName, "DEAD") end },
-                { "Task: Strike", function(groupName) Generate(groupName, "Strike") end },
+                { "Task: Strike" },
                 { "Task: Air Interdiction", function(groupName) Generate(groupName, "Air Interdiction") end },
                 { "Task: CAS" },
                 { "Mission Status", Status },
@@ -719,7 +724,16 @@ ScanPlayers = function()
                 local category = label:match("^Task: (.+)$")
                 if (not category or Player.CanTask(taskRoster, category))
                     and (not category or not trainingWing or trainingWing.leader == name) then
-                    if category == "CAS" then
+                    if category == "SEAD" or category == "Strike" then
+                        local parent = AddSubmenu(label)
+                        local modes = category == "SEAD" and Config.sead.modes or Config.strike.modes
+                        for _, mode in ipairs(modes) do
+                            local attackMode = mode
+                            MENU_GROUP_COMMAND:New(group, attackMode, parent, function()
+                                Safe(label, group, function() Generate(name, category, attackMode); ScanPlayers() end)
+                            end)
+                        end
+                    elseif category == "CAS" then
                         local parent = AddSubmenu(label)
                         for _, slot in ipairs(Config.cas.radioSlots) do
                             local code = slot.laserCode

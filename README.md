@@ -21,7 +21,7 @@ InterceptではMiG-29A ×2、Su-27 ×1、MiG-29A ×1のいずれかが、編隊�
 
 CAPではMEの9候補空域から1つを選び、空域内の哨戒時間と敵機全滅を評価します。敵はInterceptと同じ3編成から選ばれます。進め方は後述の「CAPの進め方」を参照してください。
 
-SEADでは受注時にTOO / PBを等確率で選びます。TOOは機種不明の捜索座標、PBはSAM機種・推定座標・HARM PBコードを知らせます。
+SEADではF10の`Task: SEAD → TOO / PB`で方式を選んで受注します。TOOは機種不明の捜索座標、PBはSAM機種・推定座標・HARM PBコードを知らせます。
 座標はDDM（度＋分の小数3桁）で表示し、実際の配置位置からTOOは3～5 NM、PBは1～3 NMの誤差を持たせます。HARM以外の武器で主要レーダーを破壊しても達成です。
 
 ## 始め方
@@ -46,13 +46,15 @@ CAPは受注時の長機から40〜100 NM、SEADは40〜130 NMのZone中心を�
 
 ## F10メニュー
 
+training-19からSEAD/Strikeの方式は手動選択です。SAMや地域・目標の抽選は継続し、受注後に方式を再選択しません。
+
 ```text
 Dynamic Training
 ├─ Task: Intercept
 ├─ Task: CAP
-├─ Task: SEAD
+├─ Task: SEAD → TOO / PB
 ├─ Task: DEAD
-├─ Task: Strike
+├─ Task: Strike → TOO / PP
 ├─ Task: Air Interdiction
 ├─ Task: CAS → Laser 1688 / 1687 / 1686（Apacheのみ）
 ├─ Mission Status
@@ -79,7 +81,7 @@ BLUEの4空港・CVN-71・給油機2機の航法情報は[ニーボード画像]
 
 ## Strike — 固定施設への攻撃
 
-`Task: Strike` は受注時にTOO／PPを等確率で抽選し、長機に近い2施設から使用可能な1施設を選びます。その後、方式ごとの3種類を等確率抽選します。
+`Task: Strike → TOO / PP`で方式を選び、長機に近い2施設から使用可能な1施設を選びます。その後、方式ごとの3種類を等確率抽選します。
 
 - **TOO**：コンテナ4個のうち任意2個／司令部1個／トラック2両。従来の施設基準点DDM（分の小数3桁）で捜索し、見出しは`STRIKE MISSION (TOO)`。標高・座標誤差・目標条件は変更しません。
 - **PP**：司令部／燃料タンク／弾薬庫の1個。`STRIKE MISSION (PP)`で、抽選した目標そのもののDMS（秒の小数2桁）と地表標高ft MSLを案内し、JDAM/JSOWのPP入力に使います。

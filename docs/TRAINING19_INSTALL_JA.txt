@@ -1,0 +1,21 @@
+Dynamic Training 更新（training-19）
+
+1. サーバーで使っている旧.mizを別名でバックアップします。
+2. ZIP内のpersistant_and_dynamic_traning.mizで置き換え、ミッションを再開始します。
+   通常の配置先: Saved Games\DCS.dcs_serverrelease\Missions
+3. HornetのF10 → Dynamic Trainingで任務と方式を選びます。
+   Task: SEAD → TOO または PB
+   Task: Strike → TOO または PP
+   項目が次ページにある場合はMoreを開いてください。
+
+方式の自動抽選はありません。選んだ方式は今回の任務で固定します。
+SEADのSAM種類・地域・配置と、Strikeの施設・方式別の目標は従来どおり抽選します。
+任務の進行中に反対の方式を選んでも、受注ロックにより変更・追加生成しません。
+変更したい場合は現在の任務をAbortして受注し直してください。任意Abortは0点です。
+
+従来のTOO情報制限、SEAD PBコード、Strike PPのDMS座標と標高、帰還・150/90/0採点を維持します。
+CASは直前の短縮7行ブリーフィングとRequest laser / Stop laserを含みます。
+正常に接続済みのtraining-17.3以降のHookはそのまま利用でき、今回のHook再導入や成績初期化は不要です。
+
+自動630ケース/15スイートと全結合検証を通過。方式選択メニューの実DCS内での表示・操作は未確認です。
+戻す場合は、バックアップした旧.mizへ戻してミッションを再開始します。

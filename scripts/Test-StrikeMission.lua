@@ -30,8 +30,8 @@ print('PASS: actual .miz has six complete RED nine-member facilities including s
 for _,site in ipairs(config.sites) do for mode=1,2 do for kind=1,3 do
     local s=scenario({strikeTemplates=templates})
     local p=centers[site.id]
-    s.player.position={x=p.x,y=300,z=p.y}; s.randomValues={mode,1,kind}
-    s:command('Task: Strike'); local r=assert(s:mission())
+    s.player.position={x=p.x,y=300,z=p.y}; s.strikeMode = ((mode) == 1 and "TOO" or "PP"); s.randomValues = {1,kind}
+    s:command("Task: Strike > " .. (s.strikeMode or "TOO")); local r=assert(s:mission())
     assert(r.strikePlan.site.id==site.id and #s.staticSpawns==(mode==1 and 7 or 9))
     assert(r.strikePlan.attackMode==config.modes[mode])
     assert(#r.strikePlan.targets==(mode==2 and 1 or kind==1 and 4 or kind==2 and 1 or 2))

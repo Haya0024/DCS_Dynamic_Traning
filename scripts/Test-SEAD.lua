@@ -22,19 +22,25 @@ local function setup(templateIndex, options)
         end
         s.zones[name] = zone
     end
-    s.randomValues = { templateIndex or 1, 2, 1 } -- Template, PB mode, first eligible zone.
+    s.seadMode = "PB"; s.randomValues = { templateIndex or 1, 1 } -- Template and first eligible zone; mode is explicit.
     return s, s.zones[names[1]]
 end
 local function module(s, wanted)
-    for i = 1, 100 do
-        local name, value = debug.getupvalue(s.timers[1].callback, i)
-        if not name then break end
-        if name == wanted then return value end
+    local visited = {}
+    local function find(callback)
+        if visited[callback] then return end; visited[callback] = true
+        for i = 1, 100 do
+            local name, value = debug.getupvalue(callback, i)
+            if not name then break end
+            if name == wanted then return value end
+            if type(value) == 'function' then local found = find(value); if found then return found end end
+        end
     end
+    local found = find(s.timers[1].callback); if found then return found end
     error("Test module unavailable: " .. wanted)
 end
 local function generate(s)
-    s:command("Task: SEAD")
+    s:command("Task: SEAD > " .. (s.seadMode or "PB"))
     s:lastMessageContains("SEAD mission accepted.")
 end
 local function status(s, expected, pilot)
@@ -163,7 +169,7 @@ test("unsafe selected zone terminates after 50 tries even when other zones exist
     assert(s.zones[names[1]].calls == 50)
     for i = 2, #names do assert(s.zones[names[i]].calls == 0) end
     s.surfaceLand = nil
-    s:command("Task: SEAD"); s:tick(61); assert(#s.spawns == 1)
+    s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:tick(61); assert(#s.spawns == 1)
 end)
 
 test("missing zones are skipped; all missing zones fail and permit retry", function()
@@ -171,9 +177,9 @@ test("missing zones are skipped; all missing zones fail and permit retry", funct
     generate(s); s:tick(1)
     assert(#s.spawns == 1 and s.zones[names[2]].calls == 1); s:assertClean()
     s = setup(); local zones = s.zones; s.zones = {}
-    s:command("Task: SEAD")
+    s:command("Task: SEAD > " .. (s.seadMode or "PB"))
     s:lastMessageContains("setup failed"); assert(#s.errors == 1)
-    s.zones = zones; s:command("Task: SEAD"); s:tick(3); assert(#s.spawns == 1)
+    s.zones = zones; s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:tick(3); assert(#s.spawns == 1)
 end)
 
 test("template, terrain, scan and spawn failures release locks and clean spawned enemies", function()
@@ -183,12 +189,12 @@ test("template, terrain, scan and spawn failures release locks and clean spawned
         elseif failure == "terrain" then s.terrainHeight = function() error("terrain API unavailable") end
         elseif failure == "scan" then s.scanObjects = function() error("scenery API unavailable") end
         else s[failure] = true end
-        s:command("Task: SEAD"); s:tick(1)
+        s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:tick(1)
         assert(#s.errors == 1)
         for _, g in ipairs(s.spawns) do assert(g.destroyed) end
         s.missingTemplate, s.terrainHeight, s.scanObjects = nil, nil, nil
         s.failSpawn, s.failAlarm, s.failRouteStop = false, false, false
-        s:command("Task: SEAD"); s:tick(2)
+        s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:tick(2)
         assert(s.spawns[#s.spawns].fromVec2 and not s.spawns[#s.spawns].destroyed)
     end
 end)
@@ -198,13 +204,13 @@ test("Intercept and SEAD cross-block both while selecting and while active", fun
     generate(s)
     s:command("Task: Intercept"); s:lastMessageContains("SEAD mission is already armed")
     assert(zone.calls == 0 and #s.randomValues == 0)
-    s:command("Task: SEAD"); assert(zone.calls == 0)
+    s:command("Task: SEAD > " .. (s.seadMode or "PB")); assert(zone.calls == 0)
     s:tick(1)
     s:command("Task: Intercept"); s:lastMessageContains("SEAD mission is already active")
     assert(#s.spawns == 1)
     s:command("Abort Mission")
     s.player.airborne = true; s.generate()
-    s:command("Task: SEAD"); s:lastMessageContains("Intercept mission is already active")
+    s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:lastMessageContains("Intercept mission is already active")
     assert(#s.spawns == 2); s:assertClean()
 end)
 
@@ -257,7 +263,7 @@ test("two SEAD wings avoid an occupied site and receive different aliases", func
         end
         return { units, {}, {} }
     end
-    s.randomValues = { 1, 2, 1 }; s:command("Task: SEAD", other); s:tick(4)
+    s.seadMode = "PB"; s.randomValues = { 1, 1 }; s:command("Task: SEAD > " .. (s.seadMode or "PB"), other); s:tick(4)
     assert(#s.spawns == 2 and zone.calls == 3)
     assert(s.spawns[1].position.x == 20000 and s.spawns[2].position.x == 21000)
     assert(s.spawns[1].name ~= s.spawns[2].name); s:assertClean()
@@ -286,7 +292,7 @@ end)
 test("zone draw chooses one eligible zone without changing the configured pool", function()
     for _, second in ipairs({ true, false }) do
         local s = setup(2)
-        s.randomValues = { 2, 2, second and 2 or 1 }
+        s.seadMode = "PB"; s.randomValues = { 2, second and 2 or 1 }
         generate(s); s:tick(1)
         local expected = second and names[2] or names[1]
         assert(s.zones[expected].calls == 1)
@@ -390,7 +396,7 @@ test("MP2 shares the radar objective but settles 150 and 90 individually", funct
     recover(s, s.player)
     s:score(150); s:score(0, s.wingman)
     assert(not g.destroyed)
-    s:command("Task: SEAD"); s:lastMessageContains("already active")
+    s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:lastMessageContains("already active")
     s:event("Ejection", s.wingman)
     s:score(150); s:score(90, s.wingman); assert(g.destroyed); s:assertClean()
 end)
@@ -415,12 +421,12 @@ end)
 
 test("another wing's radar events and previous assignments cannot clear the current site", function()
     local s, old = started(); s:command("Abort Mission")
-    s.randomValues = { 1, 2, 1 }; generate(s); s:tick(2)
+    s.seadMode = "PB"; s.randomValues = { 1, 1 }; generate(s); s:tick(2)
     local current = s.spawns[2]
     s:event("Dead", old.units[1]); status(s, "ACTIVE")
     local other = s:addPilot("Other", "ucid-other", 40)
     other.airborne, other.position.x = true, -80000; s:tick(3)
-    s.randomValues = { 1, 2, 2 }; s:command("Task: SEAD", other); s:tick(4)
+    s.seadMode = "PB"; s.randomValues = { 1, 2 }; s:command("Task: SEAD > " .. (s.seadMode or "PB"), other); s:tick(4)
     local otherGroup = s.spawns[3]
     destroyRadar(s, otherGroup)
     status(s, "RTB_PENDING", other); status(s, "ACTIVE")
@@ -445,10 +451,10 @@ end)
 
 test("missing or untrackable primary radars fail safely and allow a fresh request", function()
     local s = setup(); s.groundTemplates.TPL_SEAD_SA6.units[1].type = "Kub 2P25 ln"
-    s:command("Task: SEAD"); s:lastMessageContains("setup failed")
+    s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:lastMessageContains("setup failed")
     assert(#s.spawns == 0 and #s.errors == 1)
     s.groundTemplates.TPL_SEAD_SA6.units[1].type = "Kub 1S91 str"
-    s.randomValues = { 1, 2, 1 }
+    s.seadMode = "PB"; s.randomValues = { 1, 1 }
     generate(s); s:tick(1); assert(#s.spawns == 1)
     s = setup(); s.enemyTypeOverride = "Unknown"
     generate(s); s:tick(1)
@@ -481,10 +487,10 @@ local function fingerprint(plan)
     return table.concat(fields, "|")
 end
 
-test("TOO/PB use equal-size random draws and both SAM metadata/code mappings are saved at acceptance", function()
+test("TOO/PB are explicit selections and both SAM metadata/code mappings are saved at acceptance", function()
     for template = 1, 2 do
         for mode = 1, 2 do
-            local s = setup(template); s.randomValues = { template, mode, 1 }
+            local s = setup(template); s.seadMode = ((mode) == 1 and "TOO" or "PB"); s.randomValues = { template, 1 }
             generate(s)
             local r = assert(s:mission()); local plan = r.plan
             assert(plan.id == r.id and plan.missionType == "SEAD" and not r.spawn)
@@ -492,7 +498,7 @@ test("TOO/PB use equal-size random draws and both SAM metadata/code mappings are
             assert(plan.template == (template == 1 and "TPL_SEAD_SA6" or "TPL_SEAD_SA8"))
             assert(plan.samType == (template == 1 and "SA-6" or "SA-8"))
             assert(plan.pbCode == (template == 1 and 108 or 117))
-            assert(s.randomCalls[2].minimum == 1 and s.randomCalls[2].maximum == 2)
+            assert(#s.randomCalls == 2 and s.randomCalls[1].minimum == 1 and s.randomCalls[1].maximum == 2)
             s:tick(1)
             assert(plan.estimatedPoint ~= nil)
             assert(r.spawn.primaryUnits[1].unit:GetTypeName() == plan.primaryUnitType)
@@ -502,7 +508,7 @@ test("TOO/PB use equal-size random draws and both SAM metadata/code mappings are
 end)
 
 test("TOO displays its fixed search coordinate but hides type, exact location and PB code throughout the sortie", function()
-    local s = setup(); s.player.airborne = false; s.randomValues = { 1, 1, 1 }
+    local s = setup(); s.player.airborne = false; s.seadMode = "TOO"; s.randomValues = { 1, 1 }
     generate(s); status(s, "PLANNING"); s:tick(1); status(s, "ARMED")
     local r = s:mission(); local saved = fingerprint(r.plan); local draws = #s.randomCalls
     local location = s.env.COORDINATE:NewFromVec2(r.plan.estimatedPoint):ToStringLLDDM({ LL_Accuracy = 3 })
@@ -527,7 +533,7 @@ test("TOO three-to-five NM and PB one-to-three NM estimates match actual spawns 
   for mode = 1, 2 do
     for _, fraction in ipairs({ 0, 500000, 1000000 }) do
         for _, heading in ipairs({ 0, 90, 180, 359 }) do
-            local s = setup(2); s.randomValues = { 2, mode, 1, fraction, heading }
+            local s = setup(2); s.seadMode = ((mode) == 1 and "TOO" or "PB"); s.randomValues = { 2, 1, fraction, heading }
             s.env.COORDINATE.ToStringLLDMS = function() error("SEAD must display DDM coordinates") end
             generate(s); s:tick(1)
             local p = s:mission().plan
@@ -627,10 +633,10 @@ test("zone-center distance filtering uses the accepted leader position with incl
         for i, nm in ipairs({ 39.9, 40, 130, 130.1 }) do
             s.zones[names[i]].center = { x = s.player.position.x + nm * 1852, y = s.player.position.z }
         end
-        s.randomValues = { 2, 1, draw }; generate(s)
+        s.seadMode = "TOO"; s.randomValues = { 2, draw }; generate(s)
         local plan = s:mission().plan
         assert(plan.zoneName == names[draw + 1])
-        assert(s.randomCalls[3].maximum == 2)
+        assert(s.randomCalls[2].maximum == 2)
         s.player.position.x = s.player.position.x - 200000
         s:tick(1); assert(s:mission().plan.zoneName == names[draw + 1] and #s.spawns == 1)
         s:assertClean()
@@ -641,16 +647,16 @@ test("zone selection uses flight-number leader rather than player enumeration or
     local s = setup(); local wing = s:occupyWing()
     wing.position.x = 1000000
     s.player.group.units = { wing, s.player }
-    s:command("Task: SEAD", wing); s:tick(1)
+    s:command("Task: SEAD > " .. (s.seadMode or "PB"), wing); s:tick(1)
     assert(s:mission().plan.acceptancePosition.x == -80000 and #s.spawns == 1)
     s:assertClean()
 end)
 
 test("no zones in range or a missing selected zone safely fail without changing zone", function()
     local s = setup(); s.player.position.x = 1000000
-    s:command("Task: SEAD"); s:lastMessageContains("setup failed")
+    s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:lastMessageContains("setup failed")
     assert(#s.errors == 1 and not s:mission())
-    s.player.position.x = -80000; s.randomValues = { 1, 1, 1 }
+    s.player.position.x = -80000; s.seadMode = "TOO"; s.randomValues = { 1, 1 }
     generate(s); s:tick(1); assert(#s.spawns == 1)
     s = setup(); generate(s); s.zones[names[1]] = nil; s:tick(1)
     s:lastMessageContains("placement failed")
@@ -670,7 +676,7 @@ test("an unsafe fixed site at departure fails without redrawing or spawning and 
         assert(not s:mission() and #s.spawns == 0 and zone.calls == 1)
         assert(fingerprint(r.plan) == saved and #s.randomCalls == draws and #s.errors == 1)
         s.surfaceLand, s.scanObjects, s.zones[names[1]] = nil, nil, zone
-        s.randomValues = { 1, 1, 1 }; generate(s); s:tick(23)
+        s.seadMode = "TOO"; s.randomValues = { 1, 1 }; generate(s); s:tick(23)
         assert(#s.spawns == 1)
     end
 end)
@@ -680,7 +686,7 @@ test("two grounded wings reserve different actual sites before any SAM exists", 
     local other = s:addPilot("Other", "ucid-other", 40); other.position.x = -80000; s:tick(2)
     generate(s); s:tick(3); assert(#s.spawns == 0)
     zone.points[2], zone.points[3] = zone.center, { x = zone.center.x + 1000, y = 0 }
-    s.randomValues = { 2, 1, 1 }; s:command("Task: SEAD", other); s:tick(4)
+    s.seadMode = "TOO"; s.randomValues = { 2, 1 }; s:command("Task: SEAD > " .. (s.seadMode or "PB"), other); s:tick(4)
     assert(#s.spawns == 0 and zone.calls == 3)
     local a, b = s:mission(), s:mission(other)
     assert(a.plan.actualSpawnPoint.x == 20000 and b.plan.actualSpawnPoint.x == 21000 and a.id ~= b.id)
@@ -703,7 +709,7 @@ test("the expanded retry limit can find a safe site after the old thirty-attempt
 end)
 
 test("placement failure counts every rejection reason without revealing TOO target information", function()
-    local s, zone = setup(); s.randomValues = { 1, 1, 1 }
+    local s, zone = setup(); s.seadMode = "TOO"; s.randomValues = { 1, 1 }
     zone.points = { { x = 9000, y = 0 }, { x = 21000, y = 0 }, zone.center, { x = 22000, y = 0 } }
     s.surfaceLand = function(p) return p.x ~= 21000 or p.y ~= 0 end
     s.terrainHeight = function(p) return p.x == 20050 and p.y == 50 and 21 or 0 end
@@ -728,7 +734,7 @@ end)
 test("damaged live emitters need thirty full OFF seconds in both modes and both SAM types before RTB scoring", function()
     for template = 1, 2 do
         for mode = 1, 2 do
-            local s = setup(template); s.randomValues = { template, mode, 1 }; generate(s); s:tick(1)
+            local s = setup(template); s.seadMode = ((mode) == 1 and "TOO" or "PB"); s.randomValues = { template, 1 }; generate(s); s:tick(1)
             local r = s:mission(); local g = r.spawn.group; local radar = g.units[1]
             assert(r.spawn.primaryUnits[1].initialLife == 100 and r.spawn.suppressionHoldSeconds == 30)
             s:lastMessageContains("keep radar OFF for 30 seconds; then RTB.")
@@ -738,7 +744,7 @@ test("damaged live emitters need thirty full OFF seconds in both modes and both 
             s:tick(32); s:lastMessageContains("Enemy radar suppressed.")
             assert(r.state == "RTB_PENDING" and r.primaryResult == "SUPPRESSED" and radar.alive and not g.destroyed)
             status(s, "RTB_PENDING"); s:lastMessageContains("Enemy radar suppressed.")
-            s:score(0); s:command("Task: SEAD"); s:lastMessageContains("already active")
+            s:score(0); s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:lastMessageContains("already active")
             radar.radarEmitting = true; s:tick(33); assert(r.primaryResult == "SUPPRESSED")
             recover(s, nil, 70); s:score(150)
             s:categoryScores({ seadScore = 150 }); s:lastMessageContains("Primary Success: 1")
@@ -860,7 +866,7 @@ test("missing mission-start life fails safely rather than substituting a damage 
         local s = setup(); s.enemyInitialLife = life; generate(s); s:tick(1)
         s:lastMessageContains("spawn failed")
         assert(s.spawns[1].destroyed and not s:mission() and #s.errors == 1)
-        s.enemyInitialLife = 100; s.randomValues = { 1, 1, 1 }
+        s.enemyInitialLife = 100; s.seadMode = "TOO"; s.randomValues = { 1, 1 }
         generate(s); s:tick(2); assert(not s.spawns[2].destroyed)
     end
 end)
@@ -884,7 +890,7 @@ end)
 test("suppression timers are scoped to their own wing and cannot complete another assignment", function()
     local s, g = started(); local other = s:addPilot("Other", "ucid-other", 40)
     other.airborne, other.position.x = true, -80000; s:tick(3)
-    s.randomValues = { 2, 1, 2 }; s:command("Task: SEAD", other); s:tick(4)
+    s.seadMode = "TOO"; s.randomValues = { 2, 2 }; s:command("Task: SEAD > " .. (s.seadMode or "PB"), other); s:tick(4)
     local b = s.spawns[2]
     g.units[1].life, g.units[1].radarEmitting = 99, false
     for t = 5, 35 do s:tick(t) end
@@ -900,7 +906,7 @@ end)
 
 test("MP2 suppression shares the objective and settles 150/90 once while later radar changes preserve success", function()
     local s, g = started(1); s:command("Abort Mission")
-    s:occupyWing(); s.randomValues = { 1, 1, 1 }; generate(s); s:tick(2); g = s.spawns[2]
+    s:occupyWing(); s.seadMode = "TOO"; s.randomValues = { 1, 1 }; generate(s); s:tick(2); g = s.spawns[2]
     g.units[1].life, g.units[1].radarEmitting = 99, false
     for t = 3, 33 do s:tick(t) end
     assert(s:mission().primaryResult == "SUPPRESSED")
@@ -995,7 +1001,7 @@ test("abort cleanup is independent of success and releases only its own site", f
     local s, g = started(); local first = s:mission()
     local other = s:addPilot("Other", "ucid-other", 40)
     other.airborne, other.position.x = true, -80000; s:tick(3)
-    s.randomValues = { 2, 1, 2 }; s:command("Task: SEAD", other); s:tick(4)
+    s.seadMode = "TOO"; s.randomValues = { 2, 2 }; s:command("Task: SEAD > " .. (s.seadMode or "PB"), other); s:tick(4)
     local second = s:mission(other)
     assert(s:sites()[first.id] and s:sites()[second.id])
     s:command("Abort Mission")
@@ -1011,7 +1017,7 @@ test("TOO and PB automatically brief coordinates once; spawn and countdown reset
     for _, airborne in ipairs({ false, true }) do
         local s, zone = setup()
         s.player.airborne = airborne
-        s.randomValues = { 1, mode, 1 }
+        s.seadMode = ((mode) == 1 and "TOO" or "PB"); s.randomValues = { 1, 1 }
         local duration = airborne and 90 or 60
         local configured = false
         for i = 1, 100 do
@@ -1222,7 +1228,7 @@ end)
 test("TOO and PB Status keep only published coordinates and instructions from planning through completion", function()
   for mode = 1, 2 do
     for _, airborne in ipairs({ false, true }) do
-        local s, zone = setup(); s.player.airborne = airborne; s.randomValues = { 1, mode, 1 }
+        local s, zone = setup(); s.player.airborne = airborne; s.seadMode = ((mode) == 1 and "TOO" or "PB"); s.randomValues = { 1, 1 }
         zone.points = { { x = 9000, y = 0 }, { x = 9000, y = 0 }, zone.center }
         generate(s); local planning = s.messages[#s.messages].text
         s:tick(1); s:command("Mission Status")
@@ -1284,6 +1290,57 @@ test("Status reads only publication snapshots and cannot inspect live mission ta
     assert(text == "Public completion A" and seconds == 20 and not a.publicReport.briefing)
     report.Remember(a, "briefing", "Public next-stage coordinate", 60)
     text = report.Status({ a }); assert(text == "Public next-stage coordinate")
+end)
+
+test("SEAD and Strike expose separate two-choice submenus without direct parent acceptance", function()
+    local s = setup(); local commands = s.commands[s.player.group.name]
+    assert(not commands['Task: SEAD'] and not commands['Task: Strike'])
+    for _, path in ipairs({'Task: SEAD > TOO','Task: SEAD > PB','Task: Strike > TOO','Task: Strike > PP'}) do
+        assert(commands[path], path)
+    end
+    local n=0
+    for _, page in ipairs(s.menuPages[s.player.group.name]) do
+        if page.title=='Task: SEAD' or page.title=='Task: Strike' then assert(page.entries==2); n=n+1 end
+        assert(page.entries<=10)
+    end
+    assert(n==2)
+    commands['Task: SEAD > TOO'](); assert(s:mission().category=='SEAD' and s:mission().plan.attackMode=='TOO')
+    s:command('Abort Mission'); s:command('Task: Strike > TOO')
+    assert(s:mission().category=='Strike' and s:mission().strikePlan.attackMode=='TOO'); s:assertClean()
+end)
+
+test("opposite SEAD choices cannot alter a locked plan during planning departure or active combat", function()
+    for _, selected in ipairs({'TOO','PB'}) do
+        local s=setup(); s.player.airborne=false
+        local opposite=s.commands[s.player.group.name][selected=='TOO' and 'Task: SEAD > PB' or 'Task: SEAD > TOO']
+        s:command('Task: SEAD > '..selected); local r=assert(s:mission()); local plan=r.plan
+        local draws=#s.randomCalls; opposite()
+        assert(s:mission()==r and r.plan==plan and plan.attackMode==selected and #s.randomCalls==draws)
+        s:tick(1); local accepted=fingerprint(plan); draws=#s.randomCalls
+        module(s,'Config').sead.modes={'PB','TOO'}
+        s.player.airborne=true; s:tick(3); opposite()
+        assert(plan.attackMode==selected and #s.randomCalls==draws and fingerprint(plan)==accepted)
+        s:tick(23); assert(r.state=='ACTIVE' and fingerprint(plan)==accepted)
+        opposite(); assert(s:mission()==r and #s.randomCalls==draws)
+        s:command('Abort Mission'); s:assertClean()
+    end
+end)
+
+test("missing or invalid SEAD mode and ineligible aircraft reject before draws locks or planning", function()
+    for _, entry in ipairs({{}, {value='PP'}, {value='too'}, {value=false}}) do
+        local s=setup(); local missions=module(s,'Missions'); local value=entry.value
+        assert(not pcall(module(s,'SEAD').Begin,1,'invalid-mode',s.player.position,value))
+        local callback=s.commands[s.player.group.name]['Task: SEAD > TOO']; local replaced=false
+        for i=1,100 do local name=debug.getupvalue(callback,i); if not name then break end
+            if name=='attackMode' then debug.setupvalue(callback,i,value); replaced=true; break end
+        end
+        assert(replaced); callback()
+        assert(not s:mission() and #s.randomCalls==0 and #s.spawns==0 and missions.sequence==0)
+        s:lastMessageContains('Select TOO or PB'); s:assertClean()
+    end
+    local s=setup(); local callback=s.commands[s.player.group.name]['Task: SEAD > PB']
+    s.player.kind='AH-64D_BLK_II'; callback()
+    assert(not s:mission() and #s.randomCalls==0); s:lastMessageContains('not available'); s:assertClean()
 end)
 
 print(string.format("All %d SEAD tests passed (simulated DCS/MOOSE).", count))

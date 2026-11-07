@@ -22,11 +22,11 @@
 | SCORE | [Test-Scoring.lua](../scripts/Test-Scoring.lua) | 26 | UCID、帰還、事故、重複防止、累計 |
 | WING | [Test-Wing.lua](../scripts/Test-Wing.lua) | 27 | MP2、参加者固定、共有目標、個別精算、排他 |
 | PAR | [Test-ParallelWings.lua](../scripts/Test-ParallelWings.lua) | 17 | 複数ウィングの並行処理と独立性 |
-| SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 71 | 受注計画、配置、TOO/PB、状態遷移、サイト管理、表示重複防止、全地域50点の診断制御 |
+| SEAD | [Test-SEAD.lua](../scripts/Test-SEAD.lua) | 74 | F10でTOO/PB手動選択、受注計画、配置、状態遷移、サイト管理、表示重複防止、全地域50点の診断制御 |
 | DEAD | [Test-DEAD.lua](../scripts/Test-DEAD.lua) | 105 | Primary/Site分離、Group継承、Wing専用予約・明示解除・共有取得・未予約30分Cleanup・rollback、残存対象、nil観測・DDM、採点、ログアウトCleanup、未達成DEADからのSEAD帰還 |
 | PERSIST | [Test-Persistence.lua](../scripts/Test-Persistence.lua) | 50 | schema1/2/3/4→5移行・CAP/Strike/Air Interdiction/CAS保存復元・未知schema保護、保存確認、再起動・遅延復元、native I/O、backup、run、Hook/manager/SSE分離、callback寿命、スロット未選択 |
 | MAP | [Test-MapOverlay.lua](../scripts/Test-MapOverlay.lua) | 18 | BLUE陸上基地、Ship/FARP除外、Drawing引数・ID、Refresh、失敗時非干渉、初期化1回、青文字・南オフセット |
-| STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 67 | PP/TOO・近い2施設・各3種類抽選、TOO7/PP9物体、DDM/DMS・地表標高、対象判定、予約、MP2・150/90/0、生成失敗・削除再試行・任意スモーク |
+| STRIKE | [Test-Strike.lua](../scripts/Test-Strike.lua) | 70 | F10でPP/TOO手動選択・近い2施設・各3種類抽選、TOO7/PP9物体、DDM/DMS・地表標高、対象判定、予約、MP2・150/90/0、生成失敗・削除再試行・任意スモーク |
 | AI | [Test-AirInterdiction.lua](../scripts/Test-AirInterdiction.lua) | 49 | 経路/編成の独立抽選と元配置保持、機種別候補、不正編成・生成失敗の解除、近い2経路・周回中心DDM・3両破壊、ME経路維持、予約、MP2、個別精算、観測不能・生成失敗・削除再試行 |
 | DYNAMIC | [Test-DynamicPlayers.lua](../scripts/Test-DynamicPlayers.lua) | 27 | Hookによるmission unit ID/slot/UCID照合、文字列ID、Apache乗員、別DCSグループの共有、全任務・SEAD/DEAD継続、個別精算、席交換・古いcallback・配信失敗と復旧 |
 | DYNAMICME | [Test-DynamicSpawnMission.ps1](../scripts/Test-DynamicSpawnMission.ps1) | 1確認グループ | 実.mizの5拠点・9機種選択・テンプレートなし・旧固定Client削除・対象機種の無制限在庫・Cold Start |
@@ -41,13 +41,13 @@
 | CAS | [Test-CAS.lua](../scripts/Test-CAS.lua) | 63 | Apache限定、依頼/停止/再依頼、固定3両の単一AUTOLASE、実MOOSE判定/SPOT、未知・ID変更・部分失敗・停止/回収、コード排他、MGRS、Dynamic Spawn/Team/乗員、共有目標と個別精算 |
 | CASME | [Test-CASMission.ps1](../scripts/Test-CASMission.ps1) | 4 | 実.mizのTPL設定、全コードのAUTOLASE・元配置維持、Ramatの参考位置から3～13 NM、同梱MOOSEからnative生成直前までの座標保持・FAC除去 |
 
-Luaは合計624ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD71＋DEAD105＋PERSIST50＋MAP18＋STRIKE67＋AI49＋REL19＋APACHE27＋DYNAMIC27＋CAS63）、15スイート。各ケース内のループやassertは別ケースに数えない。Test-PersistenceDisk.luaはINSTALLが別プロセスで実行するfixture。Test-ZoneCoverage.lua・Test-StrikeMission.lua・Test-AirInterdictionMission.lua・Test-CASMission.luaは実.mizのデータを前置する結合検証で、Luaケース数に含めない。
+Luaは合計630ケース（INT23＋CAP35＋SCORE26＋WING27＋PAR17＋SEAD74＋DEAD105＋PERSIST50＋MAP18＋STRIKE70＋AI49＋REL19＋APACHE27＋DYNAMIC27＋CAS63）、15スイート。各ケース内のループやassertは別ケースに数えない。Test-PersistenceDisk.luaはINSTALLが別プロセスで実行するfixture。Test-ZoneCoverage.lua・Test-StrikeMission.lua・Test-AirInterdictionMission.lua・Test-CASMission.luaは実.mizのデータを前置する結合検証で、Luaケース数に含めない。
 
 PowerShellは複数のassertをまとめたPASSグループで、Luaのケース数とは別に数える。
 共通の [Intercept-TestHarness.lua](../scripts/Intercept-TestHarness.lua) は模擬環境であり、独立したテストスイートではない。
 共通の `s:score` はPlayer StatisticsのTotal Score・プレイヤー名・機体名に加え、表示時間25秒とカテゴリ別Scoreの6行がないことを検証する。CAP-17、SEAD-15/18/21/26/45、DEADの採点ケース、PERSIST-43のカテゴリ別得点は表示文ではなく採点データを検証し、集計・復元の独立性を維持する。ケース数は変更しない。
 現在の実ミッションとSyncの既定先は `mission/persistant_and_dynamic_traning.miz`。過去の検証記録は [HISTORY.md](HISTORY.md)、新表示のDCS内確認はMAN-01を参照する。
-最新の自動検証: 2026-11-07、training-18.1。Lua全624ケース（15スイート）とBUILD2・SYNC3・INSTALL7・ZONES3・STRIKEME2・INTERDICTIONME5・DYNAMICME1・CASME4が通過。実MOOSE AUTOLASE/INTEL Constructor・CanLase・SPOT関数を使うCASの14件を追加し、単一照射・固定対象・コード・追従・観測不能時の停止・部分生成・回収失敗・古いcallback・並行ウィング通知を検証。既存の共有受注・150/90/0・保存復元も維持する。Windowsの制限付き実行では使い捨てZIPのFile.Replaceが拒否されたが、通常環境で全体テストが完走した。実成績へのテスト書き込みは行わない。実DCSのLST・誘導弾命中・実駐機位置は別途確認対象。
+最新の自動検証: 2026-11-07、training-19。Lua全630ケース（15スイート）とBUILD2・SYNC3・INSTALL7・ZONES3・STRIKEME2・INTERDICTIONME5・DYNAMICME1・CASME4が通過。実MOOSE AUTOLASE/INTEL Constructor・CanLase・SPOT関数を使うCASの14件を追加し、単一照射・固定対象・コード・追従・観測不能時の停止・部分生成・回収失敗・古いcallback・並行ウィング通知を検証。既存の共有受注・150/90/0・保存復元も維持する。Windowsの制限付き実行では使い捨てZIPのFile.Replaceが拒否されたが、通常環境で全体テストが完走した。実成績へのテスト書き込みは行わない。実DCSのLST・誘導弾命中・実駐機位置は別途確認対象。
 
 training-17.3の調査段階ではCASME-4を追加し、Test-CASMission.ps1の全4件を再実行して通過。ゲーム側Lua・.mizを変更していないため、この追加検査ではBuild/Syncや全体スイートの再実行は行っていない。実サーバーの車両別地形レイとMEの警告判定の相違はdocs/CAS.mdとdocs/HISTORY.mdを参照する。
 
@@ -940,3 +940,5 @@ PERSIST-49はschema4から全旧値を維持しCAS=0でschema5へ移行、PERSIS
 単独ミッションのJTACで離れた後にK型3発3中だったことはユーザー報告として記録する。動的統合・全席・全コード・L型のDCS合格へ拡大しない。
 
 training-18.1のCAS-56～63では、地上/空中の受注後待機、依頼/停止の連打と再依頼、停止前の追従callback拒否、停止中のnative回収失敗と再試行、回収中の再依頼、達成/中止/新任務での旧メニュー拒否、途中参加/機体/Group変更拒否、Team参加グループの操作権・個人中止、ページ上限、準備中/達成後のメニューを検証した。実DCSの別検査はF10の人間操作を含まず、実AUTOLASE/SPOTで3コードのSTANDBY_OK/PAUSE_OK/SPOT_OK/CLEANUP_OKとCOMPLETEを確認。16:46～16:47 JST、目標位置+1 mとの差はすべて0.000 m。ログはbuild/CAS_Autolase_Check_training18_1_20261107.log。
+
+training-19では方式の乱数を除き、SEAD/Strikeを完全なF10経路で選択するよう既存fixtureを移行した。SEAD-72～74は同名TOOを別親で選ぶこと、2項目のサブメニュー、計画/離陸待ち/ACTIVEで反対方式を押しても不変、未指定/不正方式と機種不一致で乱数/予約を行わないことを検証。STRIKE-68～70は方式・施設・目標・公開座標の固定、無効方式の事前拒否、古いメニューからの機種再照合を検証。全36の実.miz Strike組合せとSEAD配置診断・DEAD継承も新APIで通過。手動のF10表示/操作確認は未実施。

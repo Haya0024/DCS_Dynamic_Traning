@@ -715,7 +715,7 @@ end)
 test("Strike scores survive native hook save and a fresh session alongside earlier categories", function()
     local fs=filesystem(); fs.files[path]=legacyFile()
     local s=scenario(); local h=hook(s,fs); h:frame(0)
-    s:command('Task: Strike'); local r=assert(s:mission())
+    s:command("Task: Strike > TOO"); local r=assert(s:mission())
     for _,target in ipairs(r.strikePlan.targets) do target.unit.alive=false; s:event('Dead',target.unit) end
     s:event('Ejection',s.player); h:frame(2)
     local saved=Data.Decode(fs.files[path]); local p=saved.players['ucid-a']

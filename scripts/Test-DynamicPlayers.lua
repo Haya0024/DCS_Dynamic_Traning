@@ -206,7 +206,7 @@ test('all five new-objective categories acquire one shared roster and release bo
         local s=scenario(); local p=s:addPilot('Second','ucid-b',20)
         if category=='CAP' then s:addCAPZones() elseif category=='SEAD' then seadArea(s,p) end
         s.player.airborne,p.airborne=true,true; team(s,p)
-        s.randomValues=category=='SEAD' and {1,1,1} or {}; s:command('Task: '..category); if category=='SEAD' then s:tick(s.time+1) end
+        s.randomValues=category=='SEAD' and {1,1} or {}; s:command(category=='SEAD' and 'Task: SEAD > TOO' or category=='Strike' and 'Task: Strike > TOO' or ('Task: '..category)); if category=='SEAD' then s:tick(s.time+1) end
         local r=assert(s:mission(),category); assert(#r.participants==2 and r.category==category)
         assert(module(s,'Missions').groupLocks[p.group.name]==r)
         s:command('Abort Mission'); assert(not s:mission() and next(module(s,'Missions').groupLocks)==nil); s:assertClean()
@@ -215,8 +215,8 @@ end)
 test('shared SEAD supports Immediate DEAD and preserved Follow-on DEAD with the same frozen roster',function()
     for _,mode in ipairs({'immediate','follow'}) do
         local s=scenario(); local p=s:addPilot('Second','ucid-b',20); seadArea(s,p)
-        s.player.airborne,p.airborne=true,true; team(s,p); s.randomValues={1,1,1}
-        s:command('Task: SEAD'); s:tick(s.time+1); local r=assert(s:mission())
+        s.player.airborne,p.airborne=true,true; team(s,p); s.seadMode="TOO"; s.randomValues={1,1}
+        s:command("Task: SEAD > " .. (s.seadMode or "PB")); s:tick(s.time+1); local r=assert(s:mission())
         local radar=r.spawn.primaryUnits[1].unit; radar.alive=false; s:event('Dead',radar)
         assert(r.state=='RTB_PENDING')
         if mode=='immediate' then

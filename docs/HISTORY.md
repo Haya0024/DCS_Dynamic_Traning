@@ -1,5 +1,11 @@
 # 検証・診断履歴
 
+## 2026-11-07 SEAD/Strike方式をF10で選択（training-19）
+
+ユーザー指定でTask: SEADへTOO/PB、Task: StrikeへTOO/PPのサブメニューを追加。選択方式を受注/計画へ明示的に渡し、方式乱数・既定値・自動切替を除去した。未指定/不正値は予約と乱数前に拒否し、受注ロック中の反対方式の操作で既存任務を変更しない。SAM/地域/施設/目標の抽選、秘匿・DDM/DMS精度、DEAD継承、150/90/0とHook/schema5は維持する。
+
+全630ケース/15スイート（SEAD74、Strike70）と全結合検証が通過。階層付きF10をテスト境界へ追加し、SEAD配置診断・実.mizの全36 Strike組合せを新しい明示方式APIへ移行した。CAPは版表記検査だけ変更。通常DCSの設定/Hook/成績は変更せず、実DCSでの新メニュー操作は未確認。更新ZIPを別名で作り、同期前のミッションをbefore-mode-selection-training19として保存する。
+
 ## 2026-11-07 CASブリーフィング短縮（training-18.1 shortbrief）
 
 ユーザー指定の7行へ短縮。TARGET AREA・FRIENDLIES・JTAC識別行を除き、JTAC待機・選択コード・Request laser案内を1行にまとめた。受注時とMission Statusを同じ本文にし、既存のCAS表示テストで全文と3コードを照合する。配置・照射制御・採点・60秒表示は維持。照射制御の実DCS検査は直前のtraining-18.1と共通の履歴であり、この文面のゲーム内見た目を確認した記録ではない。

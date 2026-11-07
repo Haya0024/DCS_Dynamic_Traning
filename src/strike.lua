@@ -64,12 +64,12 @@ function Strike.Initialize()
     Strike.Sweep(timer.getTime())
 end
 
-function Strike.Plan(position, assignmentID)
+function Strike.Plan(position, assignmentID, attackMode)
+    assert(attackMode == "TOO" or attackMode == "PP", "Select Strike TOO or PP before acceptance.")
     assert(position and finite(position.x) and finite(position.z), "Strike acceptance position unavailable.")
     local cfg, nearest = Config.strike, {}
     assert(finite(cfg.fullReward) and cfg.fullReward >= 0 and cfg.fullReward % 1 == 0, "Invalid Strike reward.")
-    local mode = cfg.modes[math.random(1, #cfg.modes)]
-    assert(mode == "TOO" or mode == "PP", "Invalid Strike attack mode.")
+    local mode = attackMode
     for _, site in ipairs(Strike.sites) do
         if site.point then
             local p = site.point

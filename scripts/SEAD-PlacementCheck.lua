@@ -18,7 +18,7 @@ function PlacementCheck.Start(config, sead, zones, clock, log, options)
                 -- A virtual acceptance position 60 NM away passes normal filtering.
                 settings.zones, settings.templates = { name }, { template }
                 local plan = sead.Begin(#results.rows, "placement-check:" .. #results.rows,
-                    { x = center.x - 60 * 1852, y = 0, z = center.y })
+                    { x = center.x - 60 * 1852, y = 0, z = center.y }, "PB")
                 return plan, circle
             end)
             settings.zones, settings.templates = zoneNames, templates

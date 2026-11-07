@@ -139,7 +139,7 @@ BLUE 空港への RTB を追加評価対象とする。
 
 - `TPL_SEAD_SA6`（レーダー＋発射機3両）と `TPL_SEAD_SA8`（1両）を等確率で選ぶ。
 - ZoneはすべてMEに登録した計10候補。追加6地域は現在TURKOGLU / HASSA / KILIS / MORPHOU_NORTH / GECITKALE_EAST / AKKAR。全名・座標・距離はdocs/TRAINING_AREAS.md、候補名はConfig.sead、全円の中心・半径は実.mizのME Trigger Zoneだけに置く。Luaの代替定義は持たない。追加6地域の半径は既存MEと同じ18,288 m（約9.9 NM）。
-- `Task: SEAD` の受注時に TOO / PB を等確率で抽選し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
+- `Task: SEAD → TOO / PB`で方式を手動選択し、SAM・Zone・任務IDを固定する。距離は受注時の長機位置からZone中心まで40～130 NMで判定する。
 - 地点選定は `PLANNING` として段階的に行う。安全な実配置予定点を先に固定し、TOOではそこから3～5 NMずらした捜索座標、PBでは1～3 NMずらした推定点とコード（SA-6:108、SA-8:117）を渡す。
 - TOOの `THREAT AREA` は捜索座標を表示し、機種はUNKNOWNとする。機種・正確な座標・PBコードを開始表示と状態表示の両方で隠す。PBも正確な実配置座標は表示しない。PBの `THREAT AREA` は実配置点から1～3 NMずらした推定座標とし、地域名と `ESTIMATED LOCATION` 行は表示しない。
 - TOOの捜索座標とPBの推定座標はDDM（度＋小数分、分の小数3桁）で計画確定時とMission Statusに表示する。MOOSEのToStringLLDDMへ精度3を明示し、全体の表示設定から独立させる。
@@ -560,7 +560,7 @@ Dynamic Training
 
 - docs/STRIKE.mdを正とする。src/strike.luaがME Staticの取得・原本除去・方式/施設/目標抽選・生成・座標・観測・削除を担う。
 - SITE01～06の9構成はTPL_CMD_SITE##_01（.Command Center）、TPL_CONT_SITE##_02～05（container_20ft）、TPL_TRUCK_SITE##_06～07（Ural-375）、TPL_TANK_SITE##_01（Tank 3）、TPL_AMMO_SITE##_01（.Ammunition depot）。MEの名前・位置・向きは維持し、StaticNameから実ユニット名を解決する。
-- 起動時に全54原本を無イベント除去。受注時にTOO/PPを各1/2、司令部位置から近い2施設の使用可能な1つ、その方式の3目標を各1/3で固定する。方式や3番目施設への自動切替をせず、地上でも即ACTIVE。
+- 起動時に全54原本を無イベント除去。受注時にTask: StrikeからTOO/PPを手動選択し、司令部位置から近い2施設の使用可能な1つ、その方式の3目標を各1/3で固定する。方式や3番目施設への自動切替をせず、地上でも即ACTIVE。
 - TOOは見出しをSTRIKE MISSION (TOO)へ変更するだけ。従来7個生成・司令部基準DDM3桁・標高なし・誤差なし・コンテナ任意2/4、司令部1、トラック2の達成条件を維持する。
 - PPは9個を生成し、司令部/燃料タンク/弾薬庫の指定1個だけが目標。STRIKE MISSION (PP)、TARGET AREAは抽選した目標そのもののDMS秒小数2桁＋その地点の地表標高ft MSL整数を同じ行で表示する。共通司令部位置や屋根高を使わず、標高観測不能は0へ代替しない。OBJECTIVE・報酬・人数を続ける5行、60秒。方式は別行で追加しない。
 - config.strike.modes/targets/ppTargets/membersに対応を集約。元7構成の不備は両方式、ppOnly追加構成の不備はそのSiteのPPだけを無効化し、他カテゴリは継続する。
@@ -635,3 +635,7 @@ Hook配置は結合済みbuild/DynamicTrainingPersistenceHook.luaだけ。server
 ユーザー指定により受注後はSTANDBYとし、F10 Dynamic Training → CAS JTAC → Request laserで照射を依頼する。Stop laserは再依頼まで停止する可逆操作、任務達成/終了のStopは永久停止として分離する。停止時のnative回収失敗は待機中も再試行し、再依頼でも回収未完了なら新spotを作らない。SPOTの依頼世代を固定し、停止前のcallbackは再依頼後も拒否する。メニューと操作時の両方でACTIVE任務・登録未精算者・現在の機体/UCID・Group IDを照合し、Teamの各登録グループへ提供する。F10はグループ共有のため個人の押下者は特定できない。準備中/達成後/途中参加者だけ/個人終了/別機/旧任務の操作を拒否する。配置・コード・採点・Status本文を維持し、CAS63件とLua624件/15スイートを検証する。
 
 CASの受注/Statusはユーザー指定の7行へ短縮する。CAS MISSION、FRIENDLY LOCATION、TARGETS、JTAC standing by. LASER <code>. F10 CAS JTAC > Request laser when ready.、OBJECTIVE、Reward per pilot、Registered pilotsの順とし、TARGET AREA・FRIENDLIES・JTAC識別の独立行は出さない。照射制御・採点・表示60秒は維持する。
+
+## SEAD/Strike方式のF10選択（training-19）
+
+SEADはTask: SEAD → TOO/PB、StrikeはTask: Strike → TOO/PPの2選択サブメニューとする。選択方式をGenerateからSEAD.Begin/Strike.Planへ渡し、暗黙の既定値・方式乱数・別方式への切替を行わない。未指定/不正方式は乱数・予約前に拒否。SAM/Zone/施設/対象の抽選、秘匿、座標精度、離陸待ち、DEAD継承、採点/保存/機種制限/Team排他を維持する。設定のmodesはF10順序とし、テストは親メニューをコマンド扱いせず完全な経路で選ぶ。同名TOOを別親で区別する。Lua630件/15スイート（SEAD74、Strike70）と全結合検証を通す。

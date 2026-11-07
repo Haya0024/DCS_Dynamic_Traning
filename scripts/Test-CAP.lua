@@ -236,7 +236,7 @@ end)
 test("duplicate and cross-category acceptance plus the same UCID in another wing cannot reroll CAP", function()
     local s = new(); local r = accept(s); local calls = #s.randomCalls
     s:command("Task: CAP"); s:lastMessageContains("CAP mission is already active")
-    s:command("Task: SEAD"); s:lastMessageContains("CAP mission is already active")
+    s:command("Task: SEAD > PB"); s:lastMessageContains("CAP mission is already active")
     local other = s:addPilot("Other", "ucid-a", 30); s:tick(2)
     s:command("Task: CAP", other); s:lastMessageContains("CAP mission is already active")
     assert(s:mission() == r and not s:mission(other) and #s.randomCalls == calls)
@@ -285,7 +285,7 @@ test("MOOSE weak subscribers survive garbage collection after Intercept and resp
             log:find("objectID=UNAVAILABLE; subscriberRetained=true", 1, true) then received = true end
         if log:find(r.id, 1, true) and log:find("Failure event matched: event=Ejection", 1, true) and
             log:find("objectID=50000; state=ACTIVE; done=false", 1, true) then matched = true end
-        if log:find("Runtime initialized; version=training-18.1;", 1, true) then initialized = initialized + 1 end
+        if log:find("Runtime initialized; version=training-19;", 1, true) then initialized = initialized + 1 end
     end
     assert(registered and received and matched and initialized == 1)
     s.player.alive = true; s.player.id = 50001; s.player:newDCSObject()

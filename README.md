@@ -26,6 +26,8 @@ SEADでは受注時にTOO / PBを等確率で選びます。TOOは機種不明�
 
 ## 始め方
 
+サーバーのHook更新は [scripts/Install-ServerHook.cmd](scripts/Install-ServerHook.cmd) を実行します。既定先は `Saved Games\DCS.dcs_serverrelease`。プロジェクト内では最新ソースから結合して配置し、旧Hookはバックアップします。別のユーザーフォルダーや初回のAPI許可設定は [導入手順](docs/PERSISTENCE.md#導入) を参照してください。配置後はサーバーDCSを再起動します。
+
 必要な環境は **DCS World / Syriaマップ / 搭乗するF/A-18CまたはAH-64D** です。MOOSEと訓練スクリプトはミッションに組み込まれています。
 
 1. [persistant_and_dynamic_traning.miz](mission/persistant_and_dynamic_traning.miz) をマルチプレイでホストします。

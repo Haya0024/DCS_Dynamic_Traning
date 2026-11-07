@@ -79,6 +79,12 @@ fileのwrite/flush/closeは例外・false・エラー返信を拒否するが、
 
 ## 導入
 
+プロジェクトからのHook更新は [scripts/Install-ServerHook.cmd](../scripts/Install-ServerHook.cmd) を使う。既定先は `Saved Games\DCS.dcs_serverrelease`。同じscripts内のbuilderで最新Hookを結合してから既存installerへ渡す。引数で別のDCSユーザーフォルダーを指定できる。更新ZIPにもこの同じcmdをコピーし、ZIP内では同梱の結合済みHookを使う。
+
+```bat
+scripts\Install-ServerHook.cmd "C:\Users\hayat\Saved Games\DCS.dcs_serverrelease"
+```
+
 配置するのは結合済みの `build/DynamicTrainingPersistenceHook.lua`。同名の `server/DynamicTrainingPersistenceHook.lua` は依存モジュールを含まない編集用の部品なので配置しない。単独配置すると `MissionBridge` 不在で起動できず、保存も動的機体の乗員識別配信も開始しない。
 
 更新ZIPに同梱したインストーラーは、リポジトリなしで次のように使える。生成物ヘッダーと全6モジュールを検証し、部品・不完全なbundleではHook・backup・autoexec.cfgを変更しない。既存Hookをバックアップしてから配置し、hashを照合する。既存サーバーの更新ではConfigureHostを付けなければautoexec.cfgを変更しない。

@@ -7,6 +7,10 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('dcs-persistence-install-' + [guid]::NewGuid().ToString('N'))
 $oldTestRoot = $env:DCS_TRAINING_TEST_ROOT
 $oldTestPhase = $env:DCS_TRAINING_TEST_PHASE
+function Invoke-HookLauncher([string]$Launcher, [string]$SavedGamesPath) {
+    & $env:ComSpec /d /c ('""{0}" "{1}" --no-pause"' -f $Launcher, $SavedGamesPath)
+    if ($LASTEXITCODE -ne 0) { throw "Hook launcher failed: $LASTEXITCODE" }
+}
 try {
     foreach ($directory in @('Config', 'Scripts/Hooks', 'DynamicTraining')) {
         New-Item -ItemType Directory -Path (Join-Path $fixtureRoot $directory) -Force | Out-Null
@@ -15,7 +19,7 @@ try {
     [System.IO.File]::WriteAllText($otherHook, '-- unrelated hook')
     $target = Join-Path $fixtureRoot 'Scripts/Hooks/DynamicTrainingPersistenceHook.lua'
     [System.IO.File]::WriteAllText($target, '-- previous version')
-    & (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -SavedGamesPath $fixtureRoot
+    Invoke-HookLauncher (Join-Path $PSScriptRoot 'Install-ServerHook.cmd') $fixtureRoot
     if ((Get-Content -LiteralPath $otherHook -Raw) -cne '-- unrelated hook') { throw 'Other hook changed' }
     $backups = @(Get-ChildItem -LiteralPath (Split-Path -Parent $target) -Filter '*.bak')
     if ($backups.Count -ne 1 -or (Get-Content -LiteralPath $backups[0].FullName -Raw) -cne '-- previous version') {
@@ -27,7 +31,7 @@ try {
     }
     Write-Host 'PASS: verified hook installation, backup, unrelated hook preservation, idempotence'
     $refused = $false
-    try { & (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -SavedGamesPath (Join-Path $fixtureRoot 'DynamicTraining') }
+    try { Invoke-HookLauncher (Join-Path $PSScriptRoot 'Install-ServerHook.cmd') (Join-Path $fixtureRoot 'DynamicTraining') }
     catch { $refused = $true }
     if (-not $refused) { throw 'Invalid DCS directory was accepted' }
     Write-Host 'PASS: invalid installation directory rejected'
@@ -51,9 +55,10 @@ try {
     $standaloneInstaller = Join-Path $standalone 'Install-PersistenceHook.ps1'
     $standaloneBundle = Join-Path $standalone 'DynamicTrainingPersistenceHook.lua'
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -Destination $standaloneInstaller
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-ServerHook.cmd') -Destination $standalone
     Copy-Item -LiteralPath (Join-Path $projectRoot 'build/DynamicTrainingPersistenceHook.lua') -Destination $standaloneBundle
     [System.IO.File]::WriteAllText($target, '-- standalone previous hook')
-    & $standaloneInstaller -SavedGamesPath $fixtureRoot -HookBundlePath $standaloneBundle
+    Invoke-HookLauncher (Join-Path $standalone 'Install-ServerHook.cmd') $fixtureRoot
     if ((Get-FileHash -LiteralPath $target).Hash -ne $hookHashBefore -or
         @(Get-ChildItem -LiteralPath (Split-Path -Parent $target) -Filter '*.bak').Count -ne 2 -or
         (Get-Content -LiteralPath $otherHook -Raw) -cne '-- unrelated hook' -or

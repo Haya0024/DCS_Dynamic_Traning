@@ -1,6 +1,6 @@
 # ApacheのAir Interdiction / CAS訓練
 
-仕様: 2026-11-06 / training-17.2。Apache限定のCASを追加。単独JTAC試験でK型3発3中はユーザー報告。動的CASの交信・実射・人間PLT/CPGのネットワーク動作はDCS内確認待ち。
+仕様: 2026-11-07 / training-17.3。Apache限定のCASを追加。単独JTAC試験でK型3発3中はユーザー報告。動的CASの交信・実射・人間PLT/CPGのネットワーク動作はDCS内確認待ち。
 
 ## 出撃
 

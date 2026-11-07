@@ -217,10 +217,14 @@ test('failures before, during and after each spawn clean every created group and
     end
 end)
 
-test('terrain LOS false or unobservable safely rolls back the complete set', function()
+test('terrain LOS false or unobservable is diagnostic and cannot cancel native FAC setup', function()
     for _, mode in ipairs({'blocked', 'error'}) do local s = apache()
         if mode == 'blocked' then s.casLOS = false else s.casLOSError = true end
-        s:command('Laser 1688'); assert(not s:mission() and #s.spawns == 3); clean(s)
+        local r=accept(s); assert(r.state=='ACTIVE' and #s.spawns==3)
+        s:tick(1); assert(s:mission()==r and r.state=='ACTIVE')
+        local log=table.concat(s.logs,'\n'); assert(log:find('CAS terrain visibility diagnostic',1,true))
+        assert(log:find(mode=='blocked' and 'visible=false' or 'visible=UNKNOWN',1,true))
+        complete(s,r); recover(s); s:score(150); clean(s); s:assertClean()
     end
 end)
 
@@ -425,6 +429,25 @@ test('mixed string and numeric duplicate IDs cannot describe two different gener
     end
     s:command('Laser 1688'); assert(not s:mission()); clean(s)
     assert(table.concat(s.errors,'\n'):find('Invalid generated CAS vehicle',1,true))
+end)
+
+test('delayed visibility diagnostics include endpoints once and never replace the public briefing', function()
+    local s=apache(); s.casLOS=false; s.terrainHeight=function() return 200 end
+    local r=accept(s); local briefing=s.messages[#s.messages].text
+    assert(not table.concat(s.logs,'\n'):find('CAS terrain visibility diagnostic',1,true))
+    s:tick(1)
+    local log=table.concat(s.logs,'\n')
+    assert(log:find('visible=false; offsetMeters=2; from=',1,true) and log:find('ground=200.00,AGL=-200.00',1,true))
+    for _,t in ipairs(r.casPlan.targets) do assert(log:find('targetID='..t.objectID,1,true)) end
+    s:tick(2); assert(table.concat(s.logs,'\n')==log)
+    s:command('Mission Status'); assert(s.messages[#s.messages].text==briefing)
+    s:command('Abort Mission'); clean(s); s:assertClean()
+end)
+
+test('aborted preparation never schedules a later visibility diagnostic for removed groups', function()
+    local s=apache(); accept(s); s:command('Abort Mission'); clean(s)
+    s:tick(2); assert(not table.concat(s.logs,'\n'):find('CAS terrain visibility diagnostic',1,true))
+    s:assertClean()
 end)
 
 print(string.format('All %d CAS tests passed (simulated DCS/MOOSE boundaries).', count))

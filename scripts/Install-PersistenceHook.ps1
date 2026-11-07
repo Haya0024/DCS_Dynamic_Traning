@@ -1,5 +1,6 @@
 [CmdletBinding()]
-param([Parameter(Mandatory = $true)][string]$SavedGamesPath, [switch]$ConfigureHost)
+param([Parameter(Mandatory = $true)][string]$SavedGamesPath, [switch]$ConfigureHost,
+    [string]$HookBundlePath)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $resolvedRoot = (Resolve-Path -LiteralPath $SavedGamesPath).Path
@@ -55,11 +56,26 @@ end
         $newHostText = $oldHostText + $separator + $block
     }
 }
-& (Join-Path $PSScriptRoot 'Build-PersistenceHook.ps1')
+if ($HookBundlePath) {
+    $source = (Resolve-Path -LiteralPath $HookBundlePath).Path
+} else {
+    & (Join-Path $PSScriptRoot 'Build-PersistenceHook.ps1')
+    $source = Join-Path $projectRoot 'build/DynamicTrainingPersistenceHook.lua'
+}
+# Standalone update packages carry the already-built hook. Reject a source
+# fragment before changing the destination, host config or backup files.
+$bundleText = [System.IO.File]::ReadAllText($source)
+if (-not $bundleText.StartsWith('-- Generated persistence hook.')) {
+    throw 'Not a generated hook bundle. Use build/DynamicTrainingPersistenceHook.lua; do not install server/*.lua.'
+}
+foreach ($module in @('ScoreData', 'ScoreStore', 'PersistenceFS', 'MissionBridge', 'PersistenceService', 'PlayerDirectory')) {
+    if (-not $bundleText.Contains("local $module = (function()")) {
+        throw "Incomplete hook bundle: missing $module. Destination is unchanged."
+    }
+}
 $hookDirectory = Join-Path $resolvedRoot 'Scripts/Hooks'
 New-Item -ItemType Directory -Path $hookDirectory -Force | Out-Null
 $destination = Join-Path $hookDirectory 'DynamicTrainingPersistenceHook.lua'
-$source = Join-Path $projectRoot 'build/DynamicTrainingPersistenceHook.lua'
 if ((Test-Path -LiteralPath $destination) -and
     (Get-FileHash -LiteralPath $destination).Hash -eq (Get-FileHash -LiteralPath $source).Hash) {
     Write-Host 'Persistence hook already current.'

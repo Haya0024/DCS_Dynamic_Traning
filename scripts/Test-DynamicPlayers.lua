@@ -316,4 +316,11 @@ test('identity rejection and missing APIs are logged once and recover independen
     end
 end)
 
+test('installing the unbundled hook source fails early with the correct deployment path',function()
+    local chunk=assert(loadfile('server/DynamicTrainingPersistenceHook.lua'))
+    setfenv(chunk,{assert=assert})
+    local ok,message=pcall(chunk)
+    assert(not ok and tostring(message):find('install build/DynamicTrainingPersistenceHook.lua',1,true))
+end)
+
 print(string.format('All %d dynamic player and mission team tests passed (simulated DCS/MOOSE/host APIs).',count))

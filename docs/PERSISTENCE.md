@@ -79,6 +79,14 @@ fileのwrite/flush/closeは例外・false・エラー返信を拒否するが、
 
 ## 導入
 
+配置するのは結合済みの `build/DynamicTrainingPersistenceHook.lua`。同名の `server/DynamicTrainingPersistenceHook.lua` は依存モジュールを含まない編集用の部品なので配置しない。単独配置すると `MissionBridge` 不在で起動できず、保存も動的機体の乗員識別配信も開始しない。
+
+更新ZIPに同梱したインストーラーは、リポジトリなしで次のように使える。生成物ヘッダーと全6モジュールを検証し、部品・不完全なbundleではHook・backup・autoexec.cfgを変更しない。既存Hookをバックアップしてから配置し、hashを照合する。既存サーバーの更新ではConfigureHostを付けなければautoexec.cfgを変更しない。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-PersistenceHook.ps1 -SavedGamesPath "$env:USERPROFILE\Saved Games\DCS.dcs_serverrelease" -HookBundlePath .\DynamicTrainingPersistenceHook.lua
+```
+
 次を実行する。専用モジュールを結合した1つのHookを配置し、既存の別Hookには触れない。同名の旧ファイルは更新前にbackupする。
 
 ```powershell

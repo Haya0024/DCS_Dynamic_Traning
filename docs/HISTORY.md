@@ -1,5 +1,17 @@
 # 検証・診断履歴
 
+## 2026-11-07 CASのLOS中断とHook部品の誤配置を修正（training-17.3）
+
+新サーバーログでは11:55・11:58 JSTのCASがID検証を通過し、MOOSEの地形LOS assertで回収された。ユーザーはMEでは全敵への視線が通ると報告。使用中MOOSEのUNIT:IsLOSは両端2 mを足すland.isVisibleであり、標準FACの検出状態とは異なる。旧ログに端点座標がないため、falseになった地形・高度・生成直後の状態は断定しない。
+
+簡易LOSを生成の必須条件から外し、DCS標準FACが検出・照射可否を判断する構成へ変更。全実体検証後の次の監視で対象ごとのLOS・座標・地表高・AGLを1回だけDEBUGに記録し、false・観測不能・例外でもCAS・公開済み座標・個別採点を維持する。ME配置は維持する。
+
+同じログの08:08 JSTにHookのMissionBridge=nilで起動失敗が記録され、その後ApacheはCrew could not be verifiedとなった。行番号とエラーは結合前server部品の単独配置と一致する。正しいbuildのHookを選ぶ導入手順を明確化し、単独ZIPから使えるHookBundlePathを既存installerへ追加した。部品・欠損bundleを配置前に拒否し、部品の単独起動にも正しい配置先を表示する。
+
+Lua602件/15スイート（CAS41、DynamicPlayers27）とINSTALL7を含む全結合検証が通過。LOS false/例外時の生成・帰還150、座標付き診断1回・Status維持、中止後停止、不完全Hook拒否、リポジトリなしの導入とbackupを確認。保存schema5・距離・採点率を維持。更新したHookのサーバー導入、CAS交信・照射・実射と乗員別の実照合は確認待ち。
+
+ユーザーからF/A-18 CAPとApache Air Interdictionは動いていそうとの報告があった。各任務の全分岐・帰還精算・永続保存まで確認した報告とは区別する。
+
 ## 2026-11-06 CASの文字列IDと動的機体の識別照合を修正（training-17.2）
 
 サーバーログではtraining-17.1のCASが22:26・22:27 JSTに生成済みBMP-2をalive=true / ground=true / side=1と観測しながら準備timeoutになった。旧ログはIDのLua型とrawの有無を記録していないため、その2条件のどちらだったかは直接断定できない。DCSのUnit:getIDが十進文字列を返す事例は[公式フォーラムの再現報告](https://forum.dcs.world/topic/347954-bug-unitgetbynameunitnamegetid-is-returning-a-string-and-not-a-number-as-it-should/)にもある。

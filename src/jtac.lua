@@ -81,4 +81,28 @@ function JTAC.Contact(radio)
     return string.format("%s / %.3f MHz %s / LASER %d", radio.label, radio.frequencyMHz,
         radio.modulation == 0 and "AM" or "FM", radio.laserCode)
 end
+
+function JTAC.VisibilityReport(observer, targets)
+    local function point(unit)
+        local v = unit:GetVec3()
+        assert(Observations.Vec3(v), "Vehicle position unavailable.")
+        local ground = COORDINATE:NewFromVec3(v):GetLandHeight()
+        assert(finite(ground), "Terrain height unavailable.")
+        return string.format("(x=%.2f,yMSL=%.2f,z=%.2f,ground=%.2f,AGL=%.2f)",
+            v.x, v.y, v.z, ground, v.y - ground)
+    end
+    local reports = {}
+    for _, target in ipairs(targets) do
+        local ok, report = pcall(function()
+            local from, to = point(observer), point(target.unit)
+            local visible = observer:IsLOS(target.unit)
+            assert(type(visible) == "boolean", "Terrain visibility unavailable.")
+            -- Pinned MOOSE UNIT:IsLOS uses a 2 m offset at both endpoints.
+            return "visible=" .. tostring(visible) .. "; offsetMeters=2; from=" .. from .. "; to=" .. to
+        end)
+        reports[#reports + 1] = "targetID=" .. tostring(target.objectID) .. "; " ..
+            (ok and report or "visible=UNKNOWN; " .. tostring(report))
+    end
+    return table.concat(reports, " | ")
+end
 return JTAC

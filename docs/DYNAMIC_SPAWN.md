@@ -37,9 +37,9 @@ Hookは1秒間隔で識別情報を更新する。識別配信は成績ファイ
 
 ## サーバー更新
 
-今回の.mizと更新したbuild/DynamicTrainingPersistenceHook.luaを組にして使う。新Hookはサーバーの使用中Saved Games/DCS.../Scripts/Hooksへ配置し、DCSを再起動する。標準機体設定への切り替え時はHook変更なしだったが、現在のtraining-17.2はCAS/schema5と識別修正のためHook再導入とサーバーDCS再起動が必要。新PCではInstall-PersistenceHook.ps1 -SavedGamesPath <使用中フォルダー> -ConfigureHostを使う。[導入手順](PERSISTENCE.md#導入)
+今回の.mizと更新したbuild/DynamicTrainingPersistenceHook.luaを組にして使う。新Hookはサーバーの使用中Saved Games/DCS.../Scripts/Hooksへ配置し、DCSを再起動する。標準機体設定への切り替え時はHook変更なしだったが、現在のtraining-17.3はCAS/schema5と識別修正のためHook再導入とサーバーDCS再起動が必要。新PCではInstall-PersistenceHook.ps1 -SavedGamesPath <使用中フォルダー> -ConfigureHostを使う。[導入手順](PERSISTENCE.md#導入)
 
-旧Hookでは動的生成機の識別配信ができないため、配置先が不明なサーバーへ自動導入済みとは扱わない。クライアントへのHook配置は不要。training-17.2のHook登録ログにはidentity=mission-unit-id-v2、配信成功時にはIDENTITIES_CONNECTEDを出す。API未提供・endpoint拒否・例外は状態変化時に記録し、保存処理は継続する。
+旧Hookでは動的生成機の識別配信ができないため、配置先が不明なサーバーへ自動導入済みとは扱わない。クライアントへのHook配置は不要。training-17.3のHook登録ログにはidentity=mission-unit-id-v2、配信成功時にはIDENTITIES_CONNECTEDを出す。API未提供・endpoint拒否・例外は状態変化時に記録し、保存処理は継続する。
 
 ## 移行と検証
 

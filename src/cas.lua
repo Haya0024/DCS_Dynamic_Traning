@@ -195,9 +195,9 @@ function CAS.Step(plan, time)
             assert(Observations.TargetAlive(target, true) == true, "CAS vehicle lost during preparation: " .. role)
         end
     end
-    for _, target in ipairs(plan.targets) do
-        assert(plan.jtac.unit:IsLOS(target.unit) == true, "CAS JTAC terrain line of sight unavailable or blocked.")
-    end
+    -- Native FAC owns detection/designation. MOOSE's terrain ray is only a
+    -- diagnostic: it is not ME's visibility test and must not veto this spawn.
+    plan.visibilityReportAt = time + Config.pollSeconds
     return { group = plan.instances.enemy.group, units = plan.targets }
 end
 
@@ -264,6 +264,12 @@ end
 function CAS.Sweep(time)
     local closing = {}
     for _, plan in pairs(Missions.casSites) do
+        if not plan.closing and plan.visibilityReportAt and time >= plan.visibilityReportAt then
+            plan.visibilityReportAt = nil -- One report, after the spawning frame.
+            local ok, report = pcall(JTAC.VisibilityReport, plan.jtac.unit, plan.targets)
+            env.info("[DynamicTraining] [DEBUG] CAS terrain visibility diagnostic; assignment=" ..
+                tostring(plan.assignmentID) .. "; " .. (ok and report or "visible=UNKNOWN; " .. tostring(report)))
+        end
         if plan.closing and not plan.cleaning and time >= plan.retryAt then closing[#closing + 1] = plan end
     end
     for _, plan in ipairs(closing) do

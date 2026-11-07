@@ -31,6 +31,36 @@ try {
     catch { $refused = $true }
     if (-not $refused) { throw 'Invalid DCS directory was accepted' }
     Write-Host 'PASS: invalid installation directory rejected'
+    $hookHashBefore = (Get-FileHash -LiteralPath $target).Hash
+    $badBundle = Join-Path $fixtureRoot 'incomplete-hook.lua'
+    [System.IO.File]::WriteAllText($badBundle, '-- Generated persistence hook.')
+    foreach ($sourceFragment in @((Join-Path $projectRoot 'server/DynamicTrainingPersistenceHook.lua'), $badBundle)) {
+        $refused = $false
+        try {
+            & (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -SavedGamesPath $fixtureRoot -HookBundlePath $sourceFragment -ConfigureHost
+        } catch { $refused = $true }
+        if (-not $refused -or (Get-FileHash -LiteralPath $target).Hash -ne $hookHashBefore -or
+            (Test-Path -LiteralPath (Join-Path $fixtureRoot 'Config/autoexec.cfg')) -or
+            @(Get-ChildItem -LiteralPath (Split-Path -Parent $target) -Filter '*.bak').Count -ne 1) {
+            throw 'Source fragment or incomplete bundle was installed or changed host state'
+        }
+    }
+    Write-Host 'PASS: unbundled source and incomplete bundle rejected before hook, config or backups change'
+    $standalone = Join-Path $fixtureRoot 'deployment'
+    New-Item -ItemType Directory -Path $standalone | Out-Null
+    $standaloneInstaller = Join-Path $standalone 'Install-PersistenceHook.ps1'
+    $standaloneBundle = Join-Path $standalone 'DynamicTrainingPersistenceHook.lua'
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-PersistenceHook.ps1') -Destination $standaloneInstaller
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'build/DynamicTrainingPersistenceHook.lua') -Destination $standaloneBundle
+    [System.IO.File]::WriteAllText($target, '-- standalone previous hook')
+    & $standaloneInstaller -SavedGamesPath $fixtureRoot -HookBundlePath $standaloneBundle
+    if ((Get-FileHash -LiteralPath $target).Hash -ne $hookHashBefore -or
+        @(Get-ChildItem -LiteralPath (Split-Path -Parent $target) -Filter '*.bak').Count -ne 2 -or
+        (Get-Content -LiteralPath $otherHook -Raw) -cne '-- unrelated hook' -or
+        (Test-Path -LiteralPath (Join-Path $fixtureRoot 'Config/autoexec.cfg'))) {
+        throw 'Standalone package installation failed or changed unrelated host state'
+    }
+    Write-Host 'PASS: standalone installer deploys the bundled hook with a backup and needs no repository sources'
     & (Join-Path $PSScriptRoot 'Build-Mission.ps1')
     if (-not (Test-Path -LiteralPath $LuaPath -PathType Leaf)) { throw 'Pass -LuaPath with the installed Lua 5.1/DCS luae.exe path.' }
     $env:DCS_TRAINING_TEST_ROOT = $fixtureRoot

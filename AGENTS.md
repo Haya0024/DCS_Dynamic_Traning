@@ -619,3 +619,9 @@ MOOSEのGetUnitsの順序をテンプレート順と同一視しない。CASは�
 ## DCS ID境界の修正（training-17.2）
 
 DCS Unit:getIDの正の整数/十進文字列をObservations.IDNumberで検証し、CASの固定対象には元のID型を保持する。重複判定とFAC用Group IDだけ数値化する。診断にidType/rawを含める。動的プレイヤーのHook配信にはUNIT_MISSION_IDを使い、内部エンジンのUNIT_RUNTIME_IDをSSE Unit:getIDへ比較しない。配信フィールドobjectIDはmission unit ID。照合時だけ正規化し、参加者には実機から取得した元IDを固定する。Hook登録はidentity=mission-unit-id-v2、配信成功はIDENTITIES_CONNECTED。拒否・API欠落・例外も診断し、保存処理とは独立させる。Lua599件/15スイート、CAS39・DynamicPlayers26。17.1の文字列ID準備停止とID種別の照合失敗は模擬再現済み。サーバー実ログは型/raw未記録のため直接原因の断定と区別し、17.2の実ゲーム検証は未完了。
+
+## CAS地形LOSとHook配置（training-17.3）
+
+MOOSE UNIT:IsLOSは両端2 mの地形レイであり、全敵への通過をCAS生成条件にしない。標準FACへ検出・照射判断を任せ、全実体の検証後の次の監視でID・座標・地表高・AGL・visibleを一度だけDEBUGへ記録する。false/nil/例外でCASや公開済み座標・採点を取り消さず、回収中は診断しない。生成実体のID/陣営/構成/生存検証は維持する。
+
+Hook配置は結合済みbuild/DynamicTrainingPersistenceHook.luaだけ。serverの同名ファイルは編集部品で単独配置できない。Install-PersistenceHook.ps1のHookBundlePath指定ならリポジトリなしで生成済みbundleを導入でき、ヘッダー/全6モジュールを検査してからbackup・配置する。不完全bundleではHook/backup/autoexecを変更しない。Lua602件/15スイート、CAS41・DynamicPlayers27とINSTALL7。実サーバーへの17.3導入とCAS実射・乗員照合は未確認。

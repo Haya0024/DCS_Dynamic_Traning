@@ -1,4 +1,6 @@
 -- Build-PersistenceHook.ps1 prepends data, adapters and transaction service.
+assert(MissionBridge and PersistenceFS and PersistenceService and PlayerDirectory,
+    "Incomplete persistence hook: install build/DynamicTrainingPersistenceHook.lua, not server/DynamicTrainingPersistenceHook.lua.")
 local control, hooks = Sim or DCS, {}
 local loaded, nextPoll, lastError, diagnosticState, frameSeen = false, 0, nil, nil, false
 local identityError, identityConnected
